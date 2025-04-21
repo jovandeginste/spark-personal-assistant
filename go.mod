@@ -4,9 +4,11 @@ go 1.23.7
 
 require (
 	github.com/aquasecurity/table v1.8.0
+	github.com/arran4/golang-ical v0.3.2
 	github.com/glebarez/sqlite v1.11.0
 	github.com/imdatngo/slog-gorm v1.0.0
 	github.com/spf13/cobra v1.9.1
+	github.com/spf13/viper v1.20.1
 	google.golang.org/genai v1.1.0
 	gorm.io/gorm v1.25.12
 )
@@ -41,8 +43,6 @@ require (
 	github.com/spf13/afero v1.12.0 // indirect
 	github.com/spf13/cast v1.7.1 // indirect
 	github.com/spf13/pflag v1.0.6 // indirect
-	github.com/spf13/viper v1.20.1 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 // indirect
 	go.opentelemetry.io/otel v1.29.0 // indirect

@@ -1,13 +1,14 @@
 package data
 
 import (
-	"crypto/sha1"
+	"crypto/sha512"
 	"encoding/base64"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/aquasecurity/table"
+	"gorm.io/gorm"
 )
 
 type Importance string
@@ -37,12 +38,24 @@ func (e *Entry) GenerateRemoteID() {
 		return
 	}
 
-	hasher := sha1.New()
-	hasher.Write([]byte(e.Summary))
+	e.RemoteID = e.NewRemoteID()
+}
 
-	sha := base64.URLEncoding.EncodeToString(hasher.Sum(nil))
+func (u *Entry) BeforeSave(_ *gorm.DB) error {
+	u.GenerateRemoteID()
 
-	e.RemoteID = sha
+	return nil
+}
+
+func (e *Entry) NewRemoteID() string {
+	hasher := sha512.New()
+	fmt.Fprintf(
+		hasher,
+		"%d\n%s",
+		e.Date.Unix(), e.Summary,
+	)
+
+	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
 func (e *Entry) FormattedDate() string {

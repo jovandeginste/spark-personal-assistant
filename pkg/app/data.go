@@ -2,7 +2,6 @@ package app
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
@@ -18,6 +17,7 @@ func (a *App) CurrentEntries() (data.Entries, error) {
 	if err := a.DB().
 		Where("date >= ?", from).
 		Where("date <= ?", to).
+		Order("date ASC").
 		Find(&entries).Error; err != nil {
 		return nil, err
 	}
@@ -28,7 +28,10 @@ func (a *App) CurrentEntries() (data.Entries, error) {
 func (a *App) Entries() (data.Entries, error) {
 	var entries data.Entries
 
-	if err := a.DB().Preload("Source").Find(&entries).Error; err != nil {
+	if err := a.DB().
+		Preload("Source").
+		Order("date ASC").
+		Find(&entries).Error; err != nil {
 		return nil, err
 	}
 
@@ -36,7 +39,19 @@ func (a *App) Entries() (data.Entries, error) {
 }
 
 func (a *App) FindEntry(e *data.Entry) error {
-	return a.DB().Where(&e).First(&e).Error
+	return a.DB().First(&e, e.ID).Error
+}
+
+func (a *App) FindEntryByRemoteID(e *data.Entry) (uint64, error) {
+	rid := e.NewRemoteID()
+
+	var entry data.Entry
+
+	if err := a.DB().Where("remote_id = ?", rid).First(&entry).Error; err != nil {
+		return 0, err
+	}
+
+	return entry.ID, nil
 }
 
 func (a *App) Sources() (data.Sources, error) {
@@ -50,8 +65,6 @@ func (a *App) Sources() (data.Sources, error) {
 }
 
 func (a *App) CreateEntry(entry data.Entry) error {
-	entry.GenerateRemoteID()
-
 	a.Logger().Info("Creating new entry", "date", entry.Date, "entry", entry.Summary, "source", entry.Source.Name)
 	return a.DB().Create(&entry).Error
 }
@@ -73,7 +86,8 @@ func (a *App) CreateSource(src data.Source) error {
 
 func (a *App) FetchExistingEntries(entries data.Entries) {
 	for i, e := range entries {
-		if err := a.FindEntry(&e); err != nil {
+		id, err := a.FindEntryByRemoteID(&e)
+		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				continue
 			}
@@ -81,7 +95,7 @@ func (a *App) FetchExistingEntries(entries data.Entries) {
 			a.logger.Error(err.Error())
 		}
 
-		entries[i] = e
+		entries[i].ID = id
 	}
 }
 
@@ -90,10 +104,11 @@ func (a *App) ReplaceSourceEntries(src *data.Source, entries data.Entries) error
 
 	for i := range entries {
 		entries[i].SourceID = src.ID
-		entries[i].GenerateRemoteID()
 	}
 
-	fmt.Printf("%#v\n", entries)
+	if err := a.DB().Model(&data.Entry{}).Save(entries).Error; err != nil {
+		return err
+	}
 
 	a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries)
 

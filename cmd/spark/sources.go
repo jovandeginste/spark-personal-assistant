@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
@@ -37,7 +36,7 @@ func (c *cli) addSourceCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("Source added:")
+			c.app.Logger().Info("Source added")
 			s.PrintTo(os.Stdout)
 
 			return nil

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"strconv"
 
@@ -81,7 +80,7 @@ func (c *cli) addEntryCmd() *cobra.Command {
 				return err
 			}
 
-			fmt.Println("Entry added:")
+			c.app.Logger().Info("Entry added")
 			e.PrintTo(os.Stdout)
 
 			return nil
@@ -102,7 +101,7 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 		Short: "List entries",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			entries, err := c.app.Entries()
+			entries, err := c.app.CurrentEntries()
 			if err != nil {
 				return err
 			}
