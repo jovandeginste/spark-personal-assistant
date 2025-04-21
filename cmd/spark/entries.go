@@ -66,7 +66,7 @@ func (c *cli) addEntryCmd() *cobra.Command {
 				return err
 			}
 
-			e.Source = *src
+			e.Source = src
 
 			if err := e.SetDate(d); err != nil {
 				return err

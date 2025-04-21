@@ -12,11 +12,16 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Println("Usage:", os.Args[0], "<file.json>")
+		log.Println("Usage:", os.Args[0], "<file.json> [location]")
 		return
 	}
 
 	file := os.Args[1]
+
+	location := "at home"
+	if len(os.Args) > 2 {
+		location = "in " + os.Args[2]
+	}
 
 	r, err := os.ReadFile(file)
 	if err != nil {
@@ -32,7 +37,7 @@ func main() {
 	results := make([]*data.Entry, len(d.Daily.Time))
 
 	for day := range len(d.Daily.Time) {
-		e, err := newEvent(&d, day)
+		e, err := newEvent(&d, location, day)
 		if err != nil {
 			log.Printf("Error: %s", err)
 			continue
@@ -49,7 +54,7 @@ func main() {
 	fmt.Println(string(out))
 }
 
-func newEvent(wd *WeatherData, day int) (*data.Entry, error) {
+func newEvent(wd *WeatherData, location string, day int) (*data.Entry, error) {
 	allDays := wd.Daily
 	eDate := allDays.Time[day]
 
@@ -60,13 +65,15 @@ func newEvent(wd *WeatherData, day int) (*data.Entry, error) {
 
 	e := &data.Entry{
 		Date:    parsedDate,
-		Summary: fmt.Sprintf("Weather for %s", parsedDate.Format("Monday")),
+		Summary: fmt.Sprintf("Weather for %s %s", parsedDate.Format("Monday"), location),
 		Metadata: map[string]any{
 			"Sunrise":          allDays.Sunrise[day],
 			"Sunset":           allDays.Sunset[day],
 			"Mean temperature": fmt.Sprintf("%.1f %s", allDays.Temperature2MMean[day], wd.DailyUnits.Temperature2MMean),
 			"Max temperature":  fmt.Sprintf("%.1f %s", allDays.Temperature2MMax[day], wd.DailyUnits.Temperature2MMean),
 			"Rain sum":         fmt.Sprintf("%.0f %s", allDays.RainSum[day], wd.DailyUnits.RainSum),
+			"Latitude":         wd.Latitude,
+			"Longitude":        wd.Longitude,
 		},
 	}
 

@@ -26,11 +26,11 @@ type Entry struct {
 	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id"`
 	Date       time.Time      `gorm:"not null;index"`
 	Importance Importance     `gorm:"not null"`
-	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id"`
+	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:",omitempty"`
 	Summary    string         `gorm:"not null"`
 	Metadata   map[string]any `gorm:"serializer:json"`
 
-	Source Source
+	Source *Source `json:"Source,omitempty"`
 }
 
 func (e *Entry) GenerateRemoteID() {

@@ -28,7 +28,7 @@ func (a *App) generatePrompt(data any) ([]*genai.Content, error) {
 		{
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
-				{Text: "You are a personal assistant named 'Spark'. You provide a daily summary for your employers. Use a polite British style and accent."},
+				{Text: "You are a personal assistant named 'Spark'. You provide a daily summary for your employers. Use a polite British style and accent. Use the metric system and full hours. Start your response with a suitable greeting and comment about today's weather if you have this information. Use emojis as illustrations. Add a quick summary of the past week's important events. Be more terse when events are more in the future."},
 				{Text: "The following entries consist a list of items in the near future or recent past, for which you should compile a summarized overview of todo's, a schedule and reminders."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Employer information and preferences:"},
