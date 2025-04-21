@@ -2,12 +2,12 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log"
 	"os"
 
-	ical "github.com/arran4/golang-ical"
+	"github.com/bounoable/ical"
+	"github.com/bounoable/ical/parse"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 )
 
@@ -31,7 +31,7 @@ func main() {
 
 	defer r.Close()
 
-	in, err := ical.ParseCalendar(r)
+	in, err := ical.Parse(r)
 	if err != nil {
 		panic(err)
 	}
@@ -39,11 +39,10 @@ func main() {
 	var results []*data.Entry
 	hashes := map[string]bool{}
 
-	for _, event := range in.Events() {
-		e, err := newEvent(event, collection)
+	for _, event := range in.Events {
+		e, err := newEvent(&event, collection)
 		if err != nil {
 			log.Printf("Error: %s", err)
-			continue
 		}
 
 		if hashes[e.NewRemoteID()] {
@@ -62,26 +61,17 @@ func main() {
 	fmt.Println(string(out))
 }
 
-func newEvent(event *ical.VEvent, collection string) (*data.Entry, error) {
-	eDate, err := event.GetStartAt()
-	if err != nil {
-		return nil, err
-	}
-
+func newEvent(event *parse.Event, collection string) (*data.Entry, error) {
 	e := &data.Entry{
-		Date: eDate,
 		Metadata: map[string]any{
 			"Collection": collection,
 		},
 	}
 
-	if eSummary := event.GetProperty("SUMMARY"); eSummary != nil {
-		e.Summary = eSummary.Value
-	} else {
-		return nil, errors.New("event has no summary")
-	}
+	e.Date = event.Start
+	e.Summary = event.Summary
 
-	if eLocation := event.GetProperty("LOCATION"); eLocation != nil {
+	if eLocation, ok := event.Property("LOCATION"); ok {
 		e.Metadata["Location"] = eLocation.Value
 	}
 

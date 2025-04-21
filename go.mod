@@ -4,7 +4,7 @@ go 1.23.7
 
 require (
 	github.com/aquasecurity/table v1.8.0
-	github.com/arran4/golang-ical v0.3.2
+	github.com/bounoable/ical v0.4.3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/imdatngo/slog-gorm v1.0.0
 	github.com/spf13/cobra v1.9.1
