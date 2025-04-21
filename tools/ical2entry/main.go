@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
-	"github.com/bounoable/ical"
-	"github.com/bounoable/ical/parse"
+	"github.com/apognu/gocal"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 )
 
@@ -18,6 +18,8 @@ func main() {
 	}
 
 	file := os.Args[1]
+
+	start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
 
 	collection := "calendar"
 	if len(os.Args) > 2 {
@@ -31,10 +33,9 @@ func main() {
 
 	defer r.Close()
 
-	in, err := ical.Parse(r)
-	if err != nil {
-		panic(err)
-	}
+	in := gocal.NewParser(r)
+	in.Start, in.End = &start, &end
+	in.Parse()
 
 	var results []*data.Entry
 	hashes := map[string]bool{}
@@ -61,19 +62,37 @@ func main() {
 	fmt.Println(string(out))
 }
 
-func newEvent(event *parse.Event, collection string) (*data.Entry, error) {
-	e := &data.Entry{
-		Metadata: map[string]any{
-			"Collection": collection,
-		},
+func newEvent(event *gocal.Event, collection string) (*data.Entry, error) {
+	e := &data.Entry{}
+	e.SetMetadata("Collection", collection)
+
+	if s := event.Start; s != nil {
+		e.Date = *s
 	}
 
-	e.Date = event.Start
 	e.Summary = event.Summary
 
-	if eLocation, ok := event.Property("LOCATION"); ok {
-		e.Metadata["Location"] = eLocation.Value
+	if event.Location != "" {
+		e.SetMetadata("Location", event.Location)
+	}
+
+	if event.Organizer != nil {
+		e.SetMetadata("Organizer", event.Organizer.Cn)
+	}
+
+	if len(event.Attendees) > 0 {
+		e.SetMetadata("Attendee", collectAttendees(event.Attendees))
 	}
 
 	return e, nil
+}
+
+func collectAttendees(attendees []gocal.Attendee) []string {
+	var result []string
+
+	for _, a := range attendees {
+		result = append(result, a.Cn)
+	}
+
+	return result
 }

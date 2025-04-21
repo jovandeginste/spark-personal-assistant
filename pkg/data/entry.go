@@ -28,9 +28,17 @@ type Entry struct {
 	Importance Importance     `gorm:"not null"`
 	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:",omitempty"`
 	Summary    string         `gorm:"not null"`
-	Metadata   map[string]any `gorm:"serializer:json"`
+	Metadata   map[string]any `gorm:"serializer:json" json:",omitempty"`
 
-	Source *Source `json:"Source,omitempty"`
+	Source *Source `json:",omitempty"`
+}
+
+func (e *Entry) SetMetadata(key string, value any) {
+	if e.Metadata == nil {
+		e.Metadata = make(map[string]any)
+	}
+
+	e.Metadata[key] = value
 }
 
 func (e *Entry) GenerateRemoteID() {

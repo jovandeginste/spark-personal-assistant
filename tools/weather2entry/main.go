@@ -66,16 +66,15 @@ func newEvent(wd *WeatherData, location string, day int) (*data.Entry, error) {
 	e := &data.Entry{
 		Date:    parsedDate,
 		Summary: fmt.Sprintf("Weather for %s %s", parsedDate.Format("Monday"), location),
-		Metadata: map[string]any{
-			"Sunrise":          allDays.Sunrise[day],
-			"Sunset":           allDays.Sunset[day],
-			"Mean temperature": fmt.Sprintf("%.1f %s", allDays.Temperature2MMean[day], wd.DailyUnits.Temperature2MMean),
-			"Max temperature":  fmt.Sprintf("%.1f %s", allDays.Temperature2MMax[day], wd.DailyUnits.Temperature2MMean),
-			"Rain sum":         fmt.Sprintf("%.0f %s", allDays.RainSum[day], wd.DailyUnits.RainSum),
-			"Latitude":         wd.Latitude,
-			"Longitude":        wd.Longitude,
-		},
 	}
+
+	e.SetMetadata("Sunrise", allDays.Sunrise[day])
+	e.SetMetadata("Sunset", allDays.Sunset[day])
+	e.SetMetadata("Mean temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMean[day], wd.DailyUnits.Temperature2MMean))
+	e.SetMetadata("Max temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMax[day], wd.DailyUnits.Temperature2MMean))
+	e.SetMetadata("Rain sum", fmt.Sprintf("%.0f %s", allDays.RainSum[day], wd.DailyUnits.RainSum))
+	e.SetMetadata("Latitude", wd.Latitude)
+	e.SetMetadata("Longitude", wd.Longitude)
 
 	return e, nil
 }

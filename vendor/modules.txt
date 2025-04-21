@@ -19,20 +19,22 @@ cloud.google.com/go/auth/internal/transport/cert
 # cloud.google.com/go/compute/metadata v0.6.0
 ## explicit; go 1.21
 cloud.google.com/go/compute/metadata
+# github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
+## explicit
+github.com/ChannelMeter/iso8601duration
+# github.com/apognu/gocal v0.9.1
+## explicit; go 1.21
+github.com/apognu/gocal
+github.com/apognu/gocal/parser
 # github.com/aquasecurity/table v1.8.0
 ## explicit; go 1.18
 github.com/aquasecurity/table
-# github.com/arran4/golang-ical v0.3.2
-## explicit; go 1.20
-# github.com/bounoable/ical v0.4.3
-## explicit; go 1.14
-github.com/bounoable/ical
-github.com/bounoable/ical/encode
-github.com/bounoable/ical/lex
-github.com/bounoable/ical/parse
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
+# github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
+## explicit; go 1.13
+github.com/emersion/go-vcard
 # github.com/felixge/httpsnoop v1.0.4
 ## explicit; go 1.13
 github.com/felixge/httpsnoop

@@ -3,8 +3,9 @@ module github.com/jovandeginste/spark-personal-assistant
 go 1.23.7
 
 require (
+	github.com/apognu/gocal v0.9.1
 	github.com/aquasecurity/table v1.8.0
-	github.com/bounoable/ical v0.4.3
+	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/sqlite v1.11.0
 	github.com/imdatngo/slog-gorm v1.0.0
 	github.com/spf13/cobra v1.9.1
@@ -17,6 +18,7 @@ require (
 	cloud.google.com/go v0.116.0 // indirect
 	cloud.google.com/go/auth v0.13.0 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
+	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.8.0 // indirect
