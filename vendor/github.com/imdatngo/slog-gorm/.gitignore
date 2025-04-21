@@ -1,0 +1,20 @@
+# Test artifacts
+*.test
+*.out
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Local artifacts
+/tmp
+/vendor
+*.local
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json

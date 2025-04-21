@@ -1,0 +1,6 @@
+database:
+  file: ./database.db
+employer_data:
+  names:
+    - John Doe
+    - Jane Doe
