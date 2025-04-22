@@ -8,11 +8,11 @@ import (
 	"gorm.io/gorm"
 )
 
-func (a *App) CurrentEntries() (data.Entries, error) {
+func (a *App) CurrentEntries(daysBack uint, daysAhead uint) (data.Entries, error) {
 	var entries data.Entries
 
-	from := time.Now().Add(-3 * 24 * time.Hour)
-	to := time.Now().Add(7 * 24 * time.Hour)
+	from := time.Now().Add(time.Duration(-daysBack*24) * time.Hour).Truncate(24 * time.Hour)
+	to := time.Now().Add(time.Duration(daysAhead*24) * time.Hour).Truncate(24 * time.Hour)
 
 	if err := a.DB().
 		Where("date >= ?", from).

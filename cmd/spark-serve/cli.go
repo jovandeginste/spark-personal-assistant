@@ -40,17 +40,22 @@ func (c *cli) root() *cobra.Command {
 }
 
 func (c *cli) printCmd() *cobra.Command {
+	var (
+		daysBack  uint
+		daysAhead uint
+	)
+
 	cmd := &cobra.Command{
 		Use:   "print",
 		Short: "print summary to screen",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			es, err := c.app.CurrentEntries()
+			entries, err := c.app.CurrentEntries(daysBack, daysAhead)
 			if err != nil {
 				return err
 			}
 
-			md, err := c.app.GeneratePrompt(es)
+			md, err := c.app.GeneratePrompt(entries)
 			if err != nil {
 				return err
 			}
@@ -61,10 +66,18 @@ func (c *cli) printCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
+
 	return cmd
 }
 
 func (c *cli) mailCmd() *cobra.Command {
+	var (
+		daysBack  uint
+		daysAhead uint
+	)
+
 	cmd := &cobra.Command{
 		Use:   "mail address",
 		Short: "mail summary",
@@ -72,12 +85,12 @@ func (c *cli) mailCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			addresses := args
 
-			es, err := c.app.CurrentEntries()
+			entries, err := c.app.CurrentEntries(daysBack, daysAhead)
 			if err != nil {
 				return err
 			}
 
-			md, err := c.app.GeneratePrompt(es)
+			md, err := c.app.GeneratePrompt(entries)
 			if err != nil {
 				return err
 			}
@@ -90,6 +103,9 @@ func (c *cli) mailCmd() *cobra.Command {
 			return c.app.Config.Mailer.Send(addresses, "Daily update", md, string(html))
 		},
 	}
+
+	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
 	return cmd
 }

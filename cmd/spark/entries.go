@@ -96,12 +96,17 @@ func (c *cli) addEntryCmd() *cobra.Command {
 }
 
 func (c *cli) listEntriesCmd() *cobra.Command {
+	var (
+		daysBack  uint
+		daysAhead uint
+	)
+
 	cmd := &cobra.Command{
 		Use:   "list",
 		Short: "List entries",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			entries, err := c.app.CurrentEntries()
+			entries, err := c.app.CurrentEntries(daysBack, daysAhead)
 			if err != nil {
 				return err
 			}
@@ -111,6 +116,9 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 			return nil
 		},
 	}
+
+	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
 	return cmd
 }
