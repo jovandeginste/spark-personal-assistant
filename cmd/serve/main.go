@@ -1,6 +1,10 @@
 package main
 
-import "github.com/jovandeginste/spark-personal-assistant/pkg/app"
+import (
+	"os"
+
+	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
+)
 
 func main() {
 	a := app.NewApp()
@@ -8,12 +12,8 @@ func main() {
 		panic(err)
 	}
 
-	es, err := a.CurrentEntries()
-	if err != nil {
-		panic(err)
-	}
-
-	if err := a.GeneratePrompt(es); err != nil {
-		panic(err)
+	cmd := NewCLI(a)
+	if err := cmd.rootCmd.Execute(); err != nil {
+		os.Exit(1)
 	}
 }

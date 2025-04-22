@@ -11,6 +11,7 @@ import (
 type Config struct {
 	Database     DatabaseConfig `mapstructure:"database"`
 	EmployerData EmployerData   `mapstructure:"employer_data"`
+	Mailer       Mailer         `mapstructure:"mail"`
 }
 
 type App struct {
@@ -29,6 +30,8 @@ func NewApp() *App {
 	a := &App{}
 
 	a.ReadConfig()
+
+	a.Config.Mailer.app = a
 
 	return a
 }
