@@ -9,11 +9,11 @@ import (
 type (
 	Sources []Source
 	Source  struct {
-		ID          uint64 `gorm:"primaryKey"`
+		ID          uint64 `gorm:"primaryKey" json:"-"`
 		Name        string `gorm:"not null;unique;type:varchar(16)"`
 		Description string
 
-		Entries Entries
+		Entries Entries `json:"-"`
 	}
 )
 

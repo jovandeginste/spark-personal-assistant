@@ -63,9 +63,9 @@ func (c *cli) mailCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "mail address",
 		Short: "mail summary",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			address := args[0]
+			addresses := args
 
 			es, err := c.app.CurrentEntries()
 			if err != nil {
@@ -82,7 +82,7 @@ func (c *cli) mailCmd() *cobra.Command {
 				return err
 			}
 
-			return c.app.Config.Mailer.Send(address, "Daily update", md, string(html))
+			return c.app.Config.Mailer.Send(addresses, "Daily update", md, string(html))
 		},
 	}
 

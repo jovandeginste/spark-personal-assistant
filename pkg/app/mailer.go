@@ -39,10 +39,12 @@ func New(a *App) (*Mailer, error) {
 	return &m, nil
 }
 
-func (m *Mailer) Send(address string, subject string, md string, html string) error {
-	address = normalizeString(address)
+func (m *Mailer) Send(addresses []string, subject string, md string, html string) error {
+	for i := range addresses {
+		addresses[i] = normalizeString(addresses[i])
+	}
 
-	m.Logger().Info("Sending mail", "to", address, "subject", subject)
+	m.Logger().Info("Sending mail", "to", addresses, "subject", subject)
 
 	if m.Preview {
 		fmt.Println(md)
@@ -52,7 +54,7 @@ func (m *Mailer) Send(address string, subject string, md string, html string) er
 	msg := gomail.NewMessage()
 	msg.SetHeader("From", normalizeString(m.From.Name)+" <"+m.From.Address+">")
 
-	msg.SetHeader("To", address)
+	msg.SetHeader("To", addresses...)
 	msg.SetHeader("Cc", m.From.Address)
 	msg.SetHeader("Subject", subject)
 
@@ -71,12 +73,12 @@ func (m *Mailer) Send(address string, subject string, md string, html string) er
 			break
 		}
 
-		m.Logger().Error("Error sending mail", "to", address, "error", err)
+		m.Logger().Error("Error sending mail", "to", addresses, "error", err)
 		m.Logger().Info("Waiting for 10 seconds.")
 		time.Sleep(10 * time.Second)
 	}
 
-	m.Logger().Info("Mail sent", "to", address)
+	m.Logger().Info("Mail sent", "to", addresses)
 
 	return nil
 }
