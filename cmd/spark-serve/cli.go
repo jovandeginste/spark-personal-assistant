@@ -26,10 +26,15 @@ func (c *cli) root() *cobra.Command {
 		Use:          os.Args[0],
 		Short:        "Serve Spark",
 		SilenceUsage: true,
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			return c.app.Initialize()
+		},
 	}
 
 	cmd.AddCommand(c.mailCmd())
 	cmd.AddCommand(c.printCmd())
+
+	cmd.PersistentFlags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 
 	return cmd
 }

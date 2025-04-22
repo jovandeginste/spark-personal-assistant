@@ -3,6 +3,8 @@ package app
 import (
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
@@ -15,7 +17,8 @@ type Config struct {
 }
 
 type App struct {
-	Config Config
+	ConfigFile string
+	Config     Config
 
 	ai     *Client
 	db     *gorm.DB
@@ -29,16 +32,11 @@ func (a *App) Logger() *slog.Logger {
 func NewApp() *App {
 	a := &App{}
 
-	a.ReadConfig()
-
-	a.Config.Mailer.app = a
-
 	return a
 }
 
 func (a *App) ReadConfig() error {
-	viper.SetConfigName("spark")
-	viper.AddConfigPath(".")
+	viper.SetConfigFile(a.ConfigFile)
 
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
@@ -50,6 +48,18 @@ func (a *App) ReadConfig() error {
 		return err
 	}
 
+	if strings.HasPrefix(a.Config.Database.File, "/") {
+		return nil
+	}
+
+	absPath, err := filepath.Abs(a.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	dirname := filepath.Dir(absPath)
+	a.Config.Database.File = filepath.Clean(filepath.Join(dirname, a.Config.Database.File))
+
 	return nil
 }
 
@@ -58,6 +68,12 @@ func (a *App) initializeLogger() {
 }
 
 func (a *App) Initialize() error {
+	if err := a.ReadConfig(); err != nil {
+		return err
+	}
+
+	a.Config.Mailer.app = a
+
 	a.initializeLogger()
 
 	if err := a.initializeClient(); err != nil {
