@@ -16,7 +16,7 @@ func (es Entries) PrintTo(w io.Writer) {
 	for _, entry := range es {
 		t.AddRow(
 			fmt.Sprintf("%d", entry.ID),
-			entry.FormattedDate(),
+			entry.DateString,
 			entry.Summary,
 			string(entry.Importance),
 			entry.Source.Name,

@@ -22,13 +22,15 @@ const (
 )
 
 type Entry struct {
-	ID         uint64         `gorm:"primaryKey"`
-	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id"`
+	ID         uint64         `gorm:"primaryKey" json:"-"`
+	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Date       time.Time      `gorm:"not null;index"`
 	Importance Importance     `gorm:"not null"`
-	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:",omitempty"`
+	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary    string         `gorm:"not null"`
 	Metadata   map[string]any `gorm:"serializer:json" json:",omitempty"`
+
+	DateString string `gorm:"-" json:"LocalDate"`
 
 	Source *Source `json:",omitempty"`
 }
@@ -52,6 +54,11 @@ func (e *Entry) GenerateRemoteID() {
 func (u *Entry) BeforeSave(_ *gorm.DB) error {
 	u.GenerateRemoteID()
 
+	return nil
+}
+
+func (e *Entry) AfterFind(_ *gorm.DB) error {
+	e.DateString = e.FormattedDate()
 	return nil
 }
 
@@ -112,7 +119,7 @@ func (e *Entry) PrintTo(w io.Writer) {
 
 	t.AddRow("ID", fmt.Sprintf("%d", e.ID))
 	t.AddRow("Remote ID", e.RemoteID)
-	t.AddRow("Data", e.FormattedDate())
+	t.AddRow("Data", e.DateString)
 	t.AddRow("Summary", e.Summary)
 	t.AddRow("Importance", string(e.Importance))
 	t.AddRow("Source", e.Source.Name)
