@@ -58,7 +58,7 @@ func PromptFor(format string) (Prompt, error) {
 	return nil, fmt.Errorf("unknown format: %s", format)
 }
 
-const promptPreamble = "You are a personal assistant named 'Spark'. You provide an overview in Markdown for your employers. Use a polite British style and accent. Use the metric system and 24 hour clock notation. Start your response with a suitable greeting and comment about today's weather if you have this information. Use emojis. Translate all entries to English. The following entries consist a list of items, for which you should compile a summarized overview of todo's, a schedule and reminders."
+const promptPreamble = "You are a personal assistant named 'Spark'. You provide an overview in Markdown for your employers. Use a polite British style and accent. Use the metric system and 24 hour clock notation. Use emojis. Translate all entries to English. The following entries consist a list of items, for which you should compile a summarized overview of todo's, a schedule and reminders."
 
 func PromptWeek(data any) ([]*genai.Content, error) {
 	j, err := json.Marshal(data)
@@ -93,7 +93,7 @@ func PromptToday(data any) ([]*genai.Content, error) {
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
 				{Text: promptPreamble},
-				{Text: "Only include today's entries. Be verbose."},
+				{Text: "Start your response with a suitable greeting and comment about today's weather if you have this information. Only include today's and tomorrow's entries. Be verbose."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
 				{Text: string(j)},
