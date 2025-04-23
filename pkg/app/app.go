@@ -2,7 +2,6 @@ package app
 
 import (
 	"log/slog"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,11 +15,14 @@ type Config struct {
 	Mailer       Mailer         `mapstructure:"mail"`
 }
 
+type EmployerData struct {
+	Names []string `mapstructure:"names"`
+}
+
 type App struct {
 	ConfigFile string
 	Config     Config
 
-	ai     *Client
 	db     *gorm.DB
 	logger slog.Logger
 }
@@ -76,24 +78,9 @@ func (a *App) Initialize() error {
 
 	a.initializeLogger()
 
-	if err := a.initializeClient(); err != nil {
-		return err
-	}
-
 	if err := a.initializeDatabase(); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (a *App) initializeClient() error {
-	c, err := NewClient(os.Getenv("GEMINI_API_KEY"))
-	if err != nil {
-		return err
-	}
-
-	a.ai = c
 
 	return nil
 }

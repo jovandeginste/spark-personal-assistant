@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/markdown"
 	"github.com/spf13/cobra"
 )
@@ -44,6 +46,7 @@ func (c *cli) printCmd() *cobra.Command {
 	var (
 		daysBack  uint
 		daysAhead uint
+		format    string
 	)
 
 	cmd := &cobra.Command{
@@ -56,7 +59,20 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			md, err := c.app.GeneratePrompt(entries)
+			data := struct {
+				EmployerData app.EmployerData
+				Entries      data.Entries
+			}{
+				EmployerData: c.app.Config.EmployerData,
+				Entries:      entries,
+			}
+
+			p, err := ai.PromptFor(format)
+			if err != nil {
+				return err
+			}
+
+			md, err := ai.GeneratePrompt(p, data)
 			if err != nil {
 				return err
 			}
@@ -67,6 +83,7 @@ func (c *cli) printCmd() *cobra.Command {
 		},
 	}
 
+	cmd.Flags().StringVarP(&format, "format", "f", "full", "Format to use")
 	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
@@ -91,7 +108,15 @@ func (c *cli) mailCmd() *cobra.Command {
 				return err
 			}
 
-			md, err := c.app.GeneratePrompt(entries)
+			data := struct {
+				EmployerData app.EmployerData
+				Entries      data.Entries
+			}{
+				EmployerData: c.app.Config.EmployerData,
+				Entries:      entries,
+			}
+
+			md, err := ai.GeneratePrompt(ai.PromptFull, data)
 			if err != nil {
 				return err
 			}
