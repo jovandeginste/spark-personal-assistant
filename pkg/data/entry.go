@@ -24,13 +24,13 @@ const (
 type Entry struct {
 	ID         uint64         `gorm:"primaryKey" json:"-"`
 	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date       time.Time      `gorm:"not null;index"`
+	Date       HumanTime      `gorm:"not null;index"`
 	Importance Importance     `gorm:"not null"`
 	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary    string         `gorm:"not null"`
 	Metadata   map[string]any `gorm:"serializer:json" json:",omitempty"`
 
-	DateString string `gorm:"-" json:"LocalDate"`
+	DateString string `gorm:"-" json:"-"`
 
 	Source *Source `json:",omitempty"`
 }
@@ -74,11 +74,7 @@ func (e *Entry) NewRemoteID() string {
 }
 
 func (e *Entry) FormattedDate() string {
-	if e.Date.Hour() == 0 && e.Date.Minute() == 0 {
-		return e.Date.Local().Format("2006-01-02")
-	}
-
-	return e.Date.Local().Format("2006-01-02 15:04")
+	return e.Date.FormatDate()
 }
 
 func parseDate(d string) (time.Time, error) {
@@ -95,7 +91,7 @@ func (e *Entry) SetDate(d string) error {
 		return err
 	}
 
-	e.Date = parsedDate
+	e.Date = HumanTime{parsedDate}
 	return nil
 }
 

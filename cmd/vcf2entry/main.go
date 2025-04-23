@@ -50,7 +50,7 @@ func main() {
 		}
 
 		e := data.Entry{
-			Date:    bday,
+			Date:    data.HumanTime{Time: bday},
 			Summary: "Birthday " + name,
 		}
 		if age > 0 {

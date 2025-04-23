@@ -64,7 +64,7 @@ func newEvent(wd *WeatherData, location string, day int) (*data.Entry, error) {
 	}
 
 	e := &data.Entry{
-		Date:    parsedDate,
+		Date:    data.HumanTime{Time: parsedDate},
 		Summary: fmt.Sprintf("Weather for %s %s", parsedDate.Format("Monday"), location),
 	}
 

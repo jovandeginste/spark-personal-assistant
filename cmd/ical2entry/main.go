@@ -9,6 +9,7 @@ import (
 
 	"github.com/apognu/gocal"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/yaegashi/wtz.go"
 )
 
 func main() {
@@ -67,7 +68,12 @@ func newEvent(event *gocal.Event, collection string) (*data.Entry, error) {
 	e.SetMetadata("Collection", collection)
 
 	if s := event.Start; s != nil {
-		e.Date = *s
+		t, err := parseICalRawDate(&event.RawStart)
+		if err != nil {
+			return nil, err
+		}
+
+		e.Date = data.HumanTime{Time: t}
 	}
 
 	e.Summary = event.Summary
@@ -95,4 +101,41 @@ func collectAttendees(attendees []gocal.Attendee) []string {
 	}
 
 	return result
+}
+
+func parseICalRawDate(rs *gocal.RawDate) (time.Time, error) {
+	if v, ok := rs.Params["VALUE"]; ok {
+		if v == "DATE" {
+			return parseICalDate(rs)
+		}
+	}
+
+	return parseICalTime(rs)
+}
+
+func parseICalDate(rs *gocal.RawDate) (time.Time, error) {
+	return time.Parse("20060102", rs.Value)
+}
+
+func parseICalTime(rs *gocal.RawDate) (time.Time, error) {
+	ts, ok := rs.Params["TZID"]
+	if !ok {
+		return time.Parse("20060102T150405Z", rs.Value)
+	}
+
+	l := parseTimezone(ts)
+
+	return time.ParseInLocation("20060102T150405", rs.Value, l)
+}
+
+func parseTimezone(tz string) *time.Location {
+	if l, err := wtz.LoadLocation(tz); err == nil {
+		return l
+	}
+
+	if l, err := time.LoadLocation(tz); err == nil {
+		return l
+	}
+
+	return nil
 }
