@@ -71,8 +71,12 @@ func newEvent(wd *WeatherData, location string, day int) (*data.Entry, error) {
 	e.SetMetadata("Sunrise", allDays.Sunrise[day])
 	e.SetMetadata("Sunset", allDays.Sunset[day])
 	e.SetMetadata("Mean temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMean[day], wd.DailyUnits.Temperature2MMean))
-	e.SetMetadata("Max temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMax[day], wd.DailyUnits.Temperature2MMean))
+	e.SetMetadata("Max temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMax[day], wd.DailyUnits.Temperature2MMax))
+	e.SetMetadata("Min temperature", fmt.Sprintf("%.1f %s", allDays.Temperature2MMin[day], wd.DailyUnits.Temperature2MMin))
 	e.SetMetadata("Rain sum", fmt.Sprintf("%.0f %s", allDays.RainSum[day], wd.DailyUnits.RainSum))
+	e.SetMetadata("Showers sum", fmt.Sprintf("%.0f %s", allDays.ShowersSum[day], wd.DailyUnits.ShowersSum))
+	e.SetMetadata("Snowfall sum", fmt.Sprintf("%.0f %s", allDays.SnowfallSum[day], wd.DailyUnits.SnowfallSum))
+	e.SetMetadata("Windspeed max", fmt.Sprintf("%.1f %s", allDays.WindSpeed10MMax[day], wd.DailyUnits.WindSpeed10MMax))
 	e.SetMetadata("Latitude", wd.Latitude)
 	e.SetMetadata("Longitude", wd.Longitude)
 
@@ -91,18 +95,26 @@ type WeatherData struct {
 	Daily                Daily      `json:"daily"`
 }
 type DailyUnits struct {
-	Time              string `json:"time"`
-	Temperature2MMax  string `json:"temperature_2m_max"`
+	RainSum           string `json:"rain_sum"`
+	ShowersSum        string `json:"showers_sum"`
+	SnowfallSum       string `json:"snowfall_sum"`
 	Sunrise           string `json:"sunrise"`
 	Sunset            string `json:"sunset"`
-	RainSum           string `json:"rain_sum"`
+	Temperature2MMax  string `json:"temperature_2m_max"`
 	Temperature2MMean string `json:"temperature_2m_mean"`
+	Temperature2MMin  string `json:"temperature_2m_min"`
+	Time              string `json:"time"`
+	WindSpeed10MMax   string `json:"wind_speed_10m_max"`
 }
 type Daily struct {
-	Time              []string  `json:"time"`
-	Temperature2MMax  []float64 `json:"temperature_2m_max"`
+	RainSum           []float64 `json:"rain_sum"`
+	ShowersSum        []float64 `json:"showers_sum"`
+	SnowfallSum       []float64 `json:"snowfall_sum"`
 	Sunrise           []string  `json:"sunrise"`
 	Sunset            []string  `json:"sunset"`
-	RainSum           []float64 `json:"rain_sum"`
+	Temperature2MMax  []float64 `json:"temperature_2m_max"`
 	Temperature2MMean []float64 `json:"temperature_2m_mean"`
+	Temperature2MMin  []float64 `json:"temperature_2m_min"`
+	Time              []string  `json:"time"`
+	WindSpeed10MMax   []float64 `json:"wind_speed_10m_max"`
 }
