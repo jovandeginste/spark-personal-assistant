@@ -39,7 +39,12 @@ func (c *cli) root() *cobra.Command {
 	cmd.AddCommand(c.icalCmd())
 	cmd.AddCommand(c.vcfCmd())
 
-	cmd.PersistentFlags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
+	sparkConfig, ok := os.LookupEnv("SPARK_CONFIG")
+	if !ok {
+		sparkConfig = "./spark.yaml"
+	}
+
+	cmd.PersistentFlags().StringVar(&c.app.ConfigFile, "config", sparkConfig, "config file")
 
 	return cmd
 }
