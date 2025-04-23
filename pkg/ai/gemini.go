@@ -66,7 +66,7 @@ var promptPreamble = []string{
 	"Use the metric system and 24 hour clock notation.",
 	"Use emojis.",
 	"Translate all entries to English.",
-	"The following entries consist a list of items, for which you should compile a summarized overview of todo's, a schedule and reminders.",
+	"The following entries consist a list of items.",
 }
 
 func PromptPreamble() string {
@@ -85,6 +85,7 @@ func PromptWeek(data any) ([]*genai.Content, error) {
 			Parts: []*genai.Part{
 				{Text: PromptPreamble()},
 				{Text: "Only include this week's entries."},
+				{Text: "Compile a schedule and a summarized overview of todo's, and reminders."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
 				{Text: string(j)},
@@ -106,7 +107,7 @@ func PromptToday(data any) ([]*genai.Content, error) {
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
 				{Text: PromptPreamble()},
-				{Text: "Start your response with a suitable greeting and comment about today's weather if you have this information. Only include today's and tomorrow's entries. Be verbose."},
+				{Text: "Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's entries. Be verbose."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
 				{Text: string(j)},
