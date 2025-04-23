@@ -1,4 +1,4 @@
-package app
+package markdown
 
 import (
 	"github.com/gomarkdown/markdown"

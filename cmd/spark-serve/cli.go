@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
@@ -95,7 +96,7 @@ func (c *cli) mailCmd() *cobra.Command {
 				return err
 			}
 
-			html, err := app.GenerateHTML([]byte(md))
+			html, err := markdown.GenerateHTML([]byte(md))
 			if err != nil {
 				return err
 			}
