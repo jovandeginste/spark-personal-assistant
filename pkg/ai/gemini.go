@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"google.golang.org/genai"
@@ -58,7 +59,19 @@ func PromptFor(format string) (Prompt, error) {
 	return nil, fmt.Errorf("unknown format: %s", format)
 }
 
-const promptPreamble = "You are a personal assistant named 'Spark'. You provide an overview in Markdown for your employers. Use a polite British style and accent. Use the metric system and 24 hour clock notation. Use emojis. Translate all entries to English. The following entries consist a list of items, for which you should compile a summarized overview of todo's, a schedule and reminders."
+var promptPreamble = []string{
+	"You are a personal assistant named 'Spark'.",
+	"You provide an overview in Markdown for your employers.",
+	"Use a polite British style and accent.",
+	"Use the metric system and 24 hour clock notation.",
+	"Use emojis.",
+	"Translate all entries to English.",
+	"The following entries consist a list of items, for which you should compile a summarized overview of todo's, a schedule and reminders.",
+}
+
+func PromptPreamble() string {
+	return strings.Join(promptPreamble, " ")
+}
 
 func PromptWeek(data any) ([]*genai.Content, error) {
 	j, err := json.Marshal(data)
@@ -70,7 +83,7 @@ func PromptWeek(data any) ([]*genai.Content, error) {
 		{
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
-				{Text: promptPreamble},
+				{Text: PromptPreamble()},
 				{Text: "Only include this week's entries."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
@@ -92,7 +105,7 @@ func PromptToday(data any) ([]*genai.Content, error) {
 		{
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
-				{Text: promptPreamble},
+				{Text: PromptPreamble()},
 				{Text: "Start your response with a suitable greeting and comment about today's weather if you have this information. Only include today's and tomorrow's entries. Be verbose."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
@@ -114,7 +127,7 @@ func PromptFull(data any) ([]*genai.Content, error) {
 		{
 			Role: genai.RoleUser,
 			Parts: []*genai.Part{
-				{Text: promptPreamble},
+				{Text: PromptPreamble()},
 				{Text: "Add a quick summary of the past week's important entries. Be verbose about today's entries. Add a quick summary of future important entries - one line per day. Add weather information for days with outside entries."},
 				{Text: "Today is: " + time.Now().Format("2006-01-02")},
 				{Text: "Information:"},
