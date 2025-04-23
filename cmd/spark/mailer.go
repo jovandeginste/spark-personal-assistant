@@ -3,32 +3,17 @@ package main
 import (
 	"os"
 
-	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/markdown"
 	"github.com/spf13/cobra"
 )
 
-type cli struct {
-	app     *app.App
-	rootCmd *cobra.Command
-}
-
-func NewCLI(a *app.App) *cli {
-	c := &cli{app: a}
-
-	c.rootCmd = c.root()
-
-	return c
-}
-
-func (c *cli) root() *cobra.Command {
+func (c *cli) mailerCmd() *cobra.Command {
 	var subject string
 
 	cmd := &cobra.Command{
-		Use:          os.Args[0],
-		Short:        "Send mails",
-		SilenceUsage: true,
-		Args:         cobra.MinimumNArgs(2),
+		Use:   "mailer",
+		Short: "Send mails",
+		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := c.app.Initialize(); err != nil {
 				return err
@@ -50,7 +35,6 @@ func (c *cli) root() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVar(&subject, "subject", "Daily update", "mail subject")
 
 	return cmd

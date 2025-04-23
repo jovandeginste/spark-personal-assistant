@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
@@ -10,20 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-type cli struct {
-	app     *app.App
-	rootCmd *cobra.Command
-}
-
-func NewCLI(a *app.App) *cli {
-	c := &cli{app: a}
-
-	c.rootCmd = c.root()
-
-	return c
-}
-
-func (c *cli) root() *cobra.Command {
+func (c *cli) printCmd() *cobra.Command {
 	var (
 		daysBack  uint
 		daysAhead uint
@@ -31,10 +17,9 @@ func (c *cli) root() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:          os.Args[0],
-		Short:        "Generate Spark entries",
-		SilenceUsage: true,
-		Args:         cobra.NoArgs,
+		Use:   "print",
+		Short: "Print Spark summary",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := c.app.Initialize(); err != nil {
 				return err

@@ -8,53 +8,60 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		log.Println("Usage:", os.Args[0], "<file.json> [location]")
-		return
+func (c *cli) weatherCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "weather2entry file.json [location]",
+		Short: "Convert open-meteo JSON to Spark entries",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			file := args[0]
+
+			location := "at home"
+			if len(args) > 1 {
+				location = "in " + args[1]
+			}
+
+			r, err := os.ReadFile(file)
+			if err != nil {
+				return err
+			}
+
+			var d WeatherData
+
+			if err := json.Unmarshal(r, &d); err != nil {
+				return err
+			}
+
+			results := make([]*data.Entry, len(d.Daily.Time))
+
+			for day := range len(d.Daily.Time) {
+				e, err := newEventFromOpenMeteo(&d, location, day)
+				if err != nil {
+					log.Printf("Error: %s", err)
+					continue
+				}
+
+				results[day] = e
+			}
+
+			out, err := json.Marshal(results)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(out))
+
+			return nil
+		},
 	}
 
-	file := os.Args[1]
-
-	location := "at home"
-	if len(os.Args) > 2 {
-		location = "in " + os.Args[2]
-	}
-
-	r, err := os.ReadFile(file)
-	if err != nil {
-		panic(err)
-	}
-
-	var d WeatherData
-
-	if err := json.Unmarshal(r, &d); err != nil {
-		panic(err)
-	}
-
-	results := make([]*data.Entry, len(d.Daily.Time))
-
-	for day := range len(d.Daily.Time) {
-		e, err := newEvent(&d, location, day)
-		if err != nil {
-			log.Printf("Error: %s", err)
-			continue
-		}
-
-		results[day] = e
-	}
-
-	out, err := json.Marshal(results)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(string(out))
+	return cmd
 }
 
-func newEvent(wd *WeatherData, location string, day int) (*data.Entry, error) {
+func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Entry, error) {
 	allDays := wd.Daily
 	eDate := allDays.Time[day]
 

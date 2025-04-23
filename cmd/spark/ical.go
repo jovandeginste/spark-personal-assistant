@@ -9,61 +9,66 @@ import (
 
 	"github.com/apognu/gocal"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/spf13/cobra"
 	"github.com/yaegashi/wtz.go"
 )
 
-func main() {
-	if len(os.Args) < 2 {
-		log.Println("Usage:", os.Args[0], "<file.ics> [collection]")
-		return
+func (c *cli) icalCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "ical2entry file.ics [collection]",
+		Short: "Convert ical to Spark entries",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			file := args[0]
+			start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
+
+			collection := "calendar"
+			if len(args) > 1 {
+				collection = args[1]
+			}
+
+			r, err := os.Open(file)
+			if err != nil {
+				return err
+			}
+
+			defer r.Close()
+
+			in := gocal.NewParser(r)
+			in.Start, in.End = &start, &end
+			in.Parse()
+
+			var results []*data.Entry
+			hashes := map[string]bool{}
+
+			for _, event := range in.Events {
+				e, err := newEventFromICal(&event, collection)
+				if err != nil {
+					log.Printf("Error: %s", err)
+				}
+
+				if hashes[e.NewRemoteID()] {
+					continue
+				}
+
+				hashes[e.NewRemoteID()] = true
+				results = append(results, e)
+			}
+
+			out, err := json.Marshal(results)
+			if err != nil {
+				return err
+			}
+
+			fmt.Println(string(out))
+			return nil
+		},
 	}
 
-	file := os.Args[1]
-
-	start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
-
-	collection := "calendar"
-	if len(os.Args) > 2 {
-		collection = os.Args[2]
-	}
-
-	r, err := os.Open(file)
-	if err != nil {
-		panic(err)
-	}
-
-	defer r.Close()
-
-	in := gocal.NewParser(r)
-	in.Start, in.End = &start, &end
-	in.Parse()
-
-	var results []*data.Entry
-	hashes := map[string]bool{}
-
-	for _, event := range in.Events {
-		e, err := newEvent(&event, collection)
-		if err != nil {
-			log.Printf("Error: %s", err)
-		}
-
-		if hashes[e.NewRemoteID()] {
-			continue
-		}
-
-		hashes[e.NewRemoteID()] = true
-		results = append(results, e)
-	}
-
-	out, err := json.Marshal(results)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println(string(out))
+	return cmd
 }
 
-func newEvent(event *gocal.Event, collection string) (*data.Entry, error) {
+func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error) {
 	e := &data.Entry{}
 	e.SetMetadata("Collection", collection)
 
