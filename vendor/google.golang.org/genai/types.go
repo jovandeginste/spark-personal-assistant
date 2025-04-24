@@ -1,4 +1,4 @@
-// Copyright 2024 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -147,6 +147,8 @@ const (
 	FinishReasonSafety FinishReason = "SAFETY"
 	// The token generation stopped because of potential recitation.
 	FinishReasonRecitation FinishReason = "RECITATION"
+	// The token generation stopped because of using an unsupported language.
+	FinishReasonLanguage FinishReason = "LANGUAGE"
 	// All other reasons that stopped the token generation.
 	FinishReasonOther FinishReason = "OTHER"
 	// Token generation stopped because the content contains forbidden terms.
@@ -3543,6 +3545,8 @@ type LiveConnectConfig struct {
 	// Maximum number of tokens that can be generated in the response.
 	// If empty, API will use a default value. The default value varies by model.
 	MaxOutputTokens int32 `json:"maxOutputTokens,omitempty"`
+	// If specified, the media resolution specified will be used.
+	MediaResolution MediaResolution `json:"mediaResolution,omitempty"`
 	// When ``seed`` is fixed to a specific number, the model makes a best
 	// effort to provide the same response for repeated requests. By default, a
 	// random number is used.
@@ -3571,4 +3575,58 @@ type LiveConnectConfig struct {
 	// Configures context window compression mechanism.
 	// If included, server will compress context window to fit into given length.
 	ContextWindowCompression *ContextWindowCompressionConfig `json:"contextWindowCompression,omitempty"`
+}
+
+// Parameters for sending client content to the live API.
+type LiveSendClientContentParameters struct {
+	// Client content to send to the session.
+	Turns []*Content `json:"turns,omitempty"`
+	// If true, indicates that the server content generation should start with
+	// the currently accumulated prompt. Otherwise, the server will await
+	// additional messages before starting generation. If nil, then SDK will use the default
+	// value Ptr(true).
+	TurnComplete *bool `json:"turnComplete,omitempty"`
+}
+
+func (p LiveSendClientContentParameters) toLiveClientMessage() *LiveClientMessage {
+	if p.TurnComplete == nil {
+		p.TurnComplete = Ptr(true)
+	}
+	return &LiveClientMessage{
+		ClientContent: &LiveClientContent{Turns: p.Turns, TurnComplete: *p.TurnComplete},
+	}
+}
+
+// Parameters for sending realtime input to the live API.
+type LiveSendRealtimeInputParameters struct {
+	// Realtime input to send to the session.
+	Media *Blob `json:"media,omitempty"`
+	// The realtime audio input stream.
+	Audio *Blob `json:"audio,omitempty"`
+	// Indicates that the audio stream has ended, e.g. because the microphone was
+	// turned off.
+	// This should only be sent when automatic activity detection is enabled
+	// (which is the default).
+	// The client can reopen the stream by sending an audio message.
+	AudioStreamEnd bool `json:"audioStreamEnd,omitempty"`
+	// The realtime video input stream.
+	Video *Blob `json:"video,omitempty"`
+	// The realtime text input stream.
+	Text string `json:"text,omitempty"`
+	// Marks the start of user activity.
+	ActivityStart *ActivityStart `json:"activityStart,omitempty"`
+	// Marks the end of user activity.
+	ActivityEnd *ActivityEnd `json:"activityEnd,omitempty"`
+}
+
+// Parameters for sending tool responses to the live API.
+type LiveSendToolResponseParameters struct {
+	// Tool responses to send to the session.
+	FunctionResponses []*FunctionResponse `json:"functionResponses,omitempty"`
+}
+
+func (p LiveSendToolResponseParameters) toLiveClientMessage() *LiveClientMessage {
+	return &LiveClientMessage{
+		ToolResponse: &LiveClientToolResponse{FunctionResponses: p.FunctionResponses},
+	}
 }

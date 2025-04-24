@@ -1,7 +1,7 @@
 # cloud.google.com/go v0.120.1
 ## explicit; go 1.23.0
 cloud.google.com/go/civil
-# cloud.google.com/go/auth v0.16.0
+# cloud.google.com/go/auth v0.16.1
 ## explicit; go 1.23.0
 cloud.google.com/go/auth
 cloud.google.com/go/auth/credentials
@@ -266,7 +266,7 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# google.golang.org/genai v1.1.0
+# google.golang.org/genai v1.2.0
 ## explicit; go 1.23
 google.golang.org/genai
 # google.golang.org/genproto/googleapis/rpc v0.0.0-20250422160041-2d3770c4ea7f

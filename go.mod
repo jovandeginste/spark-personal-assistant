@@ -13,14 +13,14 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/yaegashi/wtz.go v0.0.2
 	golang.org/x/text v0.24.0
-	google.golang.org/genai v1.1.0
+	google.golang.org/genai v1.2.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gorm.io/gorm v1.25.12
 )
 
 require (
 	cloud.google.com/go v0.120.1 // indirect
-	cloud.google.com/go/auth v0.16.0 // indirect
+	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
