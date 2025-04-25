@@ -25,7 +25,7 @@ type Entry struct {
 	ID         uint64         `gorm:"primaryKey" json:"-"`
 	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Date       HumanTime      `gorm:"not null;index"`
-	Importance Importance     `gorm:"not null"`
+	Importance Importance     `gorm:"not null" json:",omitempty"`
 	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary    string         `gorm:"not null"`
 	Metadata   map[string]any `gorm:"serializer:json" json:",omitempty"`

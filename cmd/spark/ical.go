@@ -1,10 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"bytes"
+	"errors"
 	"log"
-	"os"
 	"time"
 
 	"github.com/apognu/gocal"
@@ -15,30 +14,37 @@ import (
 
 func (c *cli) icalCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "ical2entry file.ics [collection]",
+		Use:   "ical2entry source url [collection]",
 		Short: "Convert ical to Spark entries",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			file := args[0]
-			start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
-
-			collection := "calendar"
-			if len(args) > 1 {
-				collection = args[1]
-			}
-
-			r, err := os.Open(file)
+			src, err := c.app.FindSourceByName(args[0])
 			if err != nil {
 				return err
 			}
 
-			defer r.Close()
+			remote := args[1]
 
-			in := gocal.NewParser(r)
+			r, err := getBody(remote)
+			if err != nil {
+				return err
+			}
+
+			collection := "calendar"
+			if len(args) > 2 {
+				collection = args[2]
+			}
+
+			in := gocal.NewParser(bytes.NewReader(r))
+			start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
 			in.Start, in.End = &start, &end
-			in.Parse()
 
-			var results []*data.Entry
+			in.Parse()
+			if len(in.Events) == 0 {
+				return errors.New("no events")
+			}
+
+			var entries data.Entries
 			hashes := map[string]bool{}
 
 			for _, event := range in.Events {
@@ -52,16 +58,12 @@ func (c *cli) icalCmd() *cobra.Command {
 				}
 
 				hashes[e.NewRemoteID()] = true
-				results = append(results, e)
+				entries = append(entries, *e)
 			}
 
-			out, err := json.Marshal(results)
-			if err != nil {
-				return err
-			}
+			c.app.FetchExistingEntries(entries)
 
-			fmt.Println(string(out))
-			return nil
+			return c.app.ReplaceSourceEntries(src, entries)
 		},
 	}
 

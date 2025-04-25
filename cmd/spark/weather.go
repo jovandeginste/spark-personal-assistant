@@ -4,61 +4,119 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"os"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/google/go-querystring/query"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	"github.com/spf13/cobra"
+)
+
+var (
+	omURL      = "https://api.open-meteo.com/v1/forecast"
+	attributes = []string{
+		"temperature_2m_min",
+		"temperature_2m_max",
+		"sunrise",
+		"sunset",
+		"rain_sum",
+		"temperature_2m_mean",
+		"snowfall_sum",
+		"showers_sum",
+		"wind_speed_10m_max",
+	}
 )
 
 func (c *cli) weatherCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "weather2entry file.json [location]",
+		Use:   "weather2entry source location",
 		Short: "Convert open-meteo JSON to Spark entries",
-		Args:  cobra.MinimumNArgs(1),
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			file := args[0]
+			geocoder.SetClient(c.app.Logger(), "Spark")
 
-			location := "at home"
-			if len(args) > 1 {
-				location = "in " + args[1]
-			}
-
-			r, err := os.ReadFile(file)
+			src, err := c.app.FindSourceByName(args[0])
 			if err != nil {
 				return err
 			}
 
-			var d WeatherData
+			location := args[1]
 
-			if err := json.Unmarshal(r, &d); err != nil {
+			weatherData, err := getWeatherData(location)
+			if err != nil {
 				return err
 			}
 
-			results := make([]*data.Entry, len(d.Daily.Time))
+			entries := make(data.Entries, len(weatherData.Daily.Time))
 
-			for day := range len(d.Daily.Time) {
-				e, err := newEventFromOpenMeteo(&d, location, day)
+			for day := range len(weatherData.Daily.Time) {
+				e, err := newEventFromOpenMeteo(weatherData, location, day)
 				if err != nil {
 					log.Printf("Error: %s", err)
 					continue
 				}
 
-				results[day] = e
+				entries[day] = *e
 			}
 
-			out, err := json.Marshal(results)
-			if err != nil {
-				return err
-			}
+			c.app.FetchExistingEntries(entries)
 
-			fmt.Println(string(out))
-
-			return nil
+			return c.app.ReplaceSourceEntries(src, entries)
 		},
 	}
 
 	return cmd
+}
+
+func queryFor(location string) (url.Values, error) {
+	addr, err := geocoder.SearchLocations(location)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(addr) == 0 {
+		return nil, fmt.Errorf("no location found for %q", location)
+	}
+
+	q := OpenMeteoParams{
+		Latitude:  addr[0].Lat,
+		Longitude: addr[0].Lon,
+		Daily:     strings.Join(attributes, ","),
+		Timezone:  "GMT+1",
+		PastDays:  1,
+	}
+
+	return query.Values(q)
+}
+
+func getWeatherInfo(location string) ([]byte, error) {
+	q, err := queryFor(location)
+	if err != nil {
+		return nil, err
+	}
+
+	return getBody(omURL + "?" + q.Encode())
+}
+
+func getWeatherData(location string) (*WeatherData, error) {
+	var d WeatherData
+
+	w, err := getWeatherInfo(location)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(w, &d); err != nil {
+		return nil, err
+	}
+
+	if d.Error {
+		return nil, fmt.Errorf("could not get forecast: %s", d.Reason)
+	}
+
+	return &d, nil
 }
 
 func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Entry, error) {
@@ -72,7 +130,7 @@ func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Ent
 
 	e := &data.Entry{
 		Date:    data.HumanTime{Time: parsedDate},
-		Summary: fmt.Sprintf("Weather for %s %s", parsedDate.Format("Monday"), location),
+		Summary: fmt.Sprintf("Weather for %s in %s", parsedDate.Format("Monday"), location),
 	}
 
 	e.SetMetadata("Sunrise", allDays.Sunrise[day])
@@ -90,6 +148,14 @@ func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Ent
 	return e, nil
 }
 
+type OpenMeteoParams struct {
+	Latitude  string `url:"latitude"`
+	Longitude string `url:"longitude"`
+	Daily     string `url:"daily"`
+	Timezone  string `url:"timezone"`
+	PastDays  int    `url:"past_days"`
+}
+
 type WeatherData struct {
 	Latitude             float64    `json:"latitude"`
 	Longitude            float64    `json:"longitude"`
@@ -100,7 +166,10 @@ type WeatherData struct {
 	Elevation            float64    `json:"elevation"`
 	DailyUnits           DailyUnits `json:"daily_units"`
 	Daily                Daily      `json:"daily"`
+	Reason               string     `json:"reason"`
+	Error                bool       `json:"error"`
 }
+
 type DailyUnits struct {
 	RainSum           string `json:"rain_sum"`
 	ShowersSum        string `json:"showers_sum"`
@@ -113,6 +182,7 @@ type DailyUnits struct {
 	Time              string `json:"time"`
 	WindSpeed10MMax   string `json:"wind_speed_10m_max"`
 }
+
 type Daily struct {
 	RainSum           []float64 `json:"rain_sum"`
 	ShowersSum        []float64 `json:"showers_sum"`

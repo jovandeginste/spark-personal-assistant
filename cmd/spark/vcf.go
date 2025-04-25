@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -17,11 +16,16 @@ import (
 
 func (c *cli) vcfCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "vcf2entry file.vcf [collection]",
+		Use:   "vcf2entry source file.vcf",
 		Short: "Convert vcf to Spark birthday entries",
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			file := args[0]
+			src, err := c.app.FindSourceByName(args[0])
+			if err != nil {
+				return err
+			}
+
+			file := args[1]
 
 			f, err := os.Open(file)
 			if err != nil {
@@ -30,7 +34,7 @@ func (c *cli) vcfCmd() *cobra.Command {
 
 			dec := vcard.NewDecoder(f)
 
-			var results data.Entries
+			var entries data.Entries
 
 			for {
 				card, err := dec.Decode()
@@ -58,16 +62,12 @@ func (c *cli) vcfCmd() *cobra.Command {
 					e.SetMetadata("Age", age)
 				}
 
-				results = append(results, e)
+				entries = append(entries, e)
 			}
 
-			out, err := json.Marshal(results)
-			if err != nil {
-				return err
-			}
+			c.app.FetchExistingEntries(entries)
 
-			fmt.Println(string(out))
-			return nil
+			return c.app.ReplaceSourceEntries(src, entries)
 		},
 	}
 

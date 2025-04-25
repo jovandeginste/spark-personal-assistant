@@ -22,6 +22,14 @@ cloud.google.com/go/compute/metadata
 # github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 ## explicit
 github.com/ChannelMeter/iso8601duration
+# github.com/PuerkitoBio/goquery v1.8.0
+## explicit; go 1.13
+github.com/PuerkitoBio/goquery
+# github.com/adrg/xdg v0.4.0
+## explicit; go 1.14
+# github.com/andybalholm/cascadia v1.3.1
+## explicit; go 1.16
+github.com/andybalholm/cascadia
 # github.com/apognu/gocal v0.9.1
 ## explicit; go 1.21
 github.com/apognu/gocal
@@ -29,6 +37,9 @@ github.com/apognu/gocal/parser
 # github.com/aquasecurity/table v1.8.0
 ## explicit; go 1.18
 github.com/aquasecurity/table
+# github.com/codingsince1985/geo-golang v1.8.5
+## explicit; go 1.24.1
+github.com/codingsince1985/geo-golang
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
@@ -72,6 +83,9 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
+# github.com/google/go-querystring v1.1.0
+## explicit; go 1.10
+github.com/google/go-querystring/query
 # github.com/google/s2a-go v0.1.9
 ## explicit; go 1.20
 github.com/google/s2a-go
@@ -121,12 +135,37 @@ github.com/jinzhu/inflection
 # github.com/jinzhu/now v1.1.5
 ## explicit; go 1.12
 github.com/jinzhu/now
+# github.com/jovandeginste/workout-tracker/v2 v2.2.3-0.20250425120601-2cfaa95db35d
+## explicit; go 1.24.1
+github.com/jovandeginste/workout-tracker/v2/pkg/geocoder
+# github.com/json-iterator/go v1.1.12
+## explicit; go 1.12
+github.com/json-iterator/go
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.16
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
+# github.com/mlange-42/tom v0.5.0
+## explicit; go 1.22.0
+# github.com/mmcdole/gofeed v1.3.0
+## explicit; go 1.19
+github.com/mmcdole/gofeed
+github.com/mmcdole/gofeed/atom
+github.com/mmcdole/gofeed/extensions
+github.com/mmcdole/gofeed/internal/shared
+github.com/mmcdole/gofeed/json
+github.com/mmcdole/gofeed/rss
+# github.com/mmcdole/goxpp v1.1.1-0.20240225020742-a0c311522b23
+## explicit; go 1.19
+github.com/mmcdole/goxpp
+# github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd
+## explicit
+github.com/modern-go/concurrent
+# github.com/modern-go/reflect2 v1.0.2
+## explicit; go 1.12
+github.com/modern-go/reflect2
 # github.com/ncruces/go-strftime v0.1.9
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
@@ -231,6 +270,9 @@ golang.org/x/crypto/internal/poly1305
 golang.org/x/exp/constraints
 # golang.org/x/net v0.39.0
 ## explicit; go 1.23.0
+golang.org/x/net/html
+golang.org/x/net/html/atom
+golang.org/x/net/html/charset
 golang.org/x/net/http/httpguts
 golang.org/x/net/http2
 golang.org/x/net/http2/hpack
@@ -252,8 +294,14 @@ golang.org/x/term
 ## explicit; go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
+golang.org/x/text/encoding/charmap
+golang.org/x/text/encoding/htmlindex
 golang.org/x/text/encoding/internal
 golang.org/x/text/encoding/internal/identifier
+golang.org/x/text/encoding/japanese
+golang.org/x/text/encoding/korean
+golang.org/x/text/encoding/simplifiedchinese
+golang.org/x/text/encoding/traditionalchinese
 golang.org/x/text/encoding/unicode
 golang.org/x/text/internal
 golang.org/x/text/internal/language
