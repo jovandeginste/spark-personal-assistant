@@ -13,6 +13,11 @@ import (
 )
 
 func (c *cli) icalCmd() *cobra.Command {
+	var (
+		daysBack  uint
+		daysAhead uint
+	)
+
 	cmd := &cobra.Command{
 		Use:   "ical2entry source url [collection]",
 		Short: "Convert ical to Spark entries",
@@ -36,7 +41,8 @@ func (c *cli) icalCmd() *cobra.Command {
 			}
 
 			in := gocal.NewParser(bytes.NewReader(r))
-			start, end := time.Now().Add(-30*24*time.Hour), time.Now().Add(60*24*time.Hour)
+			start := time.Now().Add(-time.Duration(daysBack) * 24 * time.Hour)
+			end := time.Now().Add(time.Duration(daysAhead) * 24 * time.Hour)
 			in.Start, in.End = &start, &end
 
 			in.Parse()
@@ -66,6 +72,9 @@ func (c *cli) icalCmd() *cobra.Command {
 			return c.app.ReplaceSourceEntries(src, entries)
 		},
 	}
+
+	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 30, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 120, "Number of days in the future to include")
 
 	return cmd
 }
