@@ -18,9 +18,10 @@ func (c *cli) printCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "print",
-		Short: "Print Spark summary",
-		Args:  cobra.NoArgs,
+		Use:     "print",
+		Short:   "Print Spark summary",
+		Example: "spark print",
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := c.app.Initialize(); err != nil {
 				return err

@@ -11,9 +11,10 @@ func (c *cli) mailerCmd() *cobra.Command {
 	var subject string
 
 	cmd := &cobra.Command{
-		Use:   "mailer",
-		Short: "Send mails",
-		Args:  cobra.MinimumNArgs(2),
+		Use:     "mailer input.md recipient1 recipient2 ...",
+		Short:   "Send mails",
+		Example: "spark mailer ./md/summary-full.md me@example.com",
+		Args:    cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if err := c.app.Initialize(); err != nil {
 				return err

@@ -11,9 +11,10 @@ import (
 
 func (c *cli) md2htmlCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "md2html [file.md]",
-		Short: "Convert markdown to HTML",
-		Args:  cobra.MaximumNArgs(1),
+		Use:     "md2html [file.md]",
+		Short:   "Convert markdown to HTML",
+		Example: "spark md2html ./md/summary-full.md",
+		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
 				return mdToHTML(os.Stdin)

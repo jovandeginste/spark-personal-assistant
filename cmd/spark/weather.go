@@ -31,9 +31,10 @@ var (
 
 func (c *cli) weatherCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "weather2entry source location",
-		Short: "Convert open-meteo JSON to Spark entries",
-		Args:  cobra.ExactArgs(2),
+		Use:     "weather2entry source location",
+		Short:   "Convert open-meteo JSON to Spark entries",
+		Example: "spark weather2entry weather-brussels Brussels",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			geocoder.SetClient(c.app.Logger(), "Spark")
 

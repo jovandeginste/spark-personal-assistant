@@ -19,9 +19,10 @@ func (c *cli) icalCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "ical2entry source url [collection]",
-		Short: "Convert ical to Spark entries",
-		Args:  cobra.MinimumNArgs(2),
+		Use:     "ical2entry source url [collection]",
+		Short:   "Convert ical to Spark entries",
+		Example: "spark ical2entry my-calendar https://example.com/feed/calendar.ics",
+		Args:    cobra.MinimumNArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := c.app.FindSourceByName(args[0])
 			if err != nil {

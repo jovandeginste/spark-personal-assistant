@@ -10,9 +10,10 @@ import (
 
 func (c *cli) rssCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "rss2entry source https://example.org/feed.xml",
-		Short: "Convert rss feed to Spark entries",
-		Args:  cobra.ExactArgs(2),
+		Use:     "rss2entry source https://example.org/feed.xml",
+		Short:   "Convert rss feed to Spark entries",
+		Example: "spark rss2entry my-feed https://example.org/feed.xml",
+		Args:    cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			src, err := c.app.FindSourceByName(args[0])
 			if err != nil {
