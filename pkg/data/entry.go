@@ -67,7 +67,7 @@ func (e *Entry) NewRemoteID() string {
 	fmt.Fprintf(
 		hasher,
 		"%d\n%s",
-		e.Date.Unix(), e.Summary,
+		e.Date.UTC().Unix(), e.Summary,
 	)
 
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
