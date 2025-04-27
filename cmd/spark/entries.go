@@ -4,6 +4,7 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/spf13/cobra"
 )
@@ -18,6 +19,38 @@ func (c *cli) entriesCmd() *cobra.Command {
 	cmd.AddCommand(c.listEntriesCmd())
 	cmd.AddCommand(c.addEntryCmd())
 	cmd.AddCommand(c.showEntryCmd())
+	cmd.AddCommand(c.deleteEntryCmd())
+
+	return cmd
+}
+
+func (c *cli) deleteEntryCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete id",
+		Short: "Delete an entry",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := strconv.ParseUint(args[0], 10, 64)
+			if err != nil {
+				return err
+			}
+
+			e := &data.Entry{ID: id}
+
+			if err := c.app.FindEntry(e); err != nil {
+				return err
+			}
+
+			e.PrintTo(os.Stdout)
+
+			if err := c.app.DeleteEntry(e); err != nil {
+				return err
+			}
+
+			c.app.Logger().Info("Entry deleted")
+			return nil
+		},
+	}
 
 	return cmd
 }
@@ -76,7 +109,7 @@ func (c *cli) addEntryCmd() *cobra.Command {
 				return err
 			}
 
-			if err := c.app.CreateEntry(e); err != nil {
+			if err := c.app.CreateEntry(&e); err != nil {
 				return err
 			}
 
@@ -97,8 +130,8 @@ func (c *cli) addEntryCmd() *cobra.Command {
 
 func (c *cli) listEntriesCmd() *cobra.Command {
 	var (
-		daysBack  uint
-		daysAhead uint
+		ef     app.EntryFilter
+		source string
 	)
 
 	cmd := &cobra.Command{
@@ -106,7 +139,14 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 		Short: "List entries",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			entries, err := c.app.CurrentEntries(daysBack, daysAhead)
+			src, err := c.app.FindSourceByName(source)
+			if err != nil {
+				return err
+			}
+
+			ef.Source = src
+
+			entries, err := c.app.CurrentEntries(ef)
 			if err != nil {
 				return err
 			}
@@ -117,8 +157,9 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
-	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
+	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
+	cmd.Flags().StringVarP(&source, "source", "s", "", "Source to filter for")
 
 	return cmd
 }

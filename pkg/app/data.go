@@ -8,17 +8,36 @@ import (
 	"gorm.io/gorm"
 )
 
-func (a *App) CurrentEntries(daysBack, daysAhead uint) (data.Entries, error) {
+type EntryFilter struct {
+	Source    *data.Source
+	DaysBack  uint
+	DaysAhead uint
+}
+
+func (ef *EntryFilter) From() time.Time {
+	return time.Now().Add(time.Duration(-ef.DaysBack*24) * time.Hour).Truncate(24 * time.Hour)
+}
+
+func (ef *EntryFilter) To() time.Time {
+	return time.Now().Add(time.Duration(ef.DaysAhead*24) * time.Hour).Truncate(24 * time.Hour)
+}
+
+func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
+	q = q.Where("date >= ?", ef.From()).Where("date <= ?", ef.To())
+
+	if ef.Source != nil {
+		q = q.Where("source_id = ?", ef.Source.ID)
+	}
+
+	return q
+}
+
+func (a *App) CurrentEntries(ef EntryFilter) (data.Entries, error) {
+	q := ef.Query(a.DB())
+
 	var entries data.Entries
 
-	from := time.Now().Add(time.Duration(-daysBack*24) * time.Hour).Truncate(24 * time.Hour)
-	to := time.Now().Add(time.Duration(daysAhead*24) * time.Hour).Truncate(24 * time.Hour)
-
-	if err := a.DB().
-		Where("date >= ?", from).
-		Where("date <= ?", to).
-		Order("date ASC").
-		Find(&entries).Error; err != nil {
+	if err := q.Order("date ASC").Find(&entries).Error; err != nil {
 		return nil, err
 	}
 
@@ -36,6 +55,10 @@ func (a *App) Entries() (data.Entries, error) {
 	}
 
 	return entries, nil
+}
+
+func (a *App) DeleteEntry(e *data.Entry) error {
+	return a.DB().Delete(&e).Error
 }
 
 func (a *App) FindEntry(e *data.Entry) error {
@@ -68,9 +91,13 @@ func (a *App) Sources() (data.Sources, error) {
 	return sources, nil
 }
 
-func (a *App) CreateEntry(entry data.Entry) error {
+func (a *App) CreateEntry(entry *data.Entry) error {
 	a.Logger().Info("Creating new entry", "date", entry.Date, "entry", entry.Summary, "source", entry.Source.Name)
-	return a.DB().Create(&entry).Error
+	return a.DB().Create(entry).Error
+}
+
+func (a *App) DeleteSource(s *data.Source) error {
+	return a.DB().Select("Entries").Delete(&s).Error
 }
 
 func (a *App) FindSourceByName(name string) (*data.Source, error) {
@@ -83,9 +110,9 @@ func (a *App) FindSourceByName(name string) (*data.Source, error) {
 	return &source, nil
 }
 
-func (a *App) CreateSource(src data.Source) error {
+func (a *App) CreateSource(src *data.Source) error {
 	a.Logger().Info("Creating new source", "source", src.Name)
-	return a.DB().Create(&src).Error
+	return a.DB().Create(src).Error
 }
 
 func (a *App) FetchExistingEntries(entries data.Entries) {

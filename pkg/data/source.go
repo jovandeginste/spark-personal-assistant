@@ -1,6 +1,7 @@
 package data
 
 import (
+	"fmt"
 	"io"
 
 	"github.com/aquasecurity/table"
@@ -21,10 +22,11 @@ func (srcs Sources) PrintTo(w io.Writer) {
 	t := table.New(w)
 	defer t.Render()
 
-	t.AddHeaders("Name", "Description")
+	t.AddHeaders("ID", "Name", "Description")
 
 	for _, s := range srcs {
 		t.AddRow(
+			fmt.Sprintf("%d", s.ID),
 			s.Name,
 			s.Description,
 		)

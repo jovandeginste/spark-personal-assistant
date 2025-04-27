@@ -12,9 +12,8 @@ import (
 
 func (c *cli) printCmd() *cobra.Command {
 	var (
-		daysBack  uint
-		daysAhead uint
-		format    string
+		ef     app.EntryFilter
+		format string
 	)
 
 	cmd := &cobra.Command{
@@ -27,7 +26,7 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			aiData := c.buildData(daysBack, daysAhead)
+			aiData := c.buildData(ef)
 
 			p, err := ai.PromptFor(format)
 			if err != nil {
@@ -58,14 +57,14 @@ func (c *cli) printCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVarP(&format, "format", "f", "full", "Format to use")
-	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 3, "Number of days in the past to include")
-	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
+	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
 	return cmd
 }
 
-func (c *cli) buildData(daysBack, daysAhead uint) any {
-	entries, err := c.app.CurrentEntries(daysBack, daysAhead)
+func (c *cli) buildData(ef app.EntryFilter) any {
+	entries, err := c.app.CurrentEntries(ef)
 	if err != nil {
 		return err
 	}

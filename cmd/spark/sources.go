@@ -17,6 +17,7 @@ func (c *cli) sourcesCmd() *cobra.Command {
 
 	cmd.AddCommand(c.listSourcesCmd())
 	cmd.AddCommand(c.addSourceCmd())
+	cmd.AddCommand(c.deleteSourceCmd())
 	cmd.AddCommand(c.replaceEntriesSourceCmd())
 
 	return cmd
@@ -32,7 +33,7 @@ func (c *cli) addSourceCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			s.Name = args[0]
 
-			if err := c.app.CreateSource(s); err != nil {
+			if err := c.app.CreateSource(&s); err != nil {
 				return err
 			}
 
@@ -95,6 +96,30 @@ func (c *cli) replaceEntriesSourceCmd() *cobra.Command {
 			if err := c.app.ReplaceSourceEntries(src, entries); err != nil {
 				return err
 			}
+
+			return nil
+		},
+	}
+
+	return cmd
+}
+
+func (c *cli) deleteSourceCmd() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "delete id",
+		Short: "Delete a source",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			src, err := c.app.FindSourceByName(args[0])
+			if err != nil {
+				return err
+			}
+
+			if err := c.app.DeleteSource(src); err != nil {
+				return err
+			}
+
+			c.app.Logger().Info("Source deleted", "name", src.Name, "id", src.ID)
 
 			return nil
 		},
