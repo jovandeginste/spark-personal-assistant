@@ -1,4 +1,4 @@
-# Spark, your personal AI assistant
+# ✨ Spark, your personal AI assistant
 
 Spark is a personal AI assistant. You store information about important (future)
 events in a local database. Spark
