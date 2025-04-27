@@ -7,8 +7,9 @@ import (
 )
 
 type geminiClient struct {
-	apiKey string
-	model  string
+	apiKey    string
+	model     string
+	assistant AssistantConfig
 }
 
 func (c geminiClient) APIKey() string {
@@ -19,8 +20,8 @@ func (c geminiClient) Model() string {
 	return c.model
 }
 
-func promptToGemini(p Prompt, data any) (*genai.Content, error) {
-	prompt, err := p(data)
+func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) {
+	prompt, err := p(c.assistant, data)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +41,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		return "", err
 	}
 
-	prompt, err := promptToGemini(p, data)
+	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
 	}

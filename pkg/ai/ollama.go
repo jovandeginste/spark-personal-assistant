@@ -9,7 +9,8 @@ import (
 )
 
 type ollamaClient struct {
-	model string
+	model     string
+	assistant AssistantConfig
 }
 
 func (c ollamaClient) APIKey() string {
@@ -20,8 +21,8 @@ func (c ollamaClient) Model() string {
 	return c.model
 }
 
-func promptToOllama(p Prompt, data any) (string, error) {
-	prompt, err := p(data)
+func (c ollamaClient) convertPrompt(p Prompt, data any) (string, error) {
+	prompt, err := p(c.assistant, data)
 	if err != nil {
 		return "", err
 	}
@@ -30,7 +31,7 @@ func promptToOllama(p Prompt, data any) (string, error) {
 }
 
 func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
-	prompt, err := promptToOllama(p, data)
+	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
 	}

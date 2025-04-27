@@ -34,7 +34,7 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			aiClient, err := ai.NewClient(c.app.Config.LLM)
+			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant)
 			if err != nil {
 				return err
 			}

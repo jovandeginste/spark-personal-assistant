@@ -7,31 +7,36 @@ import (
 )
 
 type AIConfig struct {
-	Type      string `mapstructure:"type"`
-	APIKey    string `mapstructure:"api_key"`
-	Model     string `mapstructure:"model"`
-	Assistant struct {
-		Name  string `mapstructure:"name"`
-		Style string `mapstructure:"style"`
-	} `mapstructure:"assistant"`
+	Type   string `mapstructure:"type"`
+	APIKey string `mapstructure:"api_key"`
+	Model  string `mapstructure:"model"`
+}
+
+type AssistantConfig struct {
+	Name  string `mapstructure:"name"`
+	Style string `mapstructure:"style"`
 }
 
 type Client interface {
 	APIKey() string
 	Model() string
-	GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error)
+	GeneratePrompt(context.Context, Prompt, any) (string, error)
 }
 
-func NewClient(cc *AIConfig) (Client, error) {
+func NewClient(cc *AIConfig, ac AssistantConfig) (Client, error) {
+	var c Client
+
 	switch cc.Type {
 	case "gemini":
-		return geminiClient{apiKey: cc.APIKey, model: cc.Model}, nil
+		c = geminiClient{apiKey: cc.APIKey, model: cc.Model, assistant: ac}
 	case "openai":
-		return openaiClient{apiKey: cc.APIKey, model: cc.Model}, nil
+		c = openaiClient{apiKey: cc.APIKey, model: cc.Model, assistant: ac}
 	case "ollama":
 		slog.Info("ollama does not work yet - input size is too large?")
-		return ollamaClient{model: cc.Model}, nil
+		c = ollamaClient{model: cc.Model, assistant: ac}
+	default:
+		return nil, fmt.Errorf("unknown type: %s", cc.Type)
 	}
 
-	return nil, fmt.Errorf("unknown type: %s", cc.Type)
+	return c, nil
 }

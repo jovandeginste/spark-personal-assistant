@@ -8,8 +8,9 @@ import (
 )
 
 type openaiClient struct {
-	apiKey string
-	model  string
+	apiKey    string
+	model     string
+	assistant AssistantConfig
 }
 
 func (c openaiClient) APIKey() string {
@@ -20,8 +21,8 @@ func (c openaiClient) Model() string {
 	return c.model
 }
 
-func promptToOpenAI(p Prompt, data any) (openai.ChatCompletionMessageParamUnion, error) {
-	prompt, err := p(data)
+func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMessageParamUnion, error) {
+	prompt, err := p(c.assistant, data)
 	if err != nil {
 		return openai.ChatCompletionMessageParamUnion{}, err
 	}
@@ -36,7 +37,7 @@ func promptToOpenAI(p Prompt, data any) (openai.ChatCompletionMessageParamUnion,
 }
 
 func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
-	prompt, err := promptToOpenAI(p, data)
+	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
 	}
