@@ -1,3 +1,4 @@
 data/*
 database.db
 spark.yaml
+.aider*
