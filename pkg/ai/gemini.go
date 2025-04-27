@@ -2,124 +2,52 @@ package ai
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"strings"
-	"time"
 
 	"google.golang.org/genai"
 )
 
-type Prompt func(data any) ([]*genai.Content, error)
-
-func PromptFor(format string) (Prompt, error) {
-	switch format {
-	case "today":
-		return PromptToday, nil
-	case "week":
-		return PromptWeek, nil
-	case "full":
-		return PromptFull, nil
-	}
-
-	return nil, fmt.Errorf("unknown format: %s", format)
+type geminiClient struct {
+	apiKey string
+	model  string
 }
 
-var promptPreamble = []string{
-	"You are a personal assistant named 'Spark'.",
-	"You provide an overview in Markdown for your employers.",
-	"Use a polite British style and accent.",
-	"Use the metric system and 24 hour clock notation.",
-	"Use emojis.",
-	"Translate all entries to English.",
-	"The following entries consist a list of items.",
+func (c geminiClient) APIKey() string {
+	return c.apiKey
 }
 
-func PromptPreamble() string {
-	return strings.Join(promptPreamble, " ")
+func (c geminiClient) Model() string {
+	return c.model
 }
 
-func PromptWeek(data any) ([]*genai.Content, error) {
-	j, err := json.Marshal(data)
+func promptToGemini(p Prompt, data any) (*genai.Content, error) {
+	prompt, err := p(data)
 	if err != nil {
 		return nil, err
 	}
 
-	c := []*genai.Content{
-		{
-			Role: genai.RoleUser,
-			Parts: []*genai.Part{
-				{Text: PromptPreamble()},
-				{Text: "Only include this week's entries."},
-				{Text: "Compile a schedule and a summarized overview of todo's, and reminders."},
-				{Text: "Today is: " + time.Now().Format("2006-01-02")},
-				{Text: "Information:"},
-				{Text: string(j)},
-			},
-		},
+	var parts []*genai.Part
+
+	for _, part := range prompt {
+		parts = append(parts, &genai.Part{Text: part})
 	}
 
-	return c, nil
+	return genai.NewContentFromParts(parts, genai.RoleUser), nil
 }
 
-func PromptToday(data any) ([]*genai.Content, error) {
-	j, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	c := []*genai.Content{
-		{
-			Role: genai.RoleUser,
-			Parts: []*genai.Part{
-				{Text: PromptPreamble()},
-				{Text: "Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's entries. Be verbose."},
-				{Text: "Today is: " + time.Now().Format("2006-01-02")},
-				{Text: "Information:"},
-				{Text: string(j)},
-			},
-		},
-	}
-
-	return c, nil
-}
-
-func PromptFull(data any) ([]*genai.Content, error) {
-	j, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	c := []*genai.Content{
-		{
-			Role: genai.RoleUser,
-			Parts: []*genai.Part{
-				{Text: PromptPreamble()},
-				{Text: "Add a quick summary of the past week's important entries. Be verbose about today's entries. Add a quick summary of future important entries - one line per day. Add weather information for days with outside entries."},
-				{Text: "Today is: " + time.Now().Format("2006-01-02")},
-				{Text: "Information:"},
-				{Text: string(j)},
-			},
-		},
-	}
-
-	return c, nil
-}
-
-func (c *Client) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
 	if err != nil {
 		return "", err
 	}
 
-	content, err := p(data)
+	prompt, err := promptToGemini(p, data)
 	if err != nil {
 		return "", err
 	}
 
 	config := &genai.GenerateContentConfig{}
 
-	result, err := client.Models.GenerateContent(ctx, c.model, content, config)
+	result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
 	if err != nil {
 		return "", err
 	}
