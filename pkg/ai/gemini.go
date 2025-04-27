@@ -4,45 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
-	"os"
 	"strings"
 	"time"
 
 	"google.golang.org/genai"
 )
-
-type Client struct {
-	APIKey string
-
-	client *genai.Client
-	ctx    context.Context
-}
-
-func (c *Client) Init(apiKey string) error {
-	c.ctx = context.Background()
-
-	client, err := genai.NewClient(c.ctx, &genai.ClientConfig{APIKey: apiKey})
-	if err != nil {
-		return err
-	}
-
-	c.client = client
-
-	return nil
-}
-
-func NewClient() (*Client, error) {
-	apiKey := os.Getenv("GEMINI_API_KEY")
-
-	c := &Client{}
-
-	if err := c.Init(apiKey); err != nil {
-		return nil, err
-	}
-
-	return c, nil
-}
 
 type Prompt func(data any) ([]*genai.Content, error)
 
@@ -140,24 +106,20 @@ func PromptFull(data any) ([]*genai.Content, error) {
 	return c, nil
 }
 
-func GeneratePrompt(p Prompt, data any) (string, error) {
-	ai, err := NewClient()
+func (c *Client) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
 	if err != nil {
 		return "", err
 	}
-
-	config := &genai.GenerateContentConfig{}
-	model := "models/gemini-2.5-flash-preview-04-17"
-	// model := "gemini-2.5-pro-exp-03-25"
-
-	slog.Info("Generating summary...")
 
 	content, err := p(data)
 	if err != nil {
 		return "", err
 	}
 
-	result, err := ai.client.Models.GenerateContent(ai.ctx, model, content, config)
+	config := &genai.GenerateContentConfig{}
+
+	result, err := client.Models.GenerateContent(ctx, c.model, content, config)
 	if err != nil {
 		return "", err
 	}

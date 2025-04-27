@@ -99,5 +99,6 @@ func (c *cli) replaceEntriesSourceCmd() *cobra.Command {
 			return nil
 		},
 	}
+
 	return cmd
 }

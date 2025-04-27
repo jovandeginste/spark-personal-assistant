@@ -40,31 +40,9 @@ func (c *cli) icalCmd() *cobra.Command {
 				collection = args[2]
 			}
 
-			in := gocal.NewParser(bytes.NewReader(r))
-			start := time.Now().Add(-time.Duration(daysBack) * 24 * time.Hour)
-			end := time.Now().Add(time.Duration(daysAhead) * 24 * time.Hour)
-			in.Start, in.End = &start, &end
-
-			in.Parse()
-			if len(in.Events) == 0 {
-				return errors.New("no events")
-			}
-
-			var entries data.Entries
-			hashes := map[string]bool{}
-
-			for _, event := range in.Events {
-				e, err := newEventFromICal(&event, collection)
-				if err != nil {
-					log.Printf("Error: %s", err)
-				}
-
-				if hashes[e.NewRemoteID()] {
-					continue
-				}
-
-				hashes[e.NewRemoteID()] = true
-				entries = append(entries, *e)
+			entries, err := c.buildEntriesFromICal(r, daysBack, daysAhead, collection)
+			if err != nil {
+				return err
 			}
 
 			c.app.FetchExistingEntries(entries)
@@ -77,6 +55,42 @@ func (c *cli) icalCmd() *cobra.Command {
 	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 120, "Number of days in the future to include")
 
 	return cmd
+}
+
+func (c *cli) buildEntriesFromICal(r []byte, daysBack, daysAhead uint, collection string) (data.Entries, error) {
+	in := gocal.NewParser(bytes.NewReader(r))
+	start := time.Now().Add(-time.Duration(daysBack) * 24 * time.Hour)
+	end := time.Now().Add(time.Duration(daysAhead) * 24 * time.Hour)
+	in.Start, in.End = &start, &end
+
+	if err := in.Parse(); err != nil {
+		return nil, err
+	}
+
+	if len(in.Events) == 0 {
+		return nil, errors.New("no events")
+	}
+
+	var entries data.Entries
+
+	hashes := map[string]bool{}
+
+	for _, event := range in.Events {
+		e, err := newEventFromICal(&event, collection)
+		if err != nil {
+			log.Printf("Error: %s", err)
+		}
+
+		if hashes[e.NewRemoteID()] {
+			continue
+		}
+
+		hashes[e.NewRemoteID()] = true
+
+		entries = append(entries, *e)
+	}
+
+	return entries, nil
 }
 
 func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error) {

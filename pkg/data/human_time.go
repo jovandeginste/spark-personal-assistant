@@ -24,6 +24,7 @@ func (ct *HumanTime) MarshalJSON() ([]byte, error) {
 	// Return the formatted time as a JSON string (needs quotes)
 	// Using fmt.Sprintf is a common way to ensure it's quoted
 	jsonString := fmt.Sprintf(`"%s"`, formatted)
+
 	return []byte(jsonString), nil
 }
 
@@ -62,8 +63,8 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 		if err == nil {
 			break
 		}
-
 	}
+
 	if t.IsZero() {
 		panic(s)
 	}
@@ -77,7 +78,7 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 func (ct HumanTime) Value() (driver.Value, error) {
 	// Check if the time is zero. You might want to store zero times as NULL in the database.
 	if ct.IsZero() {
-		return nil, nil // Return nil for zero time -> NULL in database
+		return time.Time{}, nil // Return nil for zero time -> NULL in database
 	}
 
 	// Return the embedded time.Time. GORM/database driver knows how to handle this.
@@ -105,10 +106,10 @@ func (ct *HumanTime) Scan(value interface{}) error {
 	return fmt.Errorf("cannot scan type %T into HumanTime", value)
 }
 
-func (d *HumanTime) FormatDate() string {
-	if d.Hour() == 0 && d.Minute() == 0 {
-		return d.Local().Format("2006-01-02")
+func (ct *HumanTime) FormatDate() string {
+	if ct.Hour() == 0 && ct.Minute() == 0 {
+		return ct.Local().Format("2006-01-02")
 	}
 
-	return d.Local().Format("2006-01-02 15:04")
+	return ct.Local().Format("2006-01-02 15:04")
 }

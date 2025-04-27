@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
@@ -25,25 +26,25 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			entries, err := c.app.CurrentEntries(daysBack, daysAhead)
-			if err != nil {
-				return err
-			}
-
-			data := struct {
-				EmployerData app.EmployerData
-				Entries      data.Entries
-			}{
-				EmployerData: c.app.Config.EmployerData,
-				Entries:      entries,
-			}
+			aiData := c.buildData(daysBack, daysAhead)
 
 			p, err := ai.PromptFor(format)
 			if err != nil {
 				return err
 			}
 
-			md, err := ai.GeneratePrompt(p, data)
+			aiClient, err := ai.NewClient(c.app.Config.LLM)
+			if err != nil {
+				return err
+			}
+
+			c.app.Logger().Info(
+				"Generating summary for entries...",
+				"type", c.app.Config.LLM.Type,
+				"model", c.app.Config.LLM.Model,
+			)
+
+			md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
 			if err != nil {
 				return err
 			}
@@ -60,4 +61,23 @@ func (c *cli) printCmd() *cobra.Command {
 	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
 	return cmd
+}
+
+func (c *cli) buildData(daysBack, daysAhead uint) any {
+	entries, err := c.app.CurrentEntries(daysBack, daysAhead)
+	if err != nil {
+		return err
+	}
+
+	aiData := struct {
+		ExtraContext []string
+		EmployerData app.EmployerData
+		Entries      data.Entries
+	}{
+		ExtraContext: c.app.Config.ExtraContext,
+		EmployerData: c.app.Config.EmployerData,
+		Entries:      entries,
+	}
+
+	return aiData
 }

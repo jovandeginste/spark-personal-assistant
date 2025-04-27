@@ -51,8 +51,8 @@ func (e *Entry) GenerateRemoteID() {
 	e.RemoteID = e.NewRemoteID()
 }
 
-func (u *Entry) BeforeSave(_ *gorm.DB) error {
-	u.GenerateRemoteID()
+func (e *Entry) BeforeSave(_ *gorm.DB) error {
+	e.GenerateRemoteID()
 
 	return nil
 }
@@ -92,6 +92,7 @@ func (e *Entry) SetDate(d string) error {
 	}
 
 	e.Date = HumanTime{parsedDate}
+
 	return nil
 }
 

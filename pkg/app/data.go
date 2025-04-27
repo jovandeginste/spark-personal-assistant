@@ -8,7 +8,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func (a *App) CurrentEntries(daysBack uint, daysAhead uint) (data.Entries, error) {
+func (a *App) CurrentEntries(daysBack, daysAhead uint) (data.Entries, error) {
 	var entries data.Entries
 
 	from := time.Now().Add(time.Duration(-daysBack*24) * time.Hour).Truncate(24 * time.Hour)
@@ -110,7 +110,10 @@ func (a *App) ReplaceSourceEntries(src *data.Source, entries data.Entries) error
 		return err
 	}
 
-	a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries)
+	errString := a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries).Error()
+	if errString != "" {
+		return errors.New(errString)
+	}
 
 	return nil
 }

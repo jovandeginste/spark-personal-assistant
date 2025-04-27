@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/spf13/viper"
 	"gorm.io/gorm"
 )
@@ -12,7 +13,9 @@ import (
 type Config struct {
 	Database     DatabaseConfig `mapstructure:"database"`
 	EmployerData EmployerData   `mapstructure:"employer_data"`
+	ExtraContext []string       `mapstructure:"extra_context"`
 	Mailer       Mailer         `mapstructure:"mail"`
+	LLM          *ai.AIConfig   `mapstructure:"llm"`
 }
 
 type EmployerData struct {
@@ -27,14 +30,14 @@ type App struct {
 	logger slog.Logger
 }
 
-func (a *App) Logger() *slog.Logger {
-	return &a.logger
-}
-
 func NewApp() *App {
 	a := &App{}
 
 	return a
+}
+
+func (a *App) Logger() *slog.Logger {
+	return &a.logger
 }
 
 func (a *App) ReadConfig() error {
@@ -65,10 +68,6 @@ func (a *App) ReadConfig() error {
 	return nil
 }
 
-func (a *App) initializeLogger() {
-	a.logger = *slog.Default()
-}
-
 func (a *App) Initialize() error {
 	if err := a.ReadConfig(); err != nil {
 		return err
@@ -83,4 +82,8 @@ func (a *App) Initialize() error {
 	}
 
 	return nil
+}
+
+func (a *App) initializeLogger() {
+	a.logger = *slog.Default()
 }

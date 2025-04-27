@@ -39,7 +39,7 @@ func New(a *App) (*Mailer, error) {
 	return &m, nil
 }
 
-func (m *Mailer) Send(addresses []string, subject string, md string, html string) error {
+func (m *Mailer) Send(addresses []string, subject, md, html string) error {
 	for i := range addresses {
 		addresses[i] = normalizeString(addresses[i])
 	}
