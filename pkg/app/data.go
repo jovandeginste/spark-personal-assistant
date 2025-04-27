@@ -48,6 +48,10 @@ func (a *App) FindEntryByRemoteID(e *data.Entry) (uint64, error) {
 	var entry data.Entry
 
 	if err := a.DB().Where("remote_id = ?", rid).First(&entry).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return 0, nil
+		}
+
 		return 0, err
 	}
 
@@ -110,10 +114,5 @@ func (a *App) ReplaceSourceEntries(src *data.Source, entries data.Entries) error
 		return err
 	}
 
-	errString := a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries).Error()
-	if errString != "" {
-		return errors.New(errString)
-	}
-
-	return nil
+	return a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries)
 }
