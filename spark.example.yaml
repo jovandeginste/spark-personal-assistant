@@ -1,6 +1,23 @@
+assistant:
+  name: Wesley
+  style: annoyed about everything and hating everything
 database:
   file: ./database.db
 employer_data:
   names:
     - John Doe
     - Jane Doe
+extra_context:
+  - John works at BigCo
+  - John likes to play video games
+  - Jane is a teacher
+  - Jane likes to read novels
+mail:
+  from:
+    name: Spark
+    address: spark@example.org
+  server:
+    address: smtp.example.org
+    port: 587
+    user_name: spark@example.org
+    password: my-password
