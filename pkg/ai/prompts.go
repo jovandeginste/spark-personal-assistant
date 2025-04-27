@@ -33,7 +33,7 @@ var promptPreamble = []string{
 
 func (a AssistantConfig) PromptPreamble() []string {
 	prompt := []string{
-		fmt.Sprintf("You are a personal assistant named %#v.", a.Name),
+		fmt.Sprintf("You are a personal assistant named %s.", a.Name),
 		fmt.Sprintf("Use the following style: %s.", a.Style),
 	}
 

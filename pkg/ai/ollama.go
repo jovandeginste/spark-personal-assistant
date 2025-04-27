@@ -2,7 +2,7 @@ package ai
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"strings"
 
 	"github.com/ollama/ollama/api"
@@ -38,15 +38,13 @@ func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 
 	client, err := api.ClientFromEnvironment()
 	if err != nil {
-		log.Fatal(err)
+		return "", fmt.Errorf("failed to create ollama client from environment: %w", err)
 	}
 
 	req := &api.GenerateRequest{
-		Model:  "gemma3:1b",
+		Model:  c.Model(),
 		Prompt: prompt,
-		Options: map[string]any{
-			"num_ctx": 20000,
-		},
+		// Options can be added here if needed, potentially from config
 	}
 
 	var result string

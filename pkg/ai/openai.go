@@ -46,7 +46,7 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		option.WithAPIKey(c.APIKey()),
 	)
 
-	result, err := client.Chat.Completions.New(context.TODO(), openai.ChatCompletionNewParams{
+	result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Messages: []openai.ChatCompletionMessageParamUnion{prompt},
 		Model:    c.Model(),
 	})
