@@ -139,12 +139,14 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 		Short: "List entries",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, err := c.app.FindSourceByName(source)
-			if err != nil {
-				return err
-			}
+			if source != "" {
+				src, err := c.app.FindSourceByName(source)
+				if err != nil {
+					return err
+				}
 
-			ef.Source = src
+				ef.Source = src
+			}
 
 			entries, err := c.app.CurrentEntries(ef)
 			if err != nil {
