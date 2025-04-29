@@ -71,11 +71,11 @@ func (c *cli) buildData(ef app.EntryFilter) any {
 
 	aiData := struct {
 		ExtraContext []string
-		EmployerData app.EmployerData
+		UserData     app.UserData
 		Entries      data.Entries
 	}{
 		ExtraContext: c.app.Config.ExtraContext,
-		EmployerData: c.app.Config.EmployerData,
+		UserData:     c.app.Config.UserData,
 		Entries:      entries,
 	}
 

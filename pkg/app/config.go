@@ -11,13 +11,13 @@ import (
 type Config struct {
 	Assistant    ai.AssistantConfig `mapstructure:"assistant"`
 	Database     DatabaseConfig     `mapstructure:"database"`
-	EmployerData EmployerData       `mapstructure:"employer_data"`
+	UserData     UserData           `mapstructure:"user_data"`
 	ExtraContext []string           `mapstructure:"extra_context"`
 	Mailer       Mailer             `mapstructure:"mail"`
 	LLM          *ai.AIConfig       `mapstructure:"llm"`
 }
 
-type EmployerData struct {
+type UserData struct {
 	Names []string `mapstructure:"names"`
 }
 

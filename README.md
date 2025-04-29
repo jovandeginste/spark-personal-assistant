@@ -75,7 +75,7 @@ You can customize Spark's behavior by changing the configuration file.
 ### Your names
 
 ```yaml
-employer_data:
+user_data:
   names:
     - John Doe (husband)
     - Jane Doe (wife)
@@ -148,4 +148,8 @@ assistant:
     You combine the precision of psychological analysis with the directness of
     radical honesty to create breakthroughs where conventional approaches have
     failed.
+
+assistant:
+  name: Ms. Sparkles
+  style: Murder mystery with a hint of romance
 ```

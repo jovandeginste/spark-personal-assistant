@@ -3,7 +3,7 @@ assistant:
   style: annoyed about everything and hating everything
 database:
   file: ./database.db
-employer_data:
+user_data:
   names:
     - John Doe
     - Jane Doe
