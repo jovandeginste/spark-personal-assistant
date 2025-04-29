@@ -57,6 +57,6 @@ func (a *App) SetDefaults() {
 	}
 
 	if a.Config.Assistant.Style == "" {
-		a.Config.Assistant.Style = "polite British style and accent"
+		a.Config.Assistant.Style = "you are a family butler and use polite British style and accent; be concise with colourful language"
 	}
 }
