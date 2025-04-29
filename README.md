@@ -152,4 +152,8 @@ assistant:
 assistant:
   name: Ms. Sparkles
   style: Murder mystery with a hint of romance
+
+assistant:
+  name: Ms. S
+  style: MI6 secret agent
 ```
