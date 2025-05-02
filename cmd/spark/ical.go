@@ -99,7 +99,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 	e.SetMetadata("Collection", collection)
 
 	if s := event.Start; s != nil {
-		t, err := parseICalRawDate(&event.RawStart)
+		t, err := parseICalRawDate(&event.RawStart, event.Start)
 		if err != nil {
 			return nil, err
 		}
@@ -134,29 +134,29 @@ func collectAttendees(attendees []gocal.Attendee) []string {
 	return result
 }
 
-func parseICalRawDate(rs *gocal.RawDate) (time.Time, error) {
+func parseICalRawDate(rs *gocal.RawDate, start *time.Time) (time.Time, error) {
 	if v, ok := rs.Params["VALUE"]; ok {
 		if v == "DATE" {
 			return parseICalDate(rs)
 		}
 	}
 
-	return parseICalTime(rs)
+	return parseICalTime(rs, start)
 }
 
 func parseICalDate(rs *gocal.RawDate) (time.Time, error) {
 	return time.Parse("20060102", rs.Value)
 }
 
-func parseICalTime(rs *gocal.RawDate) (time.Time, error) {
+func parseICalTime(rs *gocal.RawDate, start *time.Time) (time.Time, error) {
 	ts, ok := rs.Params["TZID"]
 	if !ok {
-		return time.Parse("20060102T150405Z", rs.Value)
+		return *start, nil
 	}
 
 	l := parseTimezone(ts)
 
-	return time.ParseInLocation("20060102T150405", rs.Value, l)
+	return time.ParseInLocation("20060102T150405", start.Format("20060102T150405"), l)
 }
 
 func parseTimezone(tz string) *time.Location {
