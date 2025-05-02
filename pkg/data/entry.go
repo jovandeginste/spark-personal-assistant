@@ -63,12 +63,15 @@ func (e *Entry) AfterFind(_ *gorm.DB) error {
 }
 
 func (e *Entry) NewRemoteID() string {
-	hasher := sha512.New()
-	fmt.Fprintf(
-		hasher,
+	return generateHash(fmt.Sprintf(
 		"%d\n%s",
 		e.Date.UTC().Unix(), e.Summary,
-	)
+	))
+}
+
+func generateHash(s string) string {
+	hasher := sha512.New()
+	fmt.Fprint(hasher, s)
 
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
@@ -79,10 +82,10 @@ func (e *Entry) FormattedDate() string {
 
 func parseDate(d string) (time.Time, error) {
 	if d == "" {
-		return time.Now().UTC().Round(24 * time.Hour), nil
+		return time.Now().In(localTimezone).Truncate(24 * time.Hour), nil
 	}
 
-	return time.Parse("2006-01-02", d)
+	return time.ParseInLocation("2006-01-02", d, localTimezone)
 }
 
 func (e *Entry) SetDate(d string) error {
@@ -119,7 +122,10 @@ func (e *Entry) PrintTo(w io.Writer) {
 	t.AddRow("Data", e.DateString)
 	t.AddRow("Summary", e.Summary)
 	t.AddRow("Importance", string(e.Importance))
-	t.AddRow("Source", e.Source.Name)
+
+	if e.Source != nil {
+		t.AddRow("Source", e.Source.Name)
+	}
 
 	for k, v := range e.Metadata {
 		t.AddRow(k, fmt.Sprintf("%v", v))
