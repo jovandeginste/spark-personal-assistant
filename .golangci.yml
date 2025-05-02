@@ -1,0 +1,105 @@
+version: "2"
+linters:
+  enable:
+    - bodyclose
+    - depguard
+    - dogsled
+    - dupword # Detects duplicate words.
+    - durationcheck
+    - errchkjson
+    - copyloopvar # Detects pointers to enclosing loop variables.
+    - gocritic # Metalinter; detects bugs, performance, and styling issues.
+    - gocyclo
+    - gosec # Detects security problems.
+    - govet
+    - ineffassign
+    - lll
+    - misspell # Detects commonly misspelled English words in comments.
+    - nakedret
+    - nilerr # Detects code that returns nil even if it checks that the error is not nil.
+    - nolintlint # Detects ill-formed or insufficient nolint directives.
+    - perfsprint # Detects fmt.Sprintf uses that can be replaced with a faster alternative.
+    - prealloc # Detects slice declarations that could potentially be pre-allocated.
+    - predeclared # Detects code that shadows one of Go's predeclared identifiers
+    - reassign
+    - revive # Metalinter; drop-in replacement for golint.
+    - staticcheck
+    - usetesting 
+    - thelper # Detects test helpers without t.Helper().
+    - tparallel # Detects inappropriate usage of t.Parallel().
+    - unconvert # Detects unnecessary type conversions.
+    - unparam
+    - unused
+    - usestdlibvars
+    - govet
+    - wastedassign
+
+  disable:
+    - errcheck
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: The io/ioutil package has been deprecated, see https://go.dev/doc/go1.16#ioutil
+    gocyclo:
+      min-complexity: 16
+    govet:
+      enable:
+        - shadow
+      settings:
+        shadow:
+          strict: true
+    lll:
+      line-length: 230
+
+    staticcheck:
+      checks:
+        - -QF1008
+
+    revive:
+      rules:
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#import-shadowing
+        - name: import-shadowing
+          severity: warning
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-block
+        - name: empty-block
+          severity: warning
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+        - name: empty-lines
+          severity: warning
+          disabled: false
+        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#use-any
+        - name: use-any
+          severity: warning
+          disabled: false
+    gosec:
+      excludes:
+        - G104
+        - G115
+        - G301
+        - G304
+
+  exclusions:
+    rules:
+      - linters:
+          - govet
+        text: 'shadow: declaration of "(err|ok)" shadows declaration'
+
+formatters:
+  enable:
+    - gofumpt # Detects whether code was gofumpt-ed.
+    - goimports
+
+run:
+  timeout: 5m
+
+issues:
+  # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
+  max-issues-per-linter: 0
+
+  # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
+  max-same-issues: 0

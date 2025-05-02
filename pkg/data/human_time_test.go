@@ -1,4 +1,3 @@
-//nolint:gocognit,funlen
 package data
 
 import (
@@ -252,7 +251,7 @@ func TestHumanTime_Scan(t *testing.T) {
 
 	tests := []struct {
 		name        string
-		scanValue   interface{}
+		scanValue   any
 		expectedHT  HumanTime
 		expectError bool
 	}{
