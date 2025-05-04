@@ -117,6 +117,11 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 		e.SetMetadata("Organizer", event.Organizer.Cn)
 	}
 
+	if event.Start != nil && event.End != nil {
+		dur := event.End.Sub(*event.Start)
+		e.SetMetadata("Duration", dur.String())
+	}
+
 	if len(event.Attendees) > 0 {
 		e.SetMetadata("Attendee", collectAttendees(event.Attendees))
 	}
