@@ -143,9 +143,11 @@ func TestBuildEntriesFromFeed(t *testing.T) {
 			if !tt.expectPanic {
 				if tt.expectError {
 					assert.Error(t, err, "Expected an error")
+
 					if tt.expectedError != nil {
 						assert.Equal(t, tt.expectedError, err, "Error mismatch")
 					}
+
 					assert.Nil(t, entries, "Expected nil entries on error")
 				} else {
 					assert.NoError(t, err, "Did not expect an error")
@@ -154,6 +156,7 @@ func TestBuildEntriesFromFeed(t *testing.T) {
 
 					// Verify basic fields for expected entries
 					require.Equal(t, len(tt.expectedEntries), len(entries), "Mismatch in number of expected vs actual entries for detailed check")
+
 					for i := range tt.expectedEntries {
 						expected := tt.expectedEntries[i]
 						actual := entries[i]
