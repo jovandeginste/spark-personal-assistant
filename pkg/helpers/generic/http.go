@@ -5,7 +5,9 @@ import (
 	"net/http"
 )
 
-func GetBody(remote string) ([]byte, error) {
+var GetBody = getBody
+
+func getBody(remote string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, remote, nil)
 	if err != nil {
 		return nil, err
