@@ -12,19 +12,23 @@ import (
 	"gopkg.in/gomail.v2"
 )
 
+type MailerFrom struct {
+	Name    string `mapstructure:"name"`
+	Address string `mapstructure:"address"`
+}
+
+type MailerServer struct {
+	Address  string `mapstructure:"address"`
+	Port     int    `mapstructure:"port"`
+	UserName string `mapstructure:"user_name"`
+	Password string `mapstructure:"password"`
+}
+
 type Mailer struct {
-	Preview bool `mapstructure:"preview"`
-	From    struct {
-		Name    string `mapstructure:"name"`
-		Address string `mapstructure:"address"`
-	} `mapstructure:"from"`
-	Bcc    string `mapstructure:"bcc"`
-	Server struct {
-		Address  string `mapstructure:"address"`
-		Port     int    `mapstructure:"port"`
-		UserName string `mapstructure:"user_name"`
-		Password string `mapstructure:"password"`
-	} `mapstructure:"server"`
+	Preview bool         `mapstructure:"preview"`
+	From    MailerFrom   `mapstructure:"from"`
+	Bcc     string       `mapstructure:"bcc"`
+	Server  MailerServer `mapstructure:"server"`
 
 	app *App
 }

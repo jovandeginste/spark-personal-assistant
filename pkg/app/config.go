@@ -34,11 +34,13 @@ func (a *App) ReadConfig() error {
 		return err
 	}
 
+	a.SetDefaults()
+
+	a.Config.Database.originalFile = a.Config.Database.File
+
 	if strings.HasPrefix(a.Config.Database.File, "/") {
 		return nil
 	}
-
-	a.SetDefaults()
 
 	absPath, err := filepath.Abs(a.ConfigFile)
 	if err != nil {
@@ -46,12 +48,16 @@ func (a *App) ReadConfig() error {
 	}
 
 	dirname := filepath.Dir(absPath)
-	a.Config.Database.File = filepath.Clean(filepath.Join(dirname, a.Config.Database.File))
+	a.Config.Database.File = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Database.File))
 
 	return nil
 }
 
 func (a *App) SetDefaults() {
+	if a.Config.Database.File == "" {
+		a.Config.Database.File = "spark.db"
+	}
+
 	if a.Config.Assistant.Name == "" {
 		a.Config.Assistant.Name = "Spark"
 	}

@@ -9,7 +9,8 @@ import (
 )
 
 type DatabaseConfig struct {
-	File string `mapstructure:"file"`
+	File         string `mapstructure:"file"`
+	originalFile string
 }
 
 func (a *App) DB() *gorm.DB {
