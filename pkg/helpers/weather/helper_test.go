@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/agiledragon/gomonkey/v2"
+	"github.com/awterman/monkey"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
@@ -129,7 +129,7 @@ func TestQueryFor(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Patch geocoder.SearchLocations
-			patchGeo := gomonkey.ApplyFunc(geocoder.SearchLocations, func(loc string) ([]geocoder.Result, error) {
+			patchGeo := monkey.Func(nil, geocoder.SearchLocations, func(loc string) ([]geocoder.Result, error) {
 				assert.Equal(t, tt.location, loc, "geocoder.SearchLocations called with incorrect location")
 				return tt.mockGeoResult, tt.mockGeoError
 			})
@@ -200,14 +200,14 @@ func TestGetWeatherInfo(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Patch queryFor
-			patchQuery := gomonkey.ApplyFunc(queryFor, func(loc string) (url.Values, error) {
+			patchQuery := monkey.Func(nil, queryFor, func(loc string) (url.Values, error) {
 				assert.Equal(t, tt.location, loc, "queryFor called with incorrect location")
 				return tt.mockQueryValue, tt.mockQueryError
 			})
 			defer patchQuery.Reset()
 
 			// Patch generic.GetBody
-			patchGetBody := gomonkey.ApplyFunc(generic.GetBody, func(u string) ([]byte, error) {
+			patchGetBody := monkey.Func(nil, generic.GetBody, func(u string) ([]byte, error) {
 				// Construct the expected URL from the mock query value
 				expectedURL := omURL + "?" + tt.mockQueryValue.Encode()
 				assert.Equal(t, expectedURL, u, "generic.GetBody called with incorrect URL")
@@ -284,7 +284,7 @@ func TestGetWeather(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Patch getWeatherInfo
-			patchGetInfo := gomonkey.ApplyFunc(getWeatherInfo, func(loc string) ([]byte, error) {
+			patchGetInfo := monkey.Func(nil, getWeatherInfo, func(loc string) ([]byte, error) {
 				assert.Equal(t, tt.location, loc, "getWeatherInfo called with incorrect location")
 				return tt.mockGetInfoRes, tt.mockGetInfoErr
 			})
@@ -537,7 +537,7 @@ func TestGetWeatherData(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Patch GetWeather
-			patchGetWeather := gomonkey.ApplyFunc(getWeatherData, func(loc string) (*WeatherData, error) {
+			patchGetWeather := monkey.Func(nil, getWeatherData, func(loc string) (*WeatherData, error) {
 				assert.Equal(t, tt.location, loc, "GetWeather called with incorrect location")
 				return tt.mockGetWeatherRes, tt.mockGetWeatherErr
 			})
@@ -550,7 +550,7 @@ func TestGetWeatherData(t *testing.T) {
 			// Let's add a patch for newEventFromOpenMeteo to simulate the invalid date case
 			// and ensure GetWeatherData handles it (logs, doesn't return error).
 			if tt.name == "GetWeather returns WeatherData with invalid date string (simulated)" {
-				patchNewEvent := gomonkey.ApplyFunc(newEventFromOpenMeteo, func(wd *WeatherData, location string, day int) (*data.Entry, error) {
+				patchNewEvent := monkey.Func(nil, newEventFromOpenMeteo, func(wd *WeatherData, location string, day int) (*data.Entry, error) {
 					// Simulate error only for this specific test case
 					return &data.Entry{}, errors.New("simulated newEventFromOpenMeteo error")
 				})
