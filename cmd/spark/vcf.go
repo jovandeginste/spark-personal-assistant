@@ -20,6 +20,9 @@ func (c *cli) vcfCmd() *cobra.Command {
 			file := args[1]
 
 			entries, err := vcf.BuildEntriesFromFile(file)
+			if err != nil {
+				return err
+			}
 
 			c.app.FetchExistingEntries(entries)
 

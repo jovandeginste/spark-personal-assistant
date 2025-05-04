@@ -1,8 +1,8 @@
 package data
 
 import (
-	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/aquasecurity/table"
 )
@@ -15,7 +15,7 @@ func (es Entries) PrintTo(w io.Writer) {
 
 	for _, entry := range es {
 		t.AddRow(
-			fmt.Sprintf("%d", entry.ID),
+			strconv.FormatUint(entry.ID, 10),
 			entry.DateString,
 			entry.Summary,
 			string(entry.Importance),

@@ -232,10 +232,12 @@ func TestGetWeatherInfo(t *testing.T) {
 func TestGetWeather(t *testing.T) {
 	mockLocation := "Berlin"
 	mockWeatherData := createMockWeatherData(7, 1) // 7 days including 1 past day
-	mockWeatherJSON, _ := json.Marshal(mockWeatherData)
+	mockWeatherJSON, err := json.Marshal(mockWeatherData)
+	assert.NoError(t, err, "Failed to marshal mock weather data")
 
 	mockApiErrorData := &WeatherData{Error: true, Reason: "API key invalid"}
-	mockApiErrorJSON, _ := json.Marshal(mockApiErrorData)
+	mockApiErrorJSON, err := json.Marshal(mockApiErrorData)
+	assert.NoError(t, err, "Failed to marshal mock API error data")
 
 	tests := []struct {
 		name                string
@@ -337,9 +339,17 @@ func TestNewEventFromOpenMeteo(t *testing.T) {
 			RainSum:           []float64{0.0, 5.2, 10.0},
 			ShowersSum:        []float64{0.5, 1.0, 0.0},
 			SnowfallSum:       []float64{0.0, 0.0, 1.5},
-			Sunrise:           []string{fixedDate.Add(6*time.Hour + 0*time.Minute).Format(time.RFC3339), fixedDate.AddDate(0, 0, 1).Add(5*time.Hour + 59*time.Minute).Format(time.RFC3339), fixedDate.AddDate(0, 0, 2).Add(5*time.Hour + 58*time.Minute).Format(time.RFC3339)},
-			Sunset:            []string{fixedDate.Add(19*time.Hour + 0*time.Minute).Format(time.RFC3339), fixedDate.AddDate(0, 0, 1).Add(19*time.Hour + 1*time.Minute).Format(time.RFC3339), fixedDate.AddDate(0, 0, 2).Add(19*time.Hour + 2*time.Minute).Format(time.RFC3339)},
-			WindSpeed10MMax:   []float64{12.3, 15.0, 18.8},
+			Sunrise: []string{
+				fixedDate.Add(6*time.Hour + 0*time.Minute).Format(time.RFC3339),
+				fixedDate.AddDate(0, 0, 1).Add(5*time.Hour + 59*time.Minute).Format(time.RFC3339),
+				fixedDate.AddDate(0, 0, 2).Add(5*time.Hour + 58*time.Minute).Format(time.RFC3339),
+			},
+			Sunset: []string{
+				fixedDate.Add(19*time.Hour + 0*time.Minute).Format(time.RFC3339),
+				fixedDate.AddDate(0, 0, 1).Add(19*time.Hour + 1*time.Minute).Format(time.RFC3339),
+				fixedDate.AddDate(0, 0, 2).Add(19*time.Hour + 2*time.Minute).Format(time.RFC3339),
+			},
+			WindSpeed10MMax: []float64{12.3, 15.0, 18.8},
 		},
 		Reason: "",
 		Error:  false,
@@ -455,16 +465,15 @@ func TestNewEventFromOpenMeteo(t *testing.T) {
 			// Call the function under test
 			entry, err := newEventFromOpenMeteo(tt.weatherData, tt.location, tt.dayIndex)
 
-			if tt.expectError && err == nil {
+			switch {
+			case tt.expectError && err == nil:
 				// If we expected an error but got none, check if the error was an out-of-bounds panic
-				if tt.dayIndex < 0 || tt.dayIndex >= len(tt.weatherData.Daily.Time) {
-					// This case is handled by the defer/recover block above
-				} else {
+				if tt.dayIndex > 0 && tt.dayIndex < len(tt.weatherData.Daily.Time) {
 					t.Errorf("Expected an error but got none")
 				}
-			} else if !tt.expectError && err != nil {
+			case !tt.expectError && err != nil:
 				t.Errorf("Did not expect an error but got: %v", err)
-			} else if !tt.expectError && err == nil {
+			case !tt.expectError && err == nil:
 				// Success case: Compare the generated entry
 				require.NotNil(t, entry, "Expected non-nil entry on success")
 

@@ -28,6 +28,9 @@ func (c *cli) icalCmd() *cobra.Command {
 			}
 
 			entries, err := ical.BuildEntriesFromRemote(args[1], daysBack, daysAhead, collection)
+			if err != nil {
+				return err
+			}
 
 			c.app.FetchExistingEntries(entries)
 

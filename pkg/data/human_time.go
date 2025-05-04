@@ -87,7 +87,7 @@ func (ct HumanTime) Value() (driver.Value, error) {
 	return ct.Time, nil
 }
 
-func (ct *HumanTime) Scan(value interface{}) error {
+func (ct *HumanTime) Scan(value any) error {
 	// Scan needs a pointer receiver to modify the struct instance
 	if value == nil {
 		// Handle NULL from database

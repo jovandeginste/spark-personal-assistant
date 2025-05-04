@@ -63,9 +63,7 @@ func TestMDToHTML(t *testing.T) {
 
 func TestMDFileToHTML(t *testing.T) {
 	// Create a temporary directory for test files
-	tmpDir, err := os.MkdirTemp("", "mdtohtmltest")
-	require.NoError(t, err, "Failed to create temporary directory")
-	defer os.RemoveAll(tmpDir) // Clean up the directory afterwards
+	tmpDir := t.TempDir()
 
 	tests := []struct {
 		name         string
@@ -114,7 +112,7 @@ func TestMDFileToHTML(t *testing.T) {
 			filePath := filepath.Join(tmpDir, tt.filename)
 
 			if tt.createFile {
-				err := os.WriteFile(filePath, []byte(tt.fileContent), 0644)
+				err := os.WriteFile(filePath, []byte(tt.fileContent), 0o600)
 				require.NoError(t, err, "Failed to write test file")
 			}
 

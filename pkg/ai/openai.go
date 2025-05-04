@@ -27,7 +27,7 @@ func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMe
 		return openai.ChatCompletionMessageParamUnion{}, err
 	}
 
-	var parts []openai.ChatCompletionContentPartUnionParam
+	parts := make([]openai.ChatCompletionContentPartUnionParam, 0, len(prompt))
 
 	for _, part := range prompt {
 		parts = append(parts, openai.TextContentPart(part))

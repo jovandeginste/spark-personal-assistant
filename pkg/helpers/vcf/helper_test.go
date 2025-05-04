@@ -17,9 +17,11 @@ import (
 
 // Helper to create a temporary VCF file
 func createTempVCFFile(t *testing.T, content string) string {
+	t.Helper()
+
 	tmpDir := t.TempDir() // Use t.TempDir() for automatic cleanup
 	filePath := filepath.Join(tmpDir, "test.vcf")
-	err := os.WriteFile(filePath, []byte(content), 0644)
+	err := os.WriteFile(filePath, []byte(content), 0o600)
 	require.NoError(t, err, "Failed to write temporary VCF file")
 	return filePath
 }
@@ -191,12 +193,13 @@ INVALIDEND:VCARD`, // Malformed property might cause go-vcard.NewDecoder(f).Deco
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var filePath string
-			if !tt.expectError { // Create file unless we expect an error related to file opening/decoding
+			switch {
+			case !tt.expectError: // Create file unless we expect an error related to file opening/decoding
 				filePath = createTempVCFFile(t, tt.vcfContent)
-			} else if tt.name == "Non-existent file" {
+			case tt.name == "Non-existent file":
 				// Use a path that definitely does not exist for the os.Open error test
 				filePath = filepath.Join(t.TempDir(), "non", "existent", "path", "file.vcf")
-			} else {
+			default:
 				// Create a temp file even if we expect a decode error,
 				// as BuildEntriesFromFile still needs a file to open.
 				filePath = createTempVCFFile(t, tt.vcfContent)

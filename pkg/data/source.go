@@ -1,8 +1,8 @@
 package data
 
 import (
-	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/aquasecurity/table"
 )
@@ -26,7 +26,7 @@ func (srcs Sources) PrintTo(w io.Writer) {
 
 	for _, s := range srcs {
 		t.AddRow(
-			fmt.Sprintf("%d", s.ID),
+			strconv.FormatUint(s.ID, 10),
 			s.Name,
 			s.Description,
 		)

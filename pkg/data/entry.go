@@ -3,8 +3,10 @@ package data
 import (
 	"crypto/sha512"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"time"
 
 	"github.com/aquasecurity/table"
@@ -13,7 +15,7 @@ import (
 
 type Importance string
 
-var ErrInvalidImportance = fmt.Errorf("invalid importance")
+var ErrInvalidImportance = errors.New("invalid importance")
 
 const (
 	LOW    Importance = "low"
@@ -117,7 +119,7 @@ func (e *Entry) SetImportance(i string) error {
 func (e *Entry) PrintTo(w io.Writer) {
 	t := table.New(w)
 
-	t.AddRow("ID", fmt.Sprintf("%d", e.ID))
+	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
 	t.AddRow("Data", e.DateString)
 	t.AddRow("Summary", e.Summary)

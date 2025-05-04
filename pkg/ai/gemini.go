@@ -26,7 +26,7 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 		return nil, err
 	}
 
-	var parts []*genai.Part
+	parts := make([]*genai.Part, 0, len(prompt))
 
 	for _, part := range prompt {
 		parts = append(parts, &genai.Part{Text: part})

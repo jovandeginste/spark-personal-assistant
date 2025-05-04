@@ -93,7 +93,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 }
 
 func collectAttendees(attendees []gocal.Attendee) []string {
-	var result []string
+	result := make([]string, 0, len(attendees))
 
 	for _, a := range attendees {
 		result = append(result, a.Cn)
