@@ -27,6 +27,7 @@ require (
 )
 
 require (
+	bou.ke/monkey v1.0.2 // indirect
 	cloud.google.com/go v0.120.1 // indirect
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
