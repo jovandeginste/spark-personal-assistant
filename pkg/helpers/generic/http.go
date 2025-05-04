@@ -1,11 +1,11 @@
-package main
+package generic
 
 import (
 	"io"
 	"net/http"
 )
 
-func getBody(remote string) ([]byte, error) {
+func GetBody(remote string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, remote, nil)
 	if err != nil {
 		return nil, err

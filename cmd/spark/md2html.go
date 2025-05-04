@@ -2,10 +2,9 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"os"
 
-	"github.com/jovandeginste/spark-personal-assistant/pkg/markdown"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/md"
 	"github.com/spf13/cobra"
 )
 
@@ -16,34 +15,25 @@ func (c *cli) md2htmlCmd() *cobra.Command {
 		Example: "spark md2html ./md/summary-full.md",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			var (
+				html string
+				err  error
+			)
+
 			if len(args) == 0 {
-				return mdToHTML(os.Stdin)
+				html, err = md.MDToHTML(os.Stdin)
+			} else {
+				html, err = md.MDFileToHTML(args[0])
 			}
 
-			file, err := os.Open(args[0])
 			if err != nil {
 				return err
 			}
 
-			return mdToHTML(file)
+			fmt.Print(html)
+			return nil
 		},
 	}
 
 	return cmd
-}
-
-func mdToHTML(file io.Reader) error {
-	md, err := io.ReadAll(file)
-	if err != nil {
-		return err
-	}
-
-	html, err := markdown.GenerateHTML(md)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println(string(html))
-
-	return nil
 }
