@@ -1,6 +1,3 @@
-# bou.ke/monkey v1.0.2
-## explicit; go 1.13
-bou.ke/monkey
 # cloud.google.com/go v0.120.1
 ## explicit; go 1.23.0
 cloud.google.com/go/civil
@@ -28,6 +25,10 @@ github.com/ChannelMeter/iso8601duration
 # github.com/PuerkitoBio/goquery v1.8.0
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
+# github.com/agiledragon/gomonkey/v2 v2.13.0
+## explicit; go 1.14
+github.com/agiledragon/gomonkey/v2
+github.com/agiledragon/gomonkey/v2/creflect
 # github.com/andybalholm/cascadia v1.3.1
 ## explicit; go 1.16
 github.com/andybalholm/cascadia
@@ -38,6 +39,9 @@ github.com/apognu/gocal/parser
 # github.com/aquasecurity/table v1.8.0
 ## explicit; go 1.18
 github.com/aquasecurity/table
+# github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
+## explicit; go 1.20
+github.com/awterman/monkey
 # github.com/codingsince1985/geo-golang v1.8.5
 ## explicit; go 1.24.1
 github.com/codingsince1985/geo-golang

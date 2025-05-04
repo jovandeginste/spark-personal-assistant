@@ -5,8 +5,10 @@ go 1.24.1
 toolchain go1.24.2
 
 require (
+	github.com/agiledragon/gomonkey/v2 v2.13.0
 	github.com/apognu/gocal v0.9.1
 	github.com/aquasecurity/table v1.8.0
+	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/sqlite v1.11.0
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
@@ -27,7 +29,6 @@ require (
 )
 
 require (
-	bou.ke/monkey v1.0.2 // indirect
 	cloud.google.com/go v0.120.1 // indirect
 	cloud.google.com/go/auth v0.16.1 // indirect
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect

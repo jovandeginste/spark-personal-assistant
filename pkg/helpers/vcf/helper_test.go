@@ -1,6 +1,3 @@
-//go:build !integration
-// +build !integration
-
 package vcf
 
 import (
@@ -11,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"bou.ke/monkey"
+	"github.com/awterman/monkey"
 	_ "github.com/emersion/go-vcard" // Import needed for test data creation implicitly
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/stretchr/testify/assert"
@@ -31,8 +28,8 @@ func createTempVCFFile(t *testing.T, content string) string {
 func TestBuildEntriesFromFile(t *testing.T) {
 	// Mock time.Now() for deterministic parseBday calls within BuildEntriesFromFile
 	fakeNow := time.Date(2024, time.March, 15, 12, 0, 0, 0, time.UTC)
-	patchTime := monkey.Patch(time.Now, func() time.Time { return fakeNow })
-	defer patchTime.Unpatch()
+	patchTime := monkey.Func(nil, time.Now, func() time.Time { return fakeNow })
+	defer patchTime.Reset()
 
 	type expectedEntry struct {
 		Date     time.Time
