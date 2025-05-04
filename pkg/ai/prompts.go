@@ -28,6 +28,7 @@ var promptPreamble = []string{
 	"Use emojis.",
 	"Translate all entries to English.",
 	"The following entries consist a list of items.",
+	"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 }
 
 func (a AssistantConfig) PromptPreamble() []string {
@@ -49,7 +50,6 @@ func PromptWeek(assistant AssistantConfig, data any) ([]string, error) {
 		[]string{
 			"Only include this week's entries.",
 			"Compile a schedule and a summarized overview of todo's, and reminders.",
-			"Today is: " + time.Now().Format("2006-01-02"),
 			"Information:",
 			string(j),
 		}...,
@@ -67,7 +67,6 @@ func PromptToday(assistant AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's entries. Be verbose.",
-			"Today is: " + time.Now().Format("2006-01-02"),
 			"Information:",
 			string(j),
 		}...,
@@ -85,7 +84,6 @@ func PromptFull(assistant AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Add a quick summary of the past week's important entries. Be verbose about today's entries. Add a quick summary of future important entries - one line per day. Add weather information for days with outside entries.",
-			"Today is: " + time.Now().Format("2006-01-02"),
 			"Information:",
 			string(j),
 		}...,
