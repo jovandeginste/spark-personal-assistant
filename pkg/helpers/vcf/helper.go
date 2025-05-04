@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"strings"
 	"time"
@@ -28,7 +27,7 @@ func BuildEntriesFromFile(file string) (data.Entries, error) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 
 		name := card.PreferredValue(vcard.FieldFormattedName)
