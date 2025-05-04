@@ -7,8 +7,9 @@ import (
 	"github.com/mmcdole/gofeed"
 )
 
+var fp = gofeed.NewParser()
+
 func BuildEntriesFromFeed(feedURL string) (data.Entries, error) {
-	fp := gofeed.NewParser()
 	fp.UserAgent = "curl/8.12.1"
 
 	feed, err := fp.ParseURL(feedURL)
