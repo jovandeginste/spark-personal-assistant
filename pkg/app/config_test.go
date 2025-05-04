@@ -74,14 +74,26 @@ func TestSetDefaults(t *testing.T) {
 	}
 }
 
-func TestReadConfig(t *testing.T) {
-	// Mock environment variable SPARK_CONFIG
-	originalSparkConfig := os.Getenv("SPARK_CONFIG")
-	t.Cleanup(func() {
-		// Restore original environment variable
-		os.Setenv("SPARK_CONFIG", originalSparkConfig)
-	})
+type testReadConfigCase struct {
+	name string
+	// Mocks for viper operations
+	mockSetConfigFile func(path string)   // Use a function to assert the path passed to SetConfigFile
+	mockReadInConfig  func() error        // Return value for ReadInConfig
+	mockUnmarshal     func(cfg any) error // Behavior for Unmarshal
 
+	// Mocks for path operations
+	mockFilepathAbs func(path string) (string, error) // Behavior for filepath.Abs
+
+	// Control flow flags/inputs
+	configFileArg string // Value passed to --config flag (simulated)
+	sparkEnvVar   string // Value of SPARK_CONFIG env var (simulated)
+
+	expectError    bool
+	expectedErr    error
+	expectedDBPath string // Expected final value of a.Config.Database.File
+}
+
+func TestReadConfig(t *testing.T) {
 	// Mock data that viper.Unmarshal will populate into a.Config
 	mockUnmarshaledConfigData := Config{
 		Assistant:    ai.AssistantConfig{Name: "TestAI", Style: "Formal"},
@@ -112,24 +124,7 @@ func TestReadConfig(t *testing.T) {
 		LLM: &ai.AIConfig{Type: "gemini", Model: "gemini-pro", APIKey: "absolute_testkey"},
 	}
 
-	tests := []struct {
-		name string
-		// Mocks for viper operations
-		mockSetConfigFile func(path string)   // Use a function to assert the path passed to SetConfigFile
-		mockReadInConfig  func() error        // Return value for ReadInConfig
-		mockUnmarshal     func(cfg any) error // Behavior for Unmarshal
-
-		// Mocks for path operations
-		mockFilepathAbs func(path string) (string, error) // Behavior for filepath.Abs
-
-		// Control flow flags/inputs
-		configFileArg string // Value passed to --config flag (simulated)
-		sparkEnvVar   string // Value of SPARK_CONFIG env var (simulated)
-
-		expectError    bool
-		expectedErr    error
-		expectedDBPath string // Expected final value of a.Config.Database.File
-	}{
+	tests := []testReadConfigCase{
 		{
 			name:              "Successful read with relative database path",
 			mockSetConfigFile: func(path string) { assert.Equal(t, "test_config.yaml", path) },
@@ -327,138 +322,149 @@ func TestReadConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			app := &App{} // Start with a fresh App instance
-
-			// Manually set ConfigFile field on the app instance, simulating Cobra's flag binding
-			// This replicates the logic in cmd/spark/cli.go's PersistentFlags().StringVar
-			app.ConfigFile = "./spark.yaml" // Default value
-			if sparkConfigEnv, ok := os.LookupEnv("SPARK_CONFIG"); ok {
-				app.ConfigFile = sparkConfigEnv // Env var overrides default
-			}
-			// The --config flag would override both. We simulate this by setting app.ConfigFile directly
-			// if configFileArg is provided in the test case.
-			if tt.configFileArg != "" {
-				app.ConfigFile = tt.configFileArg
-			} else if tt.sparkEnvVar != "" {
-				// If sparkEnvVar is set in the test, explicitly set the env var for the duration
-				// of this test case and also update app.ConfigFile to match what the CLI would do.
-				os.Setenv("SPARK_CONFIG", tt.sparkEnvVar)
-				defer os.Unsetenv("SPARK_CONFIG") // Ensure env var is not set if test doesn't specify it
-				app.ConfigFile = tt.sparkEnvVar   // Explicitly set what the CLI would
-			} else {
-				os.Unsetenv("SPARK_CONFIG") // Ensure env var is not set if test doesn't specify it
-				// app.ConfigFile remains "./spark.yaml" from its initialization
-			}
-
-			// --- Patching ---
-			// viper.SetConfigFile is called with the value of a.ConfigFile
-			patchSetConfigFile := monkey.Func(nil, viper.SetConfigFile, tt.mockSetConfigFile)
-			defer patchSetConfigFile.Reset()
-
-			// viper.ReadInConfig is called next
-			readInConfigCalls := 0
-			patchReadInConfig := monkey.Func(nil, viper.ReadInConfig, func() error {
-				readInConfigCalls++
-				return tt.mockReadInConfig()
-			})
-			defer patchReadInConfig.Reset()
-
-			// viper.Unmarshal is called after ReadInConfig (unless ReadInConfig returns a non-ConfigFileNotFoundError)
-			// Patching viper.Unmarshal requires patching a method on the *viper.Viper instance.
-			// The code `viper.Unmarshal(&a.Config)` implicitly uses the default global viper instance.
-			// We can patch the Unmarshal method directly on the default viper instance.
-			unmarshalCalls := 0
-			patchUnmarshal := monkey.Method(nil, viper.GetViper(), viper.Unmarshal, func(runTimeConfig any, _ ...viper.DecoderConfigOption) error {
-				unmarshalCalls++
-				return tt.mockUnmarshal(runTimeConfig) // Call the test-specific unmarshal behavior
-			})
-			defer patchUnmarshal.Reset()
-
-			// filepath.Abs is called *after* Unmarshal if the database path is relative.
-			// The current code calls it *only* on the config file path (`filepath.Abs(a.ConfigFile)`)
-			// *after* unmarshalling and the initial absolute check.
-			absCalls := []string{}
-			patchAbs := monkey.Func(nil, filepath.Abs, func(path string) (string, error) {
-				absCalls = append(absCalls, path)
-				return tt.mockFilepathAbs(path) // Call the test-specific Abs behavior
-			})
-			defer patchAbs.Reset()
-
-			// SetDefaults is called after Unmarshal and before database path resolution
-			setDefaultsCallCount := 0
-			patchSetDefaults := monkey.Method(nil, app, app.SetDefaults, func() {
-				setDefaultsCallCount++
-				// Don't call the real SetDefaults here to keep this mock simple.
-				// The actual effects of SetDefaults on the final config are verified
-				// by comparing against a config struct that has had SetDefaults applied elsewhere.
-			})
-			defer patchSetDefaults.Reset()
-
-			// --- Call the function under test ---
-			err := app.ReadConfig()
-
-			// --- Assertions ---
-			if tt.expectError {
-				assert.Error(t, err, "Expected an error")
-				if tt.expectedErr != nil {
-					assert.Equal(t, tt.expectedErr, err, "Error mismatch")
-				}
-				// If error, app.Config state might be partially populated or zero, hard to assert.
-			} else {
-				assert.NoError(t, err, "Did not expect an error")
-
-				// Assert viper calls
-				assert.Equal(t, 1, readInConfigCalls, "viper.ReadInConfig should be called exactly once")
-				assert.Equal(t, 1, unmarshalCalls, "viper.Unmarshal should be called exactly once")
-
-				// Assert SetDefaults was called
-				assert.Equal(t, 1, setDefaultsCallCount, "SetDefaults should be called exactly once")
-
-				// Assert filepath.Abs call(s)
-				// filepath.Abs is called once on `a.ConfigFile` after unmarshal if the DB path is relative.
-				// If the DB path is absolute, filepath.Abs is not called in this resolution block.
-				if !strings.HasPrefix(app.Config.Database.originalFile, "/") {
-					// Relative path, filepath.Abs(a.ConfigFile) should be called once
-					if assert.Equal(t, 1, len(absCalls), "filepath.Abs should be called exactly once for relative DB path") {
-						assert.Equal(t, app.ConfigFile, absCalls[0], "filepath.Abs called with incorrect path for relative DB path")
-					}
-				} else {
-					// Absolute path, filepath.Abs should not be called in the path resolution block
-					assert.Equal(t, 0, len(absCalls), "filepath.Abs should not be called for absolute DB path")
-				}
-
-				// Verify the final state of app.Config after unmarshalling and real SetDefaults.
-				// To do this, apply the real SetDefaults to a copy of the unmarshaled data.
-				tempAppConfig := Config{}
-				// Re-run the unmarshal mock to get the unmarshaled state into tempAppConfig
-				// This is necessary because the mockUnmarshal function only modifies the pointer
-				// passed to it during the actual ReadConfig call.
-				// We need to ensure the temp copy gets the same unmarshaled data.
-				// This relies on the mockUnmarshal setting the cfg pointer correctly.
-				_ = tt.mockUnmarshal(&tempAppConfig)
-				tempApp := &App{Config: tempAppConfig}
-				tempApp.SetDefaults() // Apply real SetDefaults to the temporary config
-
-				// Now compare the main app.Config (which had real SetDefaults applied because we patched the method)
-				// against the tempApp.Config (which we explicitly applied real SetDefaults to).
-				// Note: The patching of SetDefaults makes the assertion here simpler -
-				// we just need to check if the final state of app.Config matches the state
-				// resulting from the unmarshaled data *plus* the real SetDefaults logic.
-				// The DB path is resolved after SetDefaults, so compare it separately.
-				assert.Equal(t, tempApp.Config.Assistant, app.Config.Assistant, "Assistant config mismatch")
-				// Don't compare Database.File here, compare the rest of the Database struct
-				assert.Equal(t, DatabaseConfig{originalFile: app.Config.Database.originalFile, File: app.Config.Database.File}, app.Config.Database, "Database config mismatch (excluding File path resolution)") // Compare everything except the potentially resolved file path
-				assert.Equal(t, tempApp.Config.UserData, app.Config.UserData, "UserData config mismatch")
-				assert.Equal(t, tempApp.Config.ExtraContext, app.Config.ExtraContext, "ExtraContext config mismatch")
-				assert.Equal(t, tempApp.Config.Mailer.From, app.Config.Mailer.From, "Mailer From config mismatch")
-				assert.Equal(t, tempApp.Config.Mailer.Server, app.Config.Mailer.Server, "Mailer Server config mismatch")
-				assert.Equal(t, tempApp.Config.Mailer.Preview, app.Config.Mailer.Preview, "Mailer Preview config mismatch")
-				assert.Equal(t, tempApp.Config.Mailer.Bcc, app.Config.Mailer.Bcc, "Mailer Bcc config mismatch")
-				assert.Equal(t, tempApp.Config.LLM, app.Config.LLM, "LLM config mismatch")
-
-				// Assert the final database file path resolution specifically
-				assert.Equal(t, tt.expectedDBPath, app.Config.Database.File, "Database file path mismatch after resolution")
-			}
+			testAppWith(t, &tt)
 		})
 	}
+}
+
+func testAppWith(t *testing.T, tt *testReadConfigCase) {
+	t.Helper()
+	app := &App{} // Start with a fresh App instance
+
+	// Manually set ConfigFile field on the app instance, simulating Cobra's flag binding
+	// This replicates the logic in cmd/spark/cli.go's PersistentFlags().StringVar
+	app.ConfigFile = "./spark.yaml" // Default value
+	if sparkConfigEnv, ok := os.LookupEnv("SPARK_CONFIG"); ok {
+		app.ConfigFile = sparkConfigEnv // Env var overrides default
+	}
+
+	// The --config flag would override both. We simulate this by setting app.ConfigFile directly
+	// if configFileArg is provided in the test case.
+	if tt.configFileArg != "" {
+		app.ConfigFile = tt.configFileArg
+	} else if tt.sparkEnvVar != "" {
+		// If sparkEnvVar is set in the test, explicitly set the env var for the duration
+		// of this test case and also update app.ConfigFile to match what the CLI would do.
+		t.Setenv("SPARK_CONFIG", tt.sparkEnvVar)
+		app.ConfigFile = tt.sparkEnvVar // Explicitly set what the CLI would
+	}
+
+	// --- Patching ---
+	// viper.SetConfigFile is called with the value of a.ConfigFile
+	patches := monkey.Func(nil, viper.SetConfigFile, tt.mockSetConfigFile)
+	defer patches.Reset()
+
+	// viper.ReadInConfig is called next
+	readInConfigCalls := 0
+	monkey.Func(patches, viper.ReadInConfig, func() error {
+		readInConfigCalls++
+		return tt.mockReadInConfig()
+	})
+
+	// viper.Unmarshal is called after ReadInConfig (unless ReadInConfig returns a non-ConfigFileNotFoundError)
+	// Patching viper.Unmarshal requires patching a method on the *viper.Viper instance.
+	// The code `viper.Unmarshal(&a.Config)` implicitly uses the default global viper instance.
+	// We can patch the Unmarshal method directly on the default viper instance.
+	unmarshalCalls := 0
+	monkey.Method(patches, viper.GetViper(), viper.Unmarshal, func(runTimeConfig any, _ ...viper.DecoderConfigOption) error {
+		unmarshalCalls++
+		return tt.mockUnmarshal(runTimeConfig) // Call the test-specific unmarshal behavior
+	})
+
+	// filepath.Abs is called *after* Unmarshal if the database path is relative.
+	// The current code calls it *only* on the config file path (`filepath.Abs(a.ConfigFile)`)
+	// *after* unmarshalling and the initial absolute check.
+	absCalls := []string{}
+	monkey.Func(patches, filepath.Abs, func(path string) (string, error) {
+		absCalls = append(absCalls, path)
+		return tt.mockFilepathAbs(path) // Call the test-specific Abs behavior
+	})
+
+	// SetDefaults is called after Unmarshal and before database path resolution
+	setDefaultsCallCount := 0
+	monkey.Method(patches, app, app.SetDefaults, func() {
+		setDefaultsCallCount++
+		// Don't call the real SetDefaults here to keep this mock simple.
+		// The actual effects of SetDefaults on the final config are verified
+		// by comparing against a config struct that has had SetDefaults applied elsewhere.
+	})
+
+	// --- Call the function under test ---
+	err := app.ReadConfig()
+
+	// --- Assertions ---
+	if tt.expectError {
+		assert.Error(t, err, "Expected an error")
+		if tt.expectedErr != nil {
+			assert.Equal(t, tt.expectedErr, err, "Error mismatch")
+		}
+		// If error, app.Config state might be partially populated or zero, hard to assert.
+		return
+	}
+
+	assert.NoError(t, err, "Did not expect an error")
+
+	// Assert viper calls
+	assert.Equal(t, 1, readInConfigCalls, "viper.ReadInConfig should be called exactly once")
+	assert.Equal(t, 1, unmarshalCalls, "viper.Unmarshal should be called exactly once")
+
+	// Assert SetDefaults was called
+	assert.Equal(t, 1, setDefaultsCallCount, "SetDefaults should be called exactly once")
+
+	// Assert filepath.Abs call(s)
+	// filepath.Abs is called once on `a.ConfigFile` after unmarshal if the DB path is relative.
+	// If the DB path is absolute, filepath.Abs is not called in this resolution block.
+	if !strings.HasPrefix(app.Config.Database.originalFile, "/") {
+		// Relative path, filepath.Abs(a.ConfigFile) should be called once
+		if assert.Equal(t, 1, len(absCalls), "filepath.Abs should be called exactly once for relative DB path") {
+			assert.Equal(t, app.ConfigFile, absCalls[0], "filepath.Abs called with incorrect path for relative DB path")
+		}
+	} else {
+		// Absolute path, filepath.Abs should not be called in the path resolution block
+		assert.Equal(t, 0, len(absCalls), "filepath.Abs should not be called for absolute DB path")
+	}
+
+	// Verify the final state of app.Config after unmarshalling and real SetDefaults.
+	// To do this, apply the real SetDefaults to a copy of the unmarshaled data.
+	tempAppConfig := Config{}
+	// Re-run the unmarshal mock to get the unmarshaled state into tempAppConfig
+	// This is necessary because the mockUnmarshal function only modifies the pointer
+	// passed to it during the actual ReadConfig call.
+	// We need to ensure the temp copy gets the same unmarshaled data.
+	// This relies on the mockUnmarshal setting the cfg pointer correctly.
+	_ = tt.mockUnmarshal(&tempAppConfig)
+	tempApp := &App{Config: tempAppConfig}
+	tempApp.SetDefaults() // Apply real SetDefaults to the temporary config
+
+	testEqualApp(t, tempApp, app)
+
+	assert.Equal(t, tt.expectedDBPath, app.Config.Database.File, "Database file path mismatch after resolution")
+}
+
+func testEqualApp(t *testing.T, tempApp, app *App) {
+	t.Helper()
+
+	// Now compare the main app.Config (which had real SetDefaults applied because we patched the method)
+	// against the tempApp.Config (which we explicitly applied real SetDefaults to).
+	// Note: The patching of SetDefaults makes the assertion here simpler -
+	// we just need to check if the final state of app.Config matches the state
+	// resulting from the unmarshaled data *plus* the real SetDefaults logic.
+	// The DB path is resolved after SetDefaults, so compare it separately.
+	assert.Equal(t, tempApp.Config.Assistant, app.Config.Assistant, "Assistant config mismatch")
+	// Don't compare Database.File here, compare the rest of the Database struct
+	assert.Equal(
+		t,
+		DatabaseConfig{originalFile: app.Config.Database.originalFile, File: app.Config.Database.File},
+		app.Config.Database,
+		"Database config mismatch (excluding File path resolution)",
+	) // Compare everything except the potentially resolved file path
+	assert.Equal(t, tempApp.Config.UserData, app.Config.UserData, "UserData config mismatch")
+	assert.Equal(t, tempApp.Config.ExtraContext, app.Config.ExtraContext, "ExtraContext config mismatch")
+	assert.Equal(t, tempApp.Config.Mailer.From, app.Config.Mailer.From, "Mailer From config mismatch")
+	assert.Equal(t, tempApp.Config.Mailer.Server, app.Config.Mailer.Server, "Mailer Server config mismatch")
+	assert.Equal(t, tempApp.Config.Mailer.Preview, app.Config.Mailer.Preview, "Mailer Preview config mismatch")
+	assert.Equal(t, tempApp.Config.Mailer.Bcc, app.Config.Mailer.Bcc, "Mailer Bcc config mismatch")
+	assert.Equal(t, tempApp.Config.LLM, app.Config.LLM, "LLM config mismatch")
+
+	// Assert the final database file path resolution specifically
 }

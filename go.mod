@@ -5,7 +5,6 @@ go 1.24.1
 toolchain go1.24.2
 
 require (
-	github.com/agiledragon/gomonkey/v2 v2.13.0
 	github.com/apognu/gocal v0.9.1
 	github.com/aquasecurity/table v1.8.0
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
@@ -34,6 +33,7 @@ require (
 	cloud.google.com/go/compute/metadata v0.6.0 // indirect
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
+	github.com/agiledragon/gomonkey/v2 v2.13.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/codingsince1985/geo-golang v1.8.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
