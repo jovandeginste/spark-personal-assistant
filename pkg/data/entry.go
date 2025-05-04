@@ -82,10 +82,10 @@ func (e *Entry) FormattedDate() string {
 
 func parseDate(d string) (time.Time, error) {
 	if d == "" {
-		return time.Now().In(localTimezone).Truncate(24 * time.Hour), nil
+		return time.Now().In(LocalTimezone).Truncate(24 * time.Hour), nil
 	}
 
-	return time.ParseInLocation("2006-01-02", d, localTimezone)
+	return time.ParseInLocation("2006-01-02", d, LocalTimezone)
 }
 
 func (e *Entry) SetDate(d string) error {

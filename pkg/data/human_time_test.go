@@ -12,13 +12,13 @@ import (
 
 // Helper function to create a HumanTime with local time
 func newHumanTimeLocal(year int, month time.Month, day, hour, minute, sec int) HumanTime {
-	t := time.Date(year, month, day, hour, minute, sec, 0, localTimezone)
+	t := time.Date(year, month, day, hour, minute, sec, 0, LocalTimezone)
 	return HumanTime{Time: t}
 }
 
 func TestHumanTime_MarshalJSON(t *testing.T) {
-	localTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { localTimezone = time.Local }()
+	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
+	defer func() { LocalTimezone = time.Local }()
 
 	tests := []struct {
 		name        string
@@ -28,12 +28,12 @@ func TestHumanTime_MarshalJSON(t *testing.T) {
 	}{
 		{
 			name:     "Non-zero time with time part",
-			ht:       &HumanTime{Time: time.Date(2023, time.October, 27, 10, 30, 0, 0, localTimezone)},
+			ht:       &HumanTime{Time: time.Date(2023, time.October, 27, 10, 30, 0, 0, LocalTimezone)},
 			expected: `"2023-10-27 10:30"`,
 		},
 		{
 			name:     "Non-zero time without time part (midnight)",
-			ht:       &HumanTime{Time: time.Date(2024, time.January, 15, 0, 0, 0, 0, localTimezone)},
+			ht:       &HumanTime{Time: time.Date(2024, time.January, 15, 0, 0, 0, 0, LocalTimezone)},
 			expected: `"2024-01-15"`,
 		},
 		{
@@ -71,8 +71,8 @@ func TestHumanTime_MarshalJSON(t *testing.T) {
 }
 
 func TestHumanTime_UnmarshalJSON(t *testing.T) {
-	localTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { localTimezone = time.Local }()
+	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
+	defer func() { LocalTimezone = time.Local }()
 
 	tests := []struct {
 		name        string
@@ -85,14 +85,14 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 			name:      "Valid JSON string with date and time",
 			jsonInput: []byte(`"2023-10-27 10:30"`),
 			expectedHT: HumanTime{
-				Time: time.Date(2023, time.October, 27, 10, 30, 0, 0, localTimezone),
+				Time: time.Date(2023, time.October, 27, 10, 30, 0, 0, LocalTimezone),
 			},
 		},
 		{
 			name:      "Valid JSON string with date only",
 			jsonInput: []byte(`"2024-01-15"`),
 			expectedHT: HumanTime{
-				Time: time.Date(2024, time.January, 15, 0, 0, 0, 0, localTimezone),
+				Time: time.Date(2024, time.January, 15, 0, 0, 0, 0, LocalTimezone),
 			},
 		},
 		{
@@ -182,8 +182,8 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 }
 
 func TestHumanTime_Value(t *testing.T) {
-	localTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { localTimezone = time.Local }()
+	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
+	defer func() { LocalTimezone = time.Local }()
 
 	tests := []struct {
 		name          string
@@ -194,7 +194,7 @@ func TestHumanTime_Value(t *testing.T) {
 		{
 			name:          "Non-zero time",
 			ht:            newHumanTimeLocal(2023, time.October, 27, 10, 30, 0),
-			expectedValue: time.Date(2023, time.October, 27, 10, 30, 0, 0, localTimezone),
+			expectedValue: time.Date(2023, time.October, 27, 10, 30, 0, 0, LocalTimezone),
 		},
 		{
 			name:          "Zero time",
@@ -246,8 +246,8 @@ func TestHumanTime_Value(t *testing.T) {
 }
 
 func TestHumanTime_Scan(t *testing.T) {
-	localTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { localTimezone = time.Local }()
+	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
+	defer func() { LocalTimezone = time.Local }()
 
 	tests := []struct {
 		name        string
@@ -320,8 +320,8 @@ func TestHumanTime_Scan(t *testing.T) {
 }
 
 func TestHumanTime_FormatDate(t *testing.T) {
-	localTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { localTimezone = time.Local }()
+	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
+	defer func() { LocalTimezone = time.Local }()
 
 	tests := []struct {
 		name     string

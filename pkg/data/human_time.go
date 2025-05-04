@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-var localTimezone = time.Local
+var LocalTimezone = time.Local
 
 type HumanTime struct {
 	time.Time
@@ -61,7 +61,7 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04", "2006-01-02"} {
 		var err error
 
-		t, err = time.ParseInLocation(layout, s, localTimezone)
+		t, err = time.ParseInLocation(layout, s, LocalTimezone)
 		if err == nil {
 			break
 		}
@@ -110,8 +110,8 @@ func (ct *HumanTime) Scan(value interface{}) error {
 
 func (ct *HumanTime) FormatDate() string {
 	if ct.Hour() == 0 && ct.Minute() == 0 {
-		return ct.In(localTimezone).Format("2006-01-02")
+		return ct.In(LocalTimezone).Format("2006-01-02")
 	}
 
-	return ct.In(localTimezone).Format("2006-01-02 15:04")
+	return ct.In(LocalTimezone).Format("2006-01-02 15:04")
 }
