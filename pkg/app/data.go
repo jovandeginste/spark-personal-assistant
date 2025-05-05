@@ -65,12 +65,12 @@ func (a *App) FindEntry(e *data.Entry) error {
 	return a.DB().First(&e, e.ID).Error
 }
 
-func (a *App) FindEntryByRemoteID(e *data.Entry) (uint64, error) {
+func (a *App) FindEntryByRemoteID(sourceID uint64, e *data.Entry) (uint64, error) {
 	rid := e.NewRemoteID()
 
 	var entry data.Entry
 
-	if err := a.DB().Where("remote_id = ?", rid).First(&entry).Error; err != nil {
+	if err := a.DB().Where("source_id = ?", sourceID).Where("remote_id = ?", rid).First(&entry).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
@@ -115,9 +115,9 @@ func (a *App) CreateSource(src *data.Source) error {
 	return a.DB().Create(src).Error
 }
 
-func (a *App) FetchExistingEntries(entries data.Entries) {
+func (a *App) FetchExistingEntries(sourceID uint64, entries data.Entries) {
 	for i, e := range entries {
-		id, err := a.FindEntryByRemoteID(&e)
+		id, err := a.FindEntryByRemoteID(sourceID, &e)
 		if err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				continue

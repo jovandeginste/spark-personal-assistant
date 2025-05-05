@@ -32,7 +32,7 @@ func (c *cli) icalCmd() *cobra.Command {
 				return err
 			}
 
-			c.app.FetchExistingEntries(entries)
+			c.app.FetchExistingEntries(src.ID, entries)
 
 			return c.app.ReplaceSourceEntries(src, entries)
 		},

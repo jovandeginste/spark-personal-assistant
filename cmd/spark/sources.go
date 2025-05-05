@@ -91,7 +91,7 @@ func (c *cli) replaceEntriesSourceCmd() *cobra.Command {
 				return err
 			}
 
-			c.app.FetchExistingEntries(entries)
+			c.app.FetchExistingEntries(src.ID, entries)
 
 			if err := c.app.ReplaceSourceEntries(src, entries); err != nil {
 				return err
