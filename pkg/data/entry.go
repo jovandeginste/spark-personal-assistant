@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aquasecurity/table"
@@ -43,6 +44,27 @@ func (e *Entry) SetMetadata(key string, value any) {
 	}
 
 	e.Metadata[key] = value
+}
+
+func (e *Entry) SetMetadataIfNotEmpty(key string, value any) {
+	switch v := value.(type) {
+	case string:
+		uv, err := strconv.Unquote("\"" + v + "\"")
+		if err == nil {
+			uv = strings.TrimSpace(uv)
+		} else {
+			uv = strings.TrimSpace(v)
+		}
+
+		value = uv
+	}
+
+	switch value {
+	case nil, "", 0:
+		return
+	}
+
+	e.SetMetadata(key, value)
 }
 
 func (e *Entry) GenerateRemoteID() {

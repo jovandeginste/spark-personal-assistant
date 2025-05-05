@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/apognu/gocal"
@@ -72,12 +73,14 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 
 	e.Summary = event.Summary
 
-	if event.Location != "" {
-		e.SetMetadata("Location", event.Location)
-	}
+	if event.End != nil {
+		t, err := parseICalRawDate(&event.RawEnd, event.End)
+		if err != nil {
+			return nil, err
+		}
 
-	if event.Organizer != nil {
-		e.SetMetadata("Organizer", event.Organizer.Cn)
+		d := data.HumanTime{Time: t}
+		e.SetMetadata("End", d.FormatDate())
 	}
 
 	if event.Start != nil && event.End != nil {
@@ -85,21 +88,30 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 		e.SetMetadata("Duration", dur.String())
 	}
 
-	if len(event.Attendees) > 0 {
-		e.SetMetadata("Attendee", collectAttendees(event.Attendees))
+	e.SetMetadataIfNotEmpty("Location", event.Location)
+	e.SetMetadataIfNotEmpty("Attendee", collectAttendees(event.Attendees))
+	e.SetMetadataIfNotEmpty("Class", event.Class)
+	e.SetMetadataIfNotEmpty("Comment", event.Comment)
+	e.SetMetadataIfNotEmpty("Description", event.Description)
+
+	if event.Organizer != nil {
+		e.SetMetadataIfNotEmpty("Organizer", event.Organizer.Cn)
 	}
+
+	t := event.CustomAttributes["TRANSP"]
+	e.SetMetadata("Busy", t == "OPAQUE")
 
 	return e, nil
 }
 
-func collectAttendees(attendees []gocal.Attendee) []string {
+func collectAttendees(attendees []gocal.Attendee) string {
 	result := make([]string, 0, len(attendees))
 
 	for _, a := range attendees {
 		result = append(result, a.Cn)
 	}
 
-	return result
+	return strings.Join(result, ",")
 }
 
 func parseICalRawDate(rs *gocal.RawDate, start *time.Time) (time.Time, error) {
