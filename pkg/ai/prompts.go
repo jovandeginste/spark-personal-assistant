@@ -10,6 +10,8 @@ type Prompt func(assistant AssistantConfig, data any) ([]string, error)
 
 func PromptFor(format string) (Prompt, error) {
 	switch format {
+	case "custom":
+		return PromptCustom, nil
 	case "today":
 		return PromptToday, nil
 	case "week":
@@ -38,6 +40,23 @@ func (a AssistantConfig) PromptPreamble() []string {
 	}
 
 	return append(prompt, promptPreamble...)
+}
+
+func PromptCustom(assistant AssistantConfig, data any) ([]string, error) {
+	j, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	c := append(assistant.PromptPreamble(),
+		[]string{
+			"Provide an answer to your employers' question.",
+			"Take the following information into account to answer the question:",
+			string(j),
+		}...,
+	)
+
+	return c, nil
 }
 
 func PromptWeek(assistant AssistantConfig, data any) ([]string, error) {
