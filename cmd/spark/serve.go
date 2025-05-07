@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"fmt"
+	"io"
+	"os"
+	"strings"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
@@ -71,6 +75,87 @@ func (c *cli) printCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&customPrompt, "prompt", "p", nil, "extra custom prompt")
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVarP(&format, "format", "f", "full", "Format to use")
+	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
+
+	return cmd
+}
+
+func (c *cli) chatCmd() *cobra.Command {
+	var ef app.EntryFilter
+
+	cmd := &cobra.Command{
+		Use:     "chat",
+		Short:   "Chat with Spark",
+		Example: "spark chat",
+		Args:    cobra.NoArgs,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := c.app.Initialize(); err != nil {
+				return err
+			}
+
+			aiData, err := c.buildData(ef)
+			if err != nil {
+				return err
+			}
+
+			p, err := ai.PromptFor("custom")
+			if err != nil {
+				return err
+			}
+
+			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant)
+			if err != nil {
+				return err
+			}
+
+			c.app.Logger().Info(
+				"Generating summary for entries...",
+				"type", c.app.Config.LLM.Type,
+				"model", c.app.Config.LLM.Model,
+			)
+
+			reader := bufio.NewReader(os.Stdin)
+
+			fmt.Println("Enter your question. Type /quit to exit or press Ctrl+D.")
+
+			for {
+				fmt.Print("> ")
+
+				input, err := reader.ReadString('\n')
+				if err != nil {
+					if err == io.EOF { // Exit the loop on Ctrl+D (EOF)
+						fmt.Println("\nGoodbye!")
+						break
+					}
+
+					fmt.Println("Error reading input:", err)
+					continue
+				}
+
+				input = strings.TrimSpace(input)
+				if input == "/quit" {
+					fmt.Println("Goodbye!")
+					break
+				}
+
+				aiData.EmployerQuestion = []string{input}
+
+				c.app.Logger().Info("Parsing your question...")
+
+				md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
+				if err != nil {
+					return err
+				}
+
+				fmt.Println(md)
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
