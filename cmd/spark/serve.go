@@ -1,22 +1,26 @@
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 
+	"github.com/chzyer/readline"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/spf13/cobra"
 )
 
+type ChatHistory struct {
+	Role    string
+	Content string
+}
 type AIData struct {
 	ExtraContext     []string
-	EmployerQuestion []string `json:"employer_question,omitempty"`
+	ChatHistory      []ChatHistory `json:",omitempty"`
+	EmployerQuestion []string      `json:",omitempty"`
 	UserData         app.UserData
 	Entries          data.Entries
 }
@@ -115,28 +119,39 @@ func (c *cli) chatCmd() *cobra.Command {
 				"model", c.app.Config.LLM.Model,
 			)
 
-			reader := bufio.NewReader(os.Stdin)
+			rl, err := readline.New("> ")
+			if err != nil {
+				return err
+			}
+
+			defer rl.Close() // Ensure readline resources are cleaned up when the program exits
 
 			fmt.Println("Enter your question. Type /quit to exit or press Ctrl+D.")
 
+		input:
 			for {
 				fmt.Print("> ")
 
-				input, err := reader.ReadString('\n')
-				if err != nil {
-					if err == io.EOF { // Exit the loop on Ctrl+D (EOF)
-						fmt.Println("\nGoodbye!")
-						break
-					}
-
+				input, err := rl.Readline()
+				switch err {
+				case nil:
+				case io.EOF: // Exit the loop on Ctrl+D (EOF)
+					fmt.Println("\nGoodbye!")
+					break input
+				case readline.ErrInterrupt:
+					continue // Clear the current line and continue to the next prompt
+				default:
 					fmt.Println("Error reading input:", err)
 					continue
 				}
 
 				input = strings.TrimSpace(input)
-				if input == "/quit" {
+				switch input {
+				case "":
+					continue
+				case "/quit":
 					fmt.Println("Goodbye!")
-					break
+					break input
 				}
 
 				aiData.EmployerQuestion = []string{input}
@@ -149,6 +164,12 @@ func (c *cli) chatCmd() *cobra.Command {
 				}
 
 				fmt.Println(md)
+
+				aiData.ChatHistory = append(
+					aiData.ChatHistory,
+					ChatHistory{Role: "user", Content: input},
+					ChatHistory{Role: "assistant", Content: md},
+				)
 			}
 
 			return nil

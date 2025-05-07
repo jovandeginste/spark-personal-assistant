@@ -35,6 +35,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.0 // indirect
 	github.com/agiledragon/gomonkey/v2 v2.13.0 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
+	github.com/chzyer/readline v1.5.1 // indirect
 	github.com/codingsince1985/geo-golang v1.8.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect

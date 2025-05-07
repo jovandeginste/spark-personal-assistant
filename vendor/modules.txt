@@ -42,6 +42,9 @@ github.com/aquasecurity/table
 # github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 ## explicit; go 1.20
 github.com/awterman/monkey
+# github.com/chzyer/readline v1.5.1
+## explicit; go 1.15
+github.com/chzyer/readline
 # github.com/codingsince1985/geo-golang v1.8.5
 ## explicit; go 1.24.1
 github.com/codingsince1985/geo-golang
