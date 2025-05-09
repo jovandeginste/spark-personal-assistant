@@ -30,6 +30,7 @@ var promptPreamble = []string{
 	"Use emojis.",
 	"Translate all entries to English.",
 	"The following entries consist a list of items.",
+	"The names in the user data are your employers' names",
 	"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 }
 
