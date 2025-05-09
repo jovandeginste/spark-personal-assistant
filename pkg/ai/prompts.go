@@ -28,6 +28,7 @@ var promptPreamble = []string{
 	"Use the metric system and 24 hour clock notation.",
 	"Translate all entries to English.",
 	"The following entries consist a list of items.",
+	"Entries without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
 	"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 }
