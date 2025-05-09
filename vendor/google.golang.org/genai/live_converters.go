@@ -329,8 +329,14 @@ func liveConnectConfigToMldev(ac *apiClient, fromObject map[string]any, parentOb
 		setValueByPath(parentObject, []string{"setup", "sessionResumption"}, fromSessionResumption)
 	}
 
-	if getValueByPath(fromObject, []string{"inputAudioTranscription"}) != nil {
-		return nil, fmt.Errorf("inputAudioTranscription parameter is not supported in Gemini API")
+	fromInputAudioTranscription := getValueByPath(fromObject, []string{"inputAudioTranscription"})
+	if fromInputAudioTranscription != nil {
+		fromInputAudioTranscription, err = audioTranscriptionConfigToMldev(ac, fromInputAudioTranscription.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(parentObject, []string{"setup", "inputAudioTranscription"}, fromInputAudioTranscription)
 	}
 
 	fromOutputAudioTranscription := getValueByPath(fromObject, []string{"outputAudioTranscription"})
@@ -770,8 +776,14 @@ func liveClientSetupToMldev(ac *apiClient, fromObject map[string]any, parentObje
 		setValueByPath(toObject, []string{"contextWindowCompression"}, fromContextWindowCompression)
 	}
 
-	if getValueByPath(fromObject, []string{"inputAudioTranscription"}) != nil {
-		return nil, fmt.Errorf("inputAudioTranscription parameter is not supported in Gemini API")
+	fromInputAudioTranscription := getValueByPath(fromObject, []string{"inputAudioTranscription"})
+	if fromInputAudioTranscription != nil {
+		fromInputAudioTranscription, err = audioTranscriptionConfigToMldev(ac, fromInputAudioTranscription.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"inputAudioTranscription"}, fromInputAudioTranscription)
 	}
 
 	fromOutputAudioTranscription := getValueByPath(fromObject, []string{"outputAudioTranscription"})
@@ -1223,6 +1235,11 @@ func liveServerContentFromMldev(ac *apiClient, fromObject map[string]any, parent
 		setValueByPath(toObject, []string{"interrupted"}, fromInterrupted)
 	}
 
+	fromGroundingMetadata := getValueByPath(fromObject, []string{"groundingMetadata"})
+	if fromGroundingMetadata != nil {
+		setValueByPath(toObject, []string{"groundingMetadata"}, fromGroundingMetadata)
+	}
+
 	fromGenerationComplete := getValueByPath(fromObject, []string{"generationComplete"})
 	if fromGenerationComplete != nil {
 		setValueByPath(toObject, []string{"generationComplete"}, fromGenerationComplete)
@@ -1272,6 +1289,11 @@ func liveServerContentFromVertex(ac *apiClient, fromObject map[string]any, paren
 	fromInterrupted := getValueByPath(fromObject, []string{"interrupted"})
 	if fromInterrupted != nil {
 		setValueByPath(toObject, []string{"interrupted"}, fromInterrupted)
+	}
+
+	fromGroundingMetadata := getValueByPath(fromObject, []string{"groundingMetadata"})
+	if fromGroundingMetadata != nil {
+		setValueByPath(toObject, []string{"groundingMetadata"}, fromGroundingMetadata)
 	}
 
 	fromGenerationComplete := getValueByPath(fromObject, []string{"generationComplete"})

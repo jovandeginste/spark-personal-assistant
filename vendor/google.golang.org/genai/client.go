@@ -73,18 +73,23 @@ func (t Backend) String() string {
 
 // ClientConfig is the configuration for the GenAI client.
 type ClientConfig struct {
-	// API Key for GenAI. Required for BackendGeminiAPI. Can also be set via the GOOGLE_API_KEY environment variable.
+	// Optional. API Key for GenAI. Required for BackendGeminiAPI.
+	// Can also be set via the GOOGLE_API_KEY environment variable.
+	// Get a Gemini API key: https://ai.google.dev/gemini-api/docs/api-key
 	APIKey string
 
-	// Backend for GenAI. See Backend constants. Defaults to BackendGeminiAPI unless explicitly set to BackendVertexAI,
+	// Optional. Backend for GenAI. See Backend constants. Defaults to BackendGeminiAPI unless explicitly set to BackendVertexAI,
 	// or the environment variable GOOGLE_GENAI_USE_VERTEXAI is set to "1" or "true".
 	Backend Backend
 
-	// GCP Project ID for Vertex AI. Required for BackendVertexAI. Can also be set via the GOOGLE_CLOUD_PROJECT environment variable.
+	// Optional. GCP Project ID for Vertex AI. Required for BackendVertexAI.
+	// Can also be set via the GOOGLE_CLOUD_PROJECT environment variable.
+	// Find your Project ID: https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects
 	Project string
 
-	// GCP Location/Region for Vertex AI. Required for BackendVertexAI. See https://cloud.google.com/vertex-ai/docs/general/locations.
+	// Optional. GCP Location/Region for Vertex AI. Required for BackendVertexAI.
 	// Can also be set via the GOOGLE_CLOUD_LOCATION or GOOGLE_CLOUD_REGION environment variable.
+	// Generative AI locations: https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations.
 	Location string
 
 	// Optional. Google credentials.  If not specified, [Application Default Credentials] will be used.
@@ -118,6 +123,12 @@ func defaultEnvVarProvider() map[string]string {
 	}
 	if v, ok := os.LookupEnv("GOOGLE_CLOUD_REGION"); ok {
 		vars["GOOGLE_CLOUD_REGION"] = v
+	}
+	if v, ok := os.LookupEnv("GOOGLE_GEMINI_BASE_URL"); ok {
+		vars["GOOGLE_GEMINI_BASE_URL"] = v
+	}
+	if v, ok := os.LookupEnv("GOOGLE_VERTEX_BASE_URL"); ok {
+		vars["GOOGLE_VERTEX_BASE_URL"] = v
 	}
 	return vars
 }
@@ -156,10 +167,10 @@ func NewClient(ctx context.Context, cc *ClientConfig) (*Client, error) {
 	envVars := cc.envVarProvider()
 
 	if cc.Project != "" && cc.APIKey != "" {
-		return nil, fmt.Errorf("project and API key are mutually exclusive in the client initializer. ClientConfig: %v", cc)
+		return nil, fmt.Errorf("project and API key are mutually exclusive in the client initializer. ClientConfig: %#v", cc)
 	}
 	if cc.Location != "" && cc.APIKey != "" {
-		return nil, fmt.Errorf("location and API key are mutually exclusive in the client initializer. ClientConfig: %v", cc)
+		return nil, fmt.Errorf("location and API key are mutually exclusive in the client initializer. ClientConfig: %#v", cc)
 	}
 
 	if cc.Backend == BackendUnspecified {
@@ -192,14 +203,14 @@ func NewClient(ctx context.Context, cc *ClientConfig) (*Client, error) {
 
 	if cc.Backend == BackendVertexAI {
 		if cc.Project == "" {
-			return nil, fmt.Errorf("project is required for Vertex AI backend. ClientConfig: %v", cc)
+			return nil, fmt.Errorf("project is required for Vertex AI backend. ClientConfig: %#v", cc)
 		}
 		if cc.Location == "" {
-			return nil, fmt.Errorf("location is required for Vertex AI backend. ClientConfig: %v", cc)
+			return nil, fmt.Errorf("location is required for Vertex AI backend. ClientConfig: %#v", cc)
 		}
 	} else {
 		if cc.APIKey == "" {
-			return nil, fmt.Errorf("api key is required for Google AI backend. ClientConfig: %v.\nYou can get the API key from https://ai.google.dev/gemini-api/docs/api-key", cc)
+			return nil, fmt.Errorf("api key is required for Google AI backend. ClientConfig: %#v.\nYou can get the API key from https://ai.google.dev/gemini-api/docs/api-key", cc)
 		}
 	}
 
@@ -213,6 +224,10 @@ func NewClient(ctx context.Context, cc *ClientConfig) (*Client, error) {
 		cc.Credentials = cred
 	}
 
+	baseURL := getBaseURL(cc.Backend, &cc.HTTPOptions, envVars)
+	if baseURL != "" {
+		cc.HTTPOptions.BaseURL = baseURL
+	}
 	if cc.HTTPOptions.BaseURL == "" && cc.Backend == BackendVertexAI {
 		if cc.Location == "global" {
 			cc.HTTPOptions.BaseURL = "https://aiplatform.googleapis.com/"

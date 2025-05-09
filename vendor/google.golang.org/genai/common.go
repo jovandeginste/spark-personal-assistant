@@ -219,6 +219,16 @@ func deepMarshal(input any, output *map[string]any) error {
 	return nil
 }
 
+func deepCopy[T any](original T, copied *T) error {
+	bytes, err := json.Marshal(original)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(bytes, copied)
+	return err
+}
+
 // createURLQuery creates a URL query string from a map of key-value pairs.
 // The keys are sorted alphabetically before being encoded.
 // Supported value types are string, int, float64, bool, and []string.

@@ -65,15 +65,10 @@ func (c *Chat) recordHistory(ctx context.Context, inputContent *Content, outputC
 }
 
 // copySanitizedModelContent creates a (shallow) copy of modelContent with role set to
-// model and empty text parts removed.
+// model and all Parts copied verbatim.
 func copySanitizedModelContent(modelContent *Content) *Content {
 	newContent := &Content{Role: RoleModel}
-	for _, part := range modelContent.Parts {
-		text := (*part).Text
-		if len(string(text)) > 0 {
-			newContent.Parts = append(newContent.Parts, part)
-		}
-	}
+	newContent.Parts = append(newContent.Parts, modelContent.Parts...)
 	return newContent
 }
 

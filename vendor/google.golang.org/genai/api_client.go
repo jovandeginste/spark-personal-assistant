@@ -28,9 +28,13 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"time"
 )
 
 const maxChunkSize = 8 * 1024 * 1024 // 8 MB chunk size
+const maxRetryCount = 3
+const initialRetryDelay = time.Second
+const delayMultiplier = 2
 
 type apiClient struct {
 	clientConfig *ClientConfig
@@ -136,11 +140,11 @@ func buildRequest(ctx context.Context, ac *apiClient, path string, body map[stri
 	}
 	// Set headers
 	doMergeHeaders(httpOptions.Headers, &req.Header)
-	doMergeHeaders(sdkHeader(ac), &req.Header)
+	doMergeHeaders(sdkHeader(ctx, ac), &req.Header)
 	return req, nil
 }
 
-func sdkHeader(ac *apiClient) http.Header {
+func sdkHeader(ctx context.Context, ac *apiClient) http.Header {
 	header := make(http.Header)
 	header.Set("Content-Type", "application/json")
 	if ac.clientConfig.APIKey != "" {
@@ -151,7 +155,27 @@ func sdkHeader(ac *apiClient) http.Header {
 	versionHeaderValue := fmt.Sprintf("%s %s", libraryLabel, languageLabel)
 	header.Set("user-agent", versionHeaderValue)
 	header.Set("x-goog-api-client", versionHeaderValue)
+	timeoutSeconds := inferTimeout(ctx, ac).Seconds()
+	if timeoutSeconds > 0 {
+		header.Set("x-server-timeout", strconv.FormatInt(int64(timeoutSeconds), 10))
+	}
 	return header
+}
+
+func inferTimeout(ctx context.Context, ac *apiClient) time.Duration {
+	// ac.clientConfig.HTTPClient is not nil because it's initialized in the NewClient function.
+	requestTimeout := ac.clientConfig.HTTPClient.Timeout
+	contextTimeout := 0 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		contextTimeout = time.Until(deadline)
+	}
+	if requestTimeout != 0 && contextTimeout != 0 {
+		return min(requestTimeout, contextTimeout)
+	}
+	if requestTimeout != 0 {
+		return requestTimeout
+	}
+	return contextTimeout
 }
 
 func doRequest(ac *apiClient, req *http.Request) (*http.Response, error) {
@@ -355,21 +379,32 @@ func (ac *apiClient) uploadFile(ctx context.Context, r io.Reader, uploadURL stri
 		} else if err != nil {
 			return nil, fmt.Errorf("Failed to read bytes from file at offset %d: %w. Bytes actually read: %d", offset, err, bytesRead)
 		}
+		for attempt := 0; attempt < maxRetryCount; attempt++ {
+			req, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, bytes.NewReader(buffer[:bytesRead]))
+			if err != nil {
+				return nil, fmt.Errorf("Failed to create upload request for chunk at offset %d: %w", offset, err)
+			}
+			doMergeHeaders(httpOptions.Headers, &req.Header)
+			doMergeHeaders(sdkHeader(ctx, ac), &req.Header)
 
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, bytes.NewReader(buffer[:bytesRead]))
-		if err != nil {
-			return nil, fmt.Errorf("Failed to create upload request for chunk at offset %d: %w", offset, err)
-		}
-		doMergeHeaders(httpOptions.Headers, &req.Header)
-		doMergeHeaders(sdkHeader(ac), &req.Header)
+			req.Header.Set("X-Goog-Upload-Command", uploadCommand)
+			req.Header.Set("X-Goog-Upload-Offset", strconv.FormatInt(offset, 10))
+			req.Header.Set("Content-Length", strconv.FormatInt(int64(bytesRead), 10))
+			resp, err = doRequest(ac, req)
+			if err != nil {
+				return nil, fmt.Errorf("upload request failed for chunk at offset %d: %w", offset, err)
+			}
+			if resp.Header.Get("X-Goog-Upload-Status") != "" {
+				break
+			}
+			resp.Body.Close()
 
-		req.Header.Set("X-Goog-Upload-Command", uploadCommand)
-		req.Header.Set("X-Goog-Upload-Offset", strconv.FormatInt(offset, 10))
-		req.Header.Set("Content-Length", strconv.FormatInt(int64(bytesRead), 10))
-
-		resp, err = doRequest(ac, req)
-		if err != nil {
-			return nil, fmt.Errorf("upload request failed for chunk at offset %d: %w", offset, err)
+			select {
+			case <-ctx.Done():
+				return nil, fmt.Errorf("upload aborted while waiting to retry (attempt %d, offset %d): %w", attempt+1, offset, ctx.Err())
+			case <-time.After(initialRetryDelay * time.Duration(delayMultiplier^attempt)):
+				// Sleep completed, continue to the next attempt.
+			}
 		}
 		defer resp.Body.Close()
 
