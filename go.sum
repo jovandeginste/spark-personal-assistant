@@ -168,6 +168,8 @@ github.com/writeas/go-strip-markdown v2.0.1+incompatible h1:IIqxTM5Jr7RzhigcL6Fk
 github.com/writeas/go-strip-markdown v2.0.1+incompatible/go.mod h1:Rsyu10ZhbEK9pXdk8V6MVnZmTzRG0alMNLMwa0J01fE=
 github.com/yaegashi/wtz.go v0.0.2 h1:JdnGuAj7XyEpr28IVCUNLq4shV3NKyz37yK14nbF67I=
 github.com/yaegashi/wtz.go v0.0.2/go.mod h1:nOLA5QXsmdkRxBkP5tljhua13ADHCKirLBrzPf4PEJc=
+github.com/yarlson/pin v0.9.1 h1:ZfbMMTSpZw9X7ebq9QS6FAUq66PTv56S4WN4puO2HK0=
+github.com/yarlson/pin v0.9.1/go.mod h1:FC/d9PacAtwh05XzSznZWhA447uvimitjgDDl5YaVLE=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
 go.opentelemetry.io/auto/sdk v1.1.0 h1:cH53jehLUN6UFLY71z+NDOiNJqDdPRaXzTel0sJySYA=

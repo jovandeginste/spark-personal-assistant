@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 
 	"github.com/chzyer/readline"
@@ -11,6 +12,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/spf13/cobra"
+	"github.com/yarlson/pin"
 )
 
 type ChatHistory struct {
@@ -66,11 +68,20 @@ func (c *cli) printCmd() *cobra.Command {
 				"name", c.app.Config.Assistant.Name,
 			)
 
+			spinner := pin.New("Thinking...",
+				pin.WithSpinnerColor(pin.ColorCyan),
+				pin.WithTextColor(pin.ColorYellow),
+				pin.WithWriter(os.Stderr),
+			)
+			cancel := spinner.Start(context.Background())
+			defer cancel()
+
 			md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
 			if err != nil {
 				return err
 			}
 
+			spinner.Stop("Ready!")
 			fmt.Println(md)
 
 			return nil
@@ -160,12 +171,20 @@ func (c *cli) chatCmd() *cobra.Command {
 				aiData.EmployerQuestion = []string{input}
 
 				c.app.Logger().Info("Parsing your question...")
+				spinner := pin.New("Thinking...",
+					pin.WithSpinnerColor(pin.ColorCyan),
+					pin.WithTextColor(pin.ColorYellow),
+					pin.WithWriter(os.Stderr),
+				)
+				cancel := spinner.Start(context.Background())
+				defer cancel()
 
 				md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
 				if err != nil {
 					return err
 				}
 
+				spinner.Stop("Ready!")
 				fmt.Println(md)
 
 				aiData.ChatHistory = append(

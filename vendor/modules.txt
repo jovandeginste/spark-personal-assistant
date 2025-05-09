@@ -286,6 +286,9 @@ github.com/writeas/go-strip-markdown
 # github.com/yaegashi/wtz.go v0.0.2
 ## explicit; go 1.13
 github.com/yaegashi/wtz.go
+# github.com/yarlson/pin v0.9.1
+## explicit; go 1.11
+github.com/yarlson/pin
 # go.opentelemetry.io/auto/sdk v1.1.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk

@@ -24,6 +24,7 @@ require (
 	github.com/stretchr/testify v1.10.0
 	github.com/writeas/go-strip-markdown v2.0.1+incompatible
 	github.com/yaegashi/wtz.go v0.0.2
+	github.com/yarlson/pin v0.9.1
 	golang.org/x/text v0.25.0
 	google.golang.org/genai v1.4.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
