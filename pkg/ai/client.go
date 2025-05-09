@@ -13,8 +13,9 @@ type AIConfig struct {
 }
 
 type AssistantConfig struct {
-	Name  string `mapstructure:"name"`
-	Style string `mapstructure:"style"`
+	Name      string `mapstructure:"name"`
+	Style     string `mapstructure:"style"`
+	StyleFile string `mapstructure:"style_file"`
 }
 
 type Client interface {

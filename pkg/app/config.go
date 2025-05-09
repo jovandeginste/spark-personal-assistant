@@ -1,20 +1,24 @@
 package app
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/adrg/frontmatter"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	Assistant    ai.AssistantConfig `mapstructure:"assistant"`
-	Database     DatabaseConfig     `mapstructure:"database"`
-	UserData     UserData           `mapstructure:"user_data"`
-	ExtraContext []string           `mapstructure:"extra_context"`
-	Mailer       Mailer             `mapstructure:"mail"`
-	LLM          *ai.AIConfig       `mapstructure:"llm"`
+	AssistantFile string         `mapstructure:"assistant"`
+	Database      DatabaseConfig `mapstructure:"database"`
+	UserData      UserData       `mapstructure:"user_data"`
+	ExtraContext  []string       `mapstructure:"extra_context"`
+	Mailer        Mailer         `mapstructure:"mail"`
+	LLM           *ai.AIConfig   `mapstructure:"llm"`
+
+	Assistant ai.AssistantConfig `mapstructure:"-"`
 }
 
 type UserData struct {
@@ -34,10 +38,54 @@ func (a *App) ReadConfig() error {
 		return err
 	}
 
+	if err := a.setAssistantStylePath(); err != nil {
+		return err
+	}
+
+	if err := a.configureAssistant(); err != nil {
+		return err
+	}
+
 	a.SetDefaults()
 
 	a.Config.Database.originalFile = a.Config.Database.File
 
+	return a.setDatabasePath()
+}
+
+func (a *App) configureAssistant() error {
+	input, err := os.Open(a.Config.AssistantFile)
+	if err != nil {
+		return err
+	}
+
+	rest, err := frontmatter.Parse(input, &a.Config.Assistant)
+	if err != nil {
+		return err
+	}
+
+	a.Config.Assistant.Style = string(rest)
+
+	return nil
+}
+
+func (a *App) setAssistantStylePath() error {
+	if strings.HasPrefix(a.Config.AssistantFile, "/") {
+		return nil
+	}
+
+	absPath, err := filepath.Abs(a.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	dirname := filepath.Dir(absPath)
+	a.Config.AssistantFile = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.AssistantFile))
+
+	return nil
+}
+
+func (a *App) setDatabasePath() error {
 	if strings.HasPrefix(a.Config.Database.File, "/") {
 		return nil
 	}

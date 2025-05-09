@@ -19,12 +19,18 @@ cloud.google.com/go/auth/internal/transport/cert
 # cloud.google.com/go/compute/metadata v0.6.0
 ## explicit; go 1.21
 cloud.google.com/go/compute/metadata
+# github.com/BurntSushi/toml v0.3.1
+## explicit
+github.com/BurntSushi/toml
 # github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 ## explicit
 github.com/ChannelMeter/iso8601duration
 # github.com/PuerkitoBio/goquery v1.8.0
 ## explicit; go 1.13
 github.com/PuerkitoBio/goquery
+# github.com/adrg/frontmatter v0.2.0
+## explicit; go 1.14
+github.com/adrg/frontmatter
 # github.com/agiledragon/gomonkey/v2 v2.13.0
 ## explicit; go 1.14
 github.com/agiledragon/gomonkey/v2
@@ -480,6 +486,9 @@ gopkg.in/alexcesaro/quotedprintable.v3
 # gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 ## explicit
 gopkg.in/gomail.v2
+# gopkg.in/yaml.v2 v2.3.0
+## explicit
+gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3

@@ -63,6 +63,7 @@ func (c *cli) printCmd() *cobra.Command {
 				"Generating summary for entries...",
 				"type", c.app.Config.LLM.Type,
 				"model", c.app.Config.LLM.Model,
+				"name", c.app.Config.Assistant.Name,
 			)
 
 			md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
@@ -117,6 +118,7 @@ func (c *cli) chatCmd() *cobra.Command {
 				"Generating summary for entries...",
 				"type", c.app.Config.LLM.Type,
 				"model", c.app.Config.LLM.Model,
+				"name", c.app.Config.Assistant.Name,
 			)
 
 			rl, err := readline.New("> ")
