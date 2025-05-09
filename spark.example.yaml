@@ -1,6 +1,4 @@
-assistant:
-  name: Wesley
-  style: annoyed about everything and hating everything
+assistant: ./personas/wesley.md
 database:
   file: ./database.db
 user_data:
