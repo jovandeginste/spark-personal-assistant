@@ -18,7 +18,8 @@ type Config struct {
 	Mailer        Mailer         `mapstructure:"mail"`
 	LLM           *ai.AIConfig   `mapstructure:"llm"`
 
-	Assistant ai.AssistantConfig `mapstructure:"-"`
+	AssistantFileCLI string             `mapstructure:"-"`
+	Assistant        ai.AssistantConfig `mapstructure:"-"`
 }
 
 type UserData struct {
@@ -70,6 +71,10 @@ func (a *App) configureAssistant() error {
 }
 
 func (a *App) setAssistantStylePath() error {
+	if a.Config.AssistantFileCLI != "" {
+		a.Config.AssistantFile = a.Config.AssistantFileCLI
+	}
+
 	if strings.HasPrefix(a.Config.AssistantFile, "/") {
 		return nil
 	}

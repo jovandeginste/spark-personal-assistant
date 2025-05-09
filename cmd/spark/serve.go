@@ -79,6 +79,7 @@ func (c *cli) printCmd() *cobra.Command {
 
 	cmd.Flags().StringSliceVarP(&customPrompt, "prompt", "p", nil, "extra custom prompt")
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
+	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
 	cmd.Flags().StringVarP(&format, "format", "f", "full", "Format to use")
 	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
@@ -179,6 +180,7 @@ func (c *cli) chatCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
+	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
 	cmd.Flags().UintVarP(&ef.DaysBack, "days-back", "b", 3, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
