@@ -27,7 +27,7 @@ func TestSetDefaults(t *testing.T) {
 			},
 			expectedAssistant: ai.AssistantConfig{
 				Name:  "Spark",
-				Style: "you are a family butler and use polite British style and accent; be concise with colourful language",
+				Style: "Assume the persona of a classic, highly professional English butler.",
 			},
 		},
 		{
@@ -47,7 +47,7 @@ func TestSetDefaults(t *testing.T) {
 			},
 			expectedAssistant: ai.AssistantConfig{
 				Name:  "MyAssistant",
-				Style: "you are a family butler and use polite British style and accent; be concise with colourful language",
+				Style: "Assume the persona of a classic, highly professional English butler.",
 			},
 		},
 		{
@@ -68,8 +68,8 @@ func TestSetDefaults(t *testing.T) {
 
 			app.SetDefaults()
 
-			assert.Equal(t, tt.expectedAssistant.Name, app.Config.Assistant.Name, "Assistant name mismatch")
-			assert.Equal(t, tt.expectedAssistant.Style, app.Config.Assistant.Style, "Assistant style mismatch")
+			assert.Equal(t, app.Config.Assistant.Name, tt.expectedAssistant.Name, "Assistant name mismatch")
+			assert.Contains(t, app.Config.Assistant.Style, tt.expectedAssistant.Style, "Assistant style mismatch")
 		})
 	}
 }

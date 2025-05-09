@@ -2,25 +2,15 @@ package generic
 
 import (
 	"io"
-	"net/http"
 )
 
 var GetBody = getBody
 
 func getBody(remote string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, remote, nil)
+	data, err := ReadResource(remote)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Set("User-Agent", "Spark")
-
-	res, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-
-	defer res.Body.Close()
-
-	return io.ReadAll(res.Body)
+	return io.ReadAll(data)
 }

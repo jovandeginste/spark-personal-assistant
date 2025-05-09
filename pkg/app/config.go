@@ -55,6 +55,10 @@ func (a *App) ReadConfig() error {
 }
 
 func (a *App) configureAssistant() error {
+	if a.Config.AssistantFile == "" {
+		return nil
+	}
+
 	input, err := os.Open(a.Config.AssistantFile)
 	if err != nil {
 		return err
@@ -75,7 +79,7 @@ func (a *App) setAssistantStylePath() error {
 		a.Config.AssistantFile = a.Config.AssistantFileCLI
 	}
 
-	if strings.HasPrefix(a.Config.AssistantFile, "/") {
+	if a.Config.AssistantFile == "" || strings.HasPrefix(a.Config.AssistantFile, "/") {
 		return nil
 	}
 
