@@ -13,7 +13,7 @@ func (c *cli) md2textCmd() *cobra.Command {
 		Use:     "md2text [file.md]",
 		Short:   "Convert markdown to text",
 		Example: "spark md2text ./md/summary-full.md",
-		Args:    cobra.MaximumNArgs(1),
+		Args:    cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := generic.ReadResource(args[0])
 			if err != nil {
