@@ -26,8 +26,6 @@ func PromptFor(format string) (Prompt, error) {
 var promptPreamble = []string{
 	"Your entire response should be formatted in Markdown",
 	"Use the metric system and 24 hour clock notation.",
-	"Use conversational style.",
-	"Use emojis.",
 	"Translate all entries to English.",
 	"The following entries consist a list of items.",
 	"The names in the user data are your employers' names",
