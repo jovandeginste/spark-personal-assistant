@@ -12,6 +12,10 @@ import (
 // ReadResource reads a resource from a given URI, supporting file and http/https schemes.
 // It returns an io.ReadCloser and an error. The caller is responsible for closing the ReadCloser.
 func ReadResource(uri string) (io.ReadCloser, error) {
+	if uri == "-" {
+		return os.Stdin, nil
+	}
+
 	u, err := url.Parse(uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse URI: %w", err)

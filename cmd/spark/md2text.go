@@ -8,11 +8,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func (c *cli) md2htmlCmd() *cobra.Command {
+func (c *cli) md2textCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "md2html [file.md]",
-		Short:   "Convert markdown to HTML",
-		Example: "spark md2html ./md/summary-full.md",
+		Use:     "md2text [file.md]",
+		Short:   "Convert markdown to text",
+		Example: "spark md2text ./md/summary-full.md",
 		Args:    cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			f, err := generic.ReadResource(args[0])
@@ -20,12 +20,12 @@ func (c *cli) md2htmlCmd() *cobra.Command {
 				return err
 			}
 
-			html, err := md.MDToHTML(f)
+			text, err := md.MDToText(f)
 			if err != nil {
 				return err
 			}
 
-			fmt.Print(html)
+			fmt.Print(text)
 			return nil
 		},
 	}
