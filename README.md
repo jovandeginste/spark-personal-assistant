@@ -1,5 +1,11 @@
 # ✨ Spark, your personal AI assistant
 
+I was inspired by [this post](https://www.geoffreylitt.com/2025/04/12/how-i-made-a-useful-ai-assistant-with-one-sqlite-table-and-a-handful-of-cron-jobs).
+How much work would it be to make this myself?
+
+The answer: it's only a few hours of _vibe coding_ to get to a working
+prototype. But then the come all those details...
+
 Spark is a personal AI assistant. You store information about important (future)
 events in a local database. Spark
 sends this information to an AI API and compiles a summary of the events for you.
