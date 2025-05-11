@@ -116,3 +116,9 @@ A number of alternative persona can be found in the [personas](./personas) folde
 ```yaml
 assistant: ./persona/chuck.md
 ```
+
+## Wishlist
+
+- [ ] Add support for Matrix
+- [ ] Add text-to-speech support, to generate an mp3 file and expose as a
+      (personal) podcast
