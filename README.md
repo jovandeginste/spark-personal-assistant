@@ -7,17 +7,21 @@ The answer: it's only a few hours of _vibe coding_ to get to a working
 prototype. But then the come all those details...
 
 Spark is a personal AI assistant. You store information about important (future)
-events in a local database. Spark
-sends this information to an AI API and compiles a summary of the events for you.
+events in a local database. Spark sends this information to an AI API and
+compiles a summary of the events for you.
 
-The following summaries are currently supported:
+The following summaries are currently pre-defined:
 
 - today: the summary for today and a quick look at tomorrow
 - week: a summary for the current week
 - full: a summary of all entries in scope (you can use command line flags to
   determine the scope)
 
+You can also start a conversation with Spark, to ask it questions about your
+events.
+
 Spark currently supports Google Gemini and OpenAI ChatGPT.
+Ollama support is available, but I can't test this with my hardware...
 
 ## Installation
 
@@ -115,6 +119,22 @@ A number of alternative persona can be found in the [personas](./personas) folde
 
 ```yaml
 assistant: ./persona/chuck.md
+```
+
+## The result
+
+Ask for a summary:
+
+```bash
+spark print --format today --days-ahead 1 --days-back 1
+```
+
+Chat with Spark:
+
+```bash
+$ spark chat
+Enter your question. Type /quit to exit or press Ctrl+D.
+> Find a free evening for a movie
 ```
 
 ## Wishlist
