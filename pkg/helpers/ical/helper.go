@@ -3,7 +3,6 @@ package ical
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -137,7 +136,6 @@ func parseICalTime(rs *gocal.RawDate, start *time.Time) (time.Time, error) {
 
 	l := parseTimezone(ts)
 
-	fmt.Printf("Timezone: %s\n", l)
 	return time.ParseInLocation("20060102T150405", start.Format("20060102T150405"), l)
 }
 
@@ -150,5 +148,5 @@ func parseTimezone(tz string) *time.Location {
 		return l
 	}
 
-	return nil
+	return time.UTC
 }

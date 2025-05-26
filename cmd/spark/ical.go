@@ -38,7 +38,7 @@ func (c *cli) icalCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 30, "Number of days in the past to include")
+	cmd.Flags().UintVarP(&daysBack, "days-back", "b", 120, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&daysAhead, "days-ahead", "a", 120, "Number of days in the future to include")
 
 	return cmd
