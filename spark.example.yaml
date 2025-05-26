@@ -19,3 +19,6 @@ mail:
     port: 587
     user_name: spark@example.org
     password: my-password
+llm:
+  type: ollama
+  model: gemma3:1b

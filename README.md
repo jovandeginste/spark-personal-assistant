@@ -82,6 +82,38 @@ spark print -f full
 
 You can customize Spark's behavior by changing the configuration file.
 
+### Pick your LLM
+
+#### ollama
+
+```yaml
+llm:
+  type: ollama
+  model: gemma3:1b
+```
+
+#### Gemini
+
+```yaml
+llm:
+  type: gemini
+  model: models/gemini-2.5-flash-preview-04-17
+  tts_model: gemini-2.5-flash-preview-tts
+  tts_voice: Charon
+  api_key: your-key
+```
+
+#### OpenAI
+
+```yaml
+llm:
+  type: openai
+  model: gpt-4o-mini
+  tts_model: gpt-4o-mini-tts
+  tts_voice: ash
+  api_key: your-key
+```
+
 ### Your names
 
 ```yaml
