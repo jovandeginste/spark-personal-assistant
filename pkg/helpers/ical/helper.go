@@ -135,6 +135,9 @@ func parseICalTime(rs *gocal.RawDate, start *time.Time) (time.Time, error) {
 	}
 
 	l := parseTimezone(ts)
+	if l == nil {
+		l = time.Local
+	}
 
 	return time.ParseInLocation("20060102T150405", start.Format("20060102T150405"), l)
 }
