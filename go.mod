@@ -6,8 +6,6 @@ toolchain go1.24.2
 
 require (
 	github.com/adrg/frontmatter v0.2.0
-	github.com/amitybell/piper v0.0.0-20240130090909-b170e42b1e09
-	github.com/amitybell/piper-voice-jenny v0.0.0-20231118093224-dcf0d49e46b7
 	github.com/apognu/gocal v0.9.1
 	github.com/aquasecurity/table v1.10.0
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
@@ -43,11 +41,7 @@ require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/PuerkitoBio/goquery v1.10.3 // indirect
-	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/agiledragon/gomonkey/v2 v2.13.0 // indirect
-	github.com/amitybell/piper-asset v0.0.0-20231030194325-d36a29e3b1fd // indirect
-	github.com/amitybell/piper-bin-linux v0.0.0-20231118093037-92b3de178ad8 // indirect
-	github.com/amitybell/piper-bin-windows v0.0.0-20231118093113-cc2cef2f6b74 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/codingsince1985/geo-golang v1.8.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -69,7 +63,6 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.17.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect

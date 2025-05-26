@@ -11,6 +11,8 @@ import (
 type openaiClient struct {
 	apiKey    string
 	model     string
+	ttsModel  string
+	ttsVoice  string
 	assistant AssistantConfig
 }
 
@@ -72,11 +74,10 @@ func (c openaiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, 
 	)
 
 	result, err := client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{
-		Model:          "gpt-4o-mini-tts",
-		Voice:          openai.AudioSpeechNewParamsVoiceAsh,
+		Model:          c.ttsModel,
+		Voice:          openai.AudioSpeechNewParamsVoice(c.ttsVoice),
 		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatPCM,
 		Instructions:   openai.String(c.assistant.Style),
-		Speed:          openai.Float(3.0),
 		Input:          text,
 	})
 	if err != nil {

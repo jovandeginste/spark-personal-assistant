@@ -9,6 +9,8 @@ import (
 type geminiClient struct {
 	apiKey    string
 	model     string
+	ttsModel  string
+	ttsVoice  string
 	assistant AssistantConfig
 }
 
@@ -77,7 +79,7 @@ func (c geminiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, 
 		SpeechConfig: &genai.SpeechConfig{
 			VoiceConfig: &genai.VoiceConfig{
 				PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{
-					VoiceName: "Charon",
+					VoiceName: c.ttsVoice,
 				},
 			},
 		},
@@ -85,7 +87,7 @@ func (c geminiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, 
 
 	result, err := client.Models.GenerateContent(
 		ctx,
-		"gemini-2.5-flash-preview-tts",
+		c.ttsModel,
 		[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)},
 		config,
 	)

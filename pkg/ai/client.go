@@ -7,9 +7,11 @@ import (
 )
 
 type AIConfig struct {
-	Type   string `mapstructure:"type"`
-	APIKey string `mapstructure:"api_key"`
-	Model  string `mapstructure:"model"`
+	Type     string `mapstructure:"type"`
+	APIKey   string `mapstructure:"api_key"`
+	Model    string `mapstructure:"model"`
+	TTSModel string `mapstructure:"tts_model"`
+	TTSVoice string `mapstructure:"tts_voice"`
 }
 
 type AssistantConfig struct {
@@ -30,9 +32,21 @@ func NewClient(cc *AIConfig, ac AssistantConfig) (Client, error) {
 
 	switch cc.Type {
 	case "gemini":
-		c = geminiClient{apiKey: cc.APIKey, model: cc.Model, assistant: ac}
+		c = geminiClient{
+			apiKey:    cc.APIKey,
+			model:     cc.Model,
+			ttsModel:  cc.TTSModel,
+			ttsVoice:  cc.TTSVoice,
+			assistant: ac,
+		}
 	case "openai":
-		c = openaiClient{apiKey: cc.APIKey, model: cc.Model, assistant: ac}
+		c = openaiClient{
+			apiKey:    cc.APIKey,
+			model:     cc.Model,
+			ttsModel:  cc.TTSModel,
+			ttsVoice:  cc.TTSVoice,
+			assistant: ac,
+		}
 	case "ollama":
 		slog.Info("ollama does not work yet - input size is too large?")
 		c = ollamaClient{model: cc.Model, assistant: ac}
