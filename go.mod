@@ -6,12 +6,16 @@ toolchain go1.24.2
 
 require (
 	github.com/adrg/frontmatter v0.2.0
+	github.com/amitybell/piper v0.0.0-20240130090909-b170e42b1e09
+	github.com/amitybell/piper-voice-jenny v0.0.0-20231118093224-dcf0d49e46b7
 	github.com/apognu/gocal v0.9.1
 	github.com/aquasecurity/table v1.10.0
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 	github.com/chzyer/readline v1.5.1
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/sqlite v1.11.0
+	github.com/go-audio/audio v1.0.0
+	github.com/go-audio/wav v1.1.0
 	github.com/gomarkdown/markdown v0.0.0-20250311123330-531bef5e742b
 	github.com/google/go-querystring v1.1.0
 	github.com/imdatngo/slog-gorm v1.0.0
@@ -19,6 +23,7 @@ require (
 	github.com/mmcdole/gofeed v1.3.0
 	github.com/ollama/ollama v0.6.8
 	github.com/openai/openai-go v0.1.0-beta.10
+	github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/viper v1.20.1
 	github.com/stretchr/testify v1.10.0
@@ -38,7 +43,11 @@ require (
 	github.com/BurntSushi/toml v1.5.0 // indirect
 	github.com/ChannelMeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61 // indirect
 	github.com/PuerkitoBio/goquery v1.10.3 // indirect
+	github.com/adrg/xdg v0.4.0 // indirect
 	github.com/agiledragon/gomonkey/v2 v2.13.0 // indirect
+	github.com/amitybell/piper-asset v0.0.0-20231030194325-d36a29e3b1fd // indirect
+	github.com/amitybell/piper-bin-linux v0.0.0-20231118093037-92b3de178ad8 // indirect
+	github.com/amitybell/piper-bin-windows v0.0.0-20231118093113-cc2cef2f6b74 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/codingsince1985/geo-golang v1.8.5 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -46,6 +55,7 @@ require (
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/glebarez/go-sqlite v1.22.0 // indirect
+	github.com/go-audio/riff v1.0.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
@@ -59,6 +69,7 @@ require (
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
+	github.com/klauspost/compress v1.17.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
 	github.com/mmcdole/goxpp v1.1.1 // indirect

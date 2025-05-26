@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -61,4 +62,8 @@ func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	}
 
 	return result, nil
+}
+
+func (c ollamaClient) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
+	return nil, errors.New("not implemented")
 }

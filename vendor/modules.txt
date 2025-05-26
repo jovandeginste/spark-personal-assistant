@@ -32,10 +32,22 @@ github.com/PuerkitoBio/goquery
 # github.com/adrg/frontmatter v0.2.0
 ## explicit; go 1.14
 github.com/adrg/frontmatter
+# github.com/adrg/xdg v0.4.0
+## explicit; go 1.14
 # github.com/agiledragon/gomonkey/v2 v2.13.0
 ## explicit; go 1.14
 github.com/agiledragon/gomonkey/v2
 github.com/agiledragon/gomonkey/v2/creflect
+# github.com/amitybell/piper v0.0.0-20240130090909-b170e42b1e09
+## explicit; go 1.21
+# github.com/amitybell/piper-asset v0.0.0-20231030194325-d36a29e3b1fd
+## explicit; go 1.21
+# github.com/amitybell/piper-bin-linux v0.0.0-20231118093037-92b3de178ad8
+## explicit; go 1.21
+# github.com/amitybell/piper-bin-windows v0.0.0-20231118093113-cc2cef2f6b74
+## explicit; go 1.21
+# github.com/amitybell/piper-voice-jenny v0.0.0-20231118093224-dcf0d49e46b7
+## explicit; go 1.21
 # github.com/andybalholm/cascadia v1.3.3
 ## explicit; go 1.16
 github.com/andybalholm/cascadia
@@ -77,6 +89,15 @@ github.com/glebarez/go-sqlite
 # github.com/glebarez/sqlite v1.11.0
 ## explicit; go 1.18
 github.com/glebarez/sqlite
+# github.com/go-audio/audio v1.0.0
+## explicit
+github.com/go-audio/audio
+# github.com/go-audio/riff v1.0.0
+## explicit; go 1.12
+github.com/go-audio/riff
+# github.com/go-audio/wav v1.1.0
+## explicit; go 1.13
+github.com/go-audio/wav
 # github.com/go-logr/logr v1.4.2
 ## explicit; go 1.18
 github.com/go-logr/logr
@@ -159,6 +180,8 @@ github.com/jovandeginste/workout-tracker/v2/pkg/geocoder
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
+# github.com/klauspost/compress v1.17.3
+## explicit; go 1.19
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
@@ -213,6 +236,9 @@ github.com/openai/openai-go/packages/ssestream
 github.com/openai/openai-go/responses
 github.com/openai/openai-go/shared
 github.com/openai/openai-go/shared/constant
+# github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
+## explicit
+github.com/orcaman/writerseeker
 # github.com/pelletier/go-toml/v2 v2.2.4
 ## explicit; go 1.21.0
 github.com/pelletier/go-toml/v2

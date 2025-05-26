@@ -36,12 +36,12 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 }
 
 func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
 	}
 
-	prompt, err := c.convertPrompt(p, data)
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
 	if err != nil {
 		return "", err
 	}
@@ -64,4 +64,44 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	}
 
 	return "", nil
+}
+
+func (c geminiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	if err != nil {
+		return nil, err
+	}
+
+	config := &genai.GenerateContentConfig{
+		ResponseModalities: []string{"AUDIO"},
+		SpeechConfig: &genai.SpeechConfig{
+			VoiceConfig: &genai.VoiceConfig{
+				PrebuiltVoiceConfig: &genai.PrebuiltVoiceConfig{
+					VoiceName: "Charon",
+				},
+			},
+		},
+	}
+
+	result, err := client.Models.GenerateContent(
+		ctx,
+		"gemini-2.5-flash-preview-tts",
+		[]*genai.Content{genai.NewContentFromText(text, genai.RoleUser)},
+		config,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, c := range result.Candidates {
+		if len(c.Content.Parts) == 0 {
+			continue
+		}
+
+		for _, part := range c.Content.Parts {
+			return part.InlineData.Data, nil
+		}
+	}
+
+	return nil, nil
 }

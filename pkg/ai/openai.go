@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"io"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -63,4 +64,24 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	}
 
 	return "", nil
+}
+
+func (c openaiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
+	client := openai.NewClient(
+		option.WithAPIKey(c.APIKey()),
+	)
+
+	result, err := client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{
+		Model:          "gpt-4o-mini-tts",
+		Voice:          openai.AudioSpeechNewParamsVoiceAsh,
+		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatPCM,
+		Instructions:   openai.String(c.assistant.Style),
+		Speed:          openai.Float(3.0),
+		Input:          text,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return io.ReadAll(result.Body)
 }
