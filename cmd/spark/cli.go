@@ -35,6 +35,7 @@ func (c *cli) root() *cobra.Command {
 	cmd.AddCommand(c.mailerCmd())
 	cmd.AddCommand(c.printCmd())
 	cmd.AddCommand(c.chatCmd())
+	cmd.AddCommand(c.matrixChatCmd())
 	cmd.AddCommand(c.md2htmlCmd())
 	cmd.AddCommand(c.md2textCmd())
 	cmd.AddCommand(c.md2speechCmd())

@@ -19,6 +19,10 @@ cloud.google.com/go/auth/internal/transport/cert
 # cloud.google.com/go/compute/metadata v0.6.0
 ## explicit; go 1.21
 cloud.google.com/go/compute/metadata
+# filippo.io/edwards25519 v1.1.0
+## explicit; go 1.20
+filippo.io/edwards25519
+filippo.io/edwards25519/field
 # github.com/BurntSushi/toml v1.5.0
 ## explicit; go 1.18
 github.com/BurntSushi/toml
@@ -32,22 +36,10 @@ github.com/PuerkitoBio/goquery
 # github.com/adrg/frontmatter v0.2.0
 ## explicit; go 1.14
 github.com/adrg/frontmatter
-# github.com/adrg/xdg v0.4.0
-## explicit; go 1.14
 # github.com/agiledragon/gomonkey/v2 v2.13.0
 ## explicit; go 1.14
 github.com/agiledragon/gomonkey/v2
 github.com/agiledragon/gomonkey/v2/creflect
-# github.com/amitybell/piper v0.0.0-20240130090909-b170e42b1e09
-## explicit; go 1.21
-# github.com/amitybell/piper-asset v0.0.0-20231030194325-d36a29e3b1fd
-## explicit; go 1.21
-# github.com/amitybell/piper-bin-linux v0.0.0-20231118093037-92b3de178ad8
-## explicit; go 1.21
-# github.com/amitybell/piper-bin-windows v0.0.0-20231118093113-cc2cef2f6b74
-## explicit; go 1.21
-# github.com/amitybell/piper-voice-jenny v0.0.0-20231118093224-dcf0d49e46b7
-## explicit; go 1.21
 # github.com/andybalholm/cascadia v1.3.3
 ## explicit; go 1.16
 github.com/andybalholm/cascadia
@@ -180,14 +172,18 @@ github.com/jovandeginste/workout-tracker/v2/pkg/geocoder
 # github.com/json-iterator/go v1.1.12
 ## explicit; go 1.12
 github.com/json-iterator/go
-# github.com/klauspost/compress v1.17.3
-## explicit; go 1.19
+# github.com/mattn/go-colorable v0.1.14
+## explicit; go 1.18
+github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.20
 ## explicit; go 1.15
 github.com/mattn/go-isatty
 # github.com/mattn/go-runewidth v0.0.16
 ## explicit; go 1.9
 github.com/mattn/go-runewidth
+# github.com/mattn/go-sqlite3 v1.14.28
+## explicit; go 1.19
+github.com/mattn/go-sqlite3
 # github.com/mmcdole/gofeed v1.3.0
 ## explicit; go 1.19
 github.com/mmcdole/gofeed
@@ -246,6 +242,9 @@ github.com/pelletier/go-toml/v2/internal/characters
 github.com/pelletier/go-toml/v2/internal/danger
 github.com/pelletier/go-toml/v2/internal/tracker
 github.com/pelletier/go-toml/v2/unstable
+# github.com/petermattis/goid v0.0.0-20250508124226-395b08cebbdb
+## explicit; go 1.17
+github.com/petermattis/goid
 # github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -255,6 +254,12 @@ github.com/remyoudompheng/bigfft
 # github.com/rivo/uniseg v0.4.7
 ## explicit; go 1.18
 github.com/rivo/uniseg
+# github.com/rs/zerolog v1.34.0
+## explicit; go 1.15
+github.com/rs/zerolog
+github.com/rs/zerolog/internal/cbor
+github.com/rs/zerolog/internal/json
+github.com/rs/zerolog/log
 # github.com/sagikazarmark/locafero v0.9.0
 ## explicit; go 1.23.0
 github.com/sagikazarmark/locafero
@@ -315,6 +320,25 @@ github.com/yaegashi/wtz.go
 # github.com/yarlson/pin v0.9.1
 ## explicit; go 1.11
 github.com/yarlson/pin
+# go.mau.fi/util v0.8.7
+## explicit; go 1.23.0
+go.mau.fi/util/base58
+go.mau.fi/util/confusable
+go.mau.fi/util/dbutil
+go.mau.fi/util/dbutil/litestream
+go.mau.fi/util/exbytes
+go.mau.fi/util/exerrors
+go.mau.fi/util/exgjson
+go.mau.fi/util/exhttp
+go.mau.fi/util/exslices
+go.mau.fi/util/exsync
+go.mau.fi/util/exzerolog
+go.mau.fi/util/glob
+go.mau.fi/util/jsonbytes
+go.mau.fi/util/jsontime
+go.mau.fi/util/ptr
+go.mau.fi/util/random
+go.mau.fi/util/retryafter
 # go.opentelemetry.io/auto/sdk v1.1.0
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
@@ -358,12 +382,15 @@ golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
+golang.org/x/crypto/curve25519
 golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
+golang.org/x/crypto/pbkdf2
 # golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
 ## explicit; go 1.23.0
 golang.org/x/exp/constraints
+golang.org/x/exp/maps
 # golang.org/x/net v0.40.0
 ## explicit; go 1.23.0
 golang.org/x/net/html
@@ -536,6 +563,38 @@ gorm.io/gorm/logger
 gorm.io/gorm/migrator
 gorm.io/gorm/schema
 gorm.io/gorm/utils
+# maunium.net/go/mautrix v0.24.0
+## explicit; go 1.23.0
+maunium.net/go/mautrix
+maunium.net/go/mautrix/crypto
+maunium.net/go/mautrix/crypto/aescbc
+maunium.net/go/mautrix/crypto/attachment
+maunium.net/go/mautrix/crypto/backup
+maunium.net/go/mautrix/crypto/canonicaljson
+maunium.net/go/mautrix/crypto/cryptohelper
+maunium.net/go/mautrix/crypto/ed25519
+maunium.net/go/mautrix/crypto/goolm
+maunium.net/go/mautrix/crypto/goolm/account
+maunium.net/go/mautrix/crypto/goolm/aessha2
+maunium.net/go/mautrix/crypto/goolm/crypto
+maunium.net/go/mautrix/crypto/goolm/goolmbase64
+maunium.net/go/mautrix/crypto/goolm/libolmpickle
+maunium.net/go/mautrix/crypto/goolm/megolm
+maunium.net/go/mautrix/crypto/goolm/message
+maunium.net/go/mautrix/crypto/goolm/pk
+maunium.net/go/mautrix/crypto/goolm/ratchet
+maunium.net/go/mautrix/crypto/goolm/session
+maunium.net/go/mautrix/crypto/libolm
+maunium.net/go/mautrix/crypto/olm
+maunium.net/go/mautrix/crypto/pkcs7
+maunium.net/go/mautrix/crypto/signatures
+maunium.net/go/mautrix/crypto/sql_store_upgrade
+maunium.net/go/mautrix/crypto/ssss
+maunium.net/go/mautrix/crypto/utils
+maunium.net/go/mautrix/event
+maunium.net/go/mautrix/id
+maunium.net/go/mautrix/pushrules
+maunium.net/go/mautrix/sqlstatestore
 # modernc.org/libc v1.65.3
 ## explicit; go 1.23.0
 modernc.org/libc
