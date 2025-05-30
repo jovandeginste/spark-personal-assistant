@@ -14,6 +14,48 @@ type EntryFilter struct {
 	DaysAhead uint
 }
 
+type ChatHistory struct {
+	Role    string
+	Content string
+}
+type AIData struct {
+	ExtraContext     []string
+	ChatHistory      []ChatHistory `json:",omitempty"`
+	EmployerQuestion []string      `json:",omitempty"`
+	UserData         UserData
+	EntryFilter      *EntryFilter
+	Entries          data.Entries
+}
+
+func (aiData *AIData) AddChatHistory(role string, input string) {
+	aiData.ChatHistory = append(
+		aiData.ChatHistory,
+		ChatHistory{Role: role, Content: input},
+	)
+}
+
+func (aiData *AIData) UpdateEntries(a *App) error {
+	entries, err := a.CurrentEntries(aiData.EntryFilter)
+	if err != nil {
+		return err
+	}
+
+	aiData.Entries = entries
+	return nil
+}
+
+func (a *App) BuildData(ef *EntryFilter) (*AIData, error) {
+	aiData := &AIData{
+		ExtraContext: a.Config.ExtraContext,
+		UserData:     a.Config.UserData,
+		EntryFilter:  ef,
+	}
+
+	aiData.UpdateEntries(a)
+
+	return aiData, nil
+}
+
 func (ef *EntryFilter) From() time.Time {
 	return time.Now().Add(time.Duration(-ef.DaysBack*24) * time.Hour).Truncate(24 * time.Hour)
 }
@@ -32,7 +74,7 @@ func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
 	return q
 }
 
-func (a *App) CurrentEntries(ef EntryFilter) (data.Entries, error) {
+func (a *App) CurrentEntries(ef *EntryFilter) (data.Entries, error) {
 	q := ef.Query(a.DB())
 
 	var entries data.Entries

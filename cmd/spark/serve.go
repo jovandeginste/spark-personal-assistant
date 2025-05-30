@@ -10,22 +10,9 @@ import (
 	"github.com/chzyer/readline"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/spf13/cobra"
 	"github.com/yarlson/pin"
 )
-
-type ChatHistory struct {
-	Role    string
-	Content string
-}
-type AIData struct {
-	ExtraContext     []string
-	ChatHistory      []ChatHistory `json:",omitempty"`
-	EmployerQuestion []string      `json:",omitempty"`
-	UserData         app.UserData
-	Entries          data.Entries
-}
 
 func (c *cli) printCmd() *cobra.Command {
 	var (
@@ -44,7 +31,7 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			aiData, err := c.buildData(ef)
+			aiData, err := c.app.BuildData(&ef)
 			if err != nil {
 				return err
 			}
@@ -111,7 +98,7 @@ func (c *cli) chatCmd() *cobra.Command {
 				return err
 			}
 
-			aiData, err := c.buildData(ef)
+			aiData, err := c.app.BuildData(&ef)
 			if err != nil {
 				return err
 			}
@@ -187,11 +174,8 @@ func (c *cli) chatCmd() *cobra.Command {
 				spinner.Stop("Ready!")
 				fmt.Println(md)
 
-				aiData.ChatHistory = append(
-					aiData.ChatHistory,
-					ChatHistory{Role: "user", Content: input},
-					ChatHistory{Role: "assistant", Content: md},
-				)
+				aiData.AddChatHistory("user", input)
+				aiData.AddChatHistory("assistant", md)
 			}
 
 			return nil
@@ -204,19 +188,4 @@ func (c *cli) chatCmd() *cobra.Command {
 	cmd.Flags().UintVarP(&ef.DaysAhead, "days-ahead", "a", 7, "Number of days in the future to include")
 
 	return cmd
-}
-
-func (c *cli) buildData(ef app.EntryFilter) (*AIData, error) {
-	entries, err := c.app.CurrentEntries(ef)
-	if err != nil {
-		return nil, err
-	}
-
-	aiData := &AIData{
-		ExtraContext: c.app.Config.ExtraContext,
-		UserData:     c.app.Config.UserData,
-		Entries:      entries,
-	}
-
-	return aiData, nil
 }

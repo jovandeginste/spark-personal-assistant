@@ -42,6 +42,44 @@ func (a AssistantConfig) PromptPreamble() []string {
 	return append(prompt, promptPreamble...)
 }
 
+func PromptCheckTask(assistant AssistantConfig, data any) ([]string, error) {
+	j, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+	c := []string{
+		"Assert whether the employer's question is about creating, updating or deleting one or more tasks.",
+		"If no actions are required, answer with a single zero and nothing else.",
+		"If actions are required, provide a human readable list of those actions.",
+		string(j),
+	}
+
+	return c, nil
+}
+
+func PromptTask(assistant AssistantConfig, data any) ([]string, error) {
+	j, err := json.Marshal(data)
+	if err != nil {
+		return nil, err
+	}
+
+	c := []string{
+		"Execute the employer's question.",
+		"Respond with only a JSON array with the following fields for each task:",
+		"- action: either add or delete",
+		"- date: the date of the task, either YYYY-MM-DD or YYYY-MM-DD HH:MM",
+		"- summary: the summary of the task to perform",
+		"- description: a more verbose description of the task (omit this field if not needed)",
+		"- name: the person or persons for which this task is created, as comma-separated list",
+		"Take the following information into account to answer the question:",
+		"The names in the user data are your employers' names",
+		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
+		string(j),
+	}
+
+	return c, nil
+}
+
 func PromptCustom(assistant AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {

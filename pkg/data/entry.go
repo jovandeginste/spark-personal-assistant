@@ -109,6 +109,10 @@ func parseDate(d string) (time.Time, error) {
 		return time.Now().In(LocalTimezone).Truncate(24 * time.Hour), nil
 	}
 
+	if t, err := time.ParseInLocation("2006-01-02 15:04", d, LocalTimezone); err == nil {
+		return t, nil
+	}
+
 	return time.ParseInLocation("2006-01-02", d, LocalTimezone)
 }
 

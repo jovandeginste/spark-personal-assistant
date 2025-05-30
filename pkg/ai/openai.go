@@ -2,7 +2,9 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"time"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -49,20 +51,28 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		option.WithAPIKey(c.APIKey()),
 	)
 
-	result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Messages: []openai.ChatCompletionMessageParamUnion{prompt},
-		Model:    c.Model(),
-	})
-	if err != nil {
-		return "", err
-	}
+	for i := range 10 {
+		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			Messages: []openai.ChatCompletionMessageParamUnion{prompt},
+			Model:    c.Model(),
+		})
+		if err != nil {
+			if i < 10 {
+				fmt.Println("Retrying in 30 seconds...")
+				time.Sleep(30 * time.Second)
+				continue
+			}
 
-	for _, c := range result.Choices {
-		if len(c.Message.Content) == 0 {
-			continue
+			return "", err
 		}
 
-		return c.Message.Content, nil
+		for _, c := range result.Choices {
+			if len(c.Message.Content) == 0 {
+				continue
+			}
+
+			return c.Message.Content, nil
+		}
 	}
 
 	return "", nil

@@ -320,6 +320,17 @@ github.com/yaegashi/wtz.go
 # github.com/yarlson/pin v0.9.1
 ## explicit; go 1.11
 github.com/yarlson/pin
+# github.com/yuin/goldmark v1.7.11
+## explicit; go 1.22
+github.com/yuin/goldmark
+github.com/yuin/goldmark/ast
+github.com/yuin/goldmark/extension
+github.com/yuin/goldmark/extension/ast
+github.com/yuin/goldmark/parser
+github.com/yuin/goldmark/renderer
+github.com/yuin/goldmark/renderer/html
+github.com/yuin/goldmark/text
+github.com/yuin/goldmark/util
 # go.mau.fi/util v0.8.7
 ## explicit; go 1.23.0
 go.mau.fi/util/base58
@@ -331,6 +342,7 @@ go.mau.fi/util/exerrors
 go.mau.fi/util/exgjson
 go.mau.fi/util/exhttp
 go.mau.fi/util/exslices
+go.mau.fi/util/exstrings
 go.mau.fi/util/exsync
 go.mau.fi/util/exzerolog
 go.mau.fi/util/glob
@@ -592,6 +604,8 @@ maunium.net/go/mautrix/crypto/sql_store_upgrade
 maunium.net/go/mautrix/crypto/ssss
 maunium.net/go/mautrix/crypto/utils
 maunium.net/go/mautrix/event
+maunium.net/go/mautrix/format
+maunium.net/go/mautrix/format/mdext
 maunium.net/go/mautrix/id
 maunium.net/go/mautrix/pushrules
 maunium.net/go/mautrix/sqlstatestore

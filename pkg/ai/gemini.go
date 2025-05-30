@@ -2,6 +2,8 @@ package ai
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"google.golang.org/genai"
 )
@@ -50,18 +52,26 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 
 	config := &genai.GenerateContentConfig{}
 
-	result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
-	if err != nil {
-		return "", err
-	}
+	for i := range 10 {
+		result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
+		if err != nil {
+			if i < 10 {
+				fmt.Println("Retrying in 30 seconds...")
+				time.Sleep(30 * time.Second)
+				continue
+			}
 
-	for _, c := range result.Candidates {
-		if len(c.Content.Parts) == 0 {
-			continue
+			return "", err
 		}
 
-		for _, part := range c.Content.Parts {
-			return part.Text, nil
+		for _, c := range result.Candidates {
+			if len(c.Content.Parts) == 0 {
+				continue
+			}
+
+			for _, part := range c.Content.Parts {
+				return part.Text, nil
+			}
 		}
 	}
 

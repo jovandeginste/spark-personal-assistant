@@ -148,7 +148,7 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 				ef.Source = src
 			}
 
-			entries, err := c.app.CurrentEntries(ef)
+			entries, err := c.app.CurrentEntries(&ef)
 			if err != nil {
 				return err
 			}
