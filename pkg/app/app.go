@@ -25,13 +25,13 @@ func (a *App) Logger() *slog.Logger {
 }
 
 func (a *App) Initialize() error {
+	a.initializeLogger()
+
 	if err := a.ReadConfig(); err != nil {
 		return err
 	}
 
 	a.Config.Mailer.app = a
-
-	a.initializeLogger()
 
 	if err := a.initializeDatabase(); err != nil {
 		return err
