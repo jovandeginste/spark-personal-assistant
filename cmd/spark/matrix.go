@@ -89,7 +89,12 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 			}
 
 			mc.initChat()
-			c.app.Logger().Info("Now running", "client_id", mc.client.UserID.String())
+			c.app.Logger().Info(
+				"Now running",
+				"client_id",
+				mc.client.UserID.String(),
+				"name", c.app.Config.Assistant.Name,
+			)
 
 			if err := mc.client.SyncWithContext(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
 				c.app.Logger().Error("Failed to sync", "error", err)
