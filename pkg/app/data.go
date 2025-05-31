@@ -27,6 +27,15 @@ type AIData struct {
 	Entries          data.Entries
 }
 
+// CleanHistory: keep last 10 elements in aiData.ChatHistory:
+func (aiData *AIData) CleanHistory() {
+	if len(aiData.ChatHistory) < 10 {
+		return
+	}
+
+	aiData.ChatHistory = aiData.ChatHistory[len(aiData.ChatHistory)-10:]
+}
+
 func (aiData *AIData) AddChatHistory(role string, input string) {
 	aiData.ChatHistory = append(
 		aiData.ChatHistory,
