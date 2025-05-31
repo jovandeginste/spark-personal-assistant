@@ -20,6 +20,13 @@ type Config struct {
 
 	AssistantFileCLI string             `mapstructure:"-"`
 	Assistant        ai.AssistantConfig `mapstructure:"-"`
+	Matrix           MatrixConfig       `mapstructure:"matrix"`
+}
+
+type MatrixConfig struct {
+	Homeserver string `mapstructure:"homeserver"`
+	Username   string `mapstructure:"username"`
+	Password   string `mapstructure:"password"`
 }
 
 type UserData struct {

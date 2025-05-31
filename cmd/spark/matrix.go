@@ -30,11 +30,8 @@ import (
 )
 
 type matrixConfig struct {
-	homeserver string
-	username   string
-	password   string
-	database   string
-	source     string
+	database string
+	source   string
 
 	sourceID     uint64
 	ef           app.EntryFilter
@@ -104,9 +101,6 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
-	cmd.Flags().StringVar(&mc.homeserver, "homeserver", "", "Matrix homeserver")
-	cmd.Flags().StringVar(&mc.username, "username", "", "Matrix username localpart")
-	cmd.Flags().StringVar(&mc.password, "password", "", "Matrix password")
 	cmd.Flags().StringVar(&mc.database, "database", "mautrix-example.db", "SQLite database path")
 	cmd.Flags().StringVar(&mc.source, "source", "custom", "Name of the source to use")
 	cmd.Flags().UintVarP(&mc.ef.DaysBack, "days-back", "b", 30, "Number of days in the past to include")
@@ -312,7 +306,7 @@ func (mc *matrixConfig) syncFunc(ctx context.Context, evt *event.Event) {
 }
 
 func (mc *matrixConfig) initClient() error {
-	client, err := mautrix.NewClient(mc.homeserver, "", "")
+	client, err := mautrix.NewClient(mc.app.Config.Matrix.Homeserver, "", "")
 	if err != nil {
 		return err
 	}
@@ -330,8 +324,8 @@ func (mc *matrixConfig) configureCryptoHelper() error {
 
 	cryptoHelper.LoginAs = &mautrix.ReqLogin{
 		Type:       mautrix.AuthTypePassword,
-		Identifier: mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: mc.username},
-		Password:   mc.password,
+		Identifier: mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: mc.app.Config.Matrix.Username},
+		Password:   mc.app.Config.Matrix.Password,
 	}
 
 	if err := cryptoHelper.Init(context.TODO()); err != nil {
