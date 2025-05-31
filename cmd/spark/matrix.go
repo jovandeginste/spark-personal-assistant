@@ -146,7 +146,7 @@ func (mc *matrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 
 	r, err := mc.calculateResponse(roomID, sender, input)
 	if err != nil {
-		mc.app.Logger().Error("Failed to calulate response", "error", err)
+		mc.app.Logger().Error("Failed to calculate response", "error", err)
 		r = fmt.Sprintf("Error: %s", err)
 	}
 
@@ -175,7 +175,7 @@ func (e *entry) ToEntry() *data.Entry {
 	return de
 }
 
-func (mc *matrixConfig) performTasks(roomID id.RoomID, sender id.UserID, input string) error {
+func (mc *matrixConfig) performTasks(roomID id.RoomID) error {
 	src, err := mc.app.FindSourceByName(mc.source)
 	if err != nil {
 		return err
@@ -223,13 +223,13 @@ func (e *entry) Execute(mc *matrixConfig, roomID id.RoomID, src *data.Source) {
 		mc.aiData.AddChatHistory("assistant", fmt.Sprintf("added task: %v", e))
 		mc.sendMessage(roomID, fmt.Sprintf("Creating task: %+v", de))
 	case "delete":
-		id, err := mc.app.FindEntryByRemoteID(mc.sourceID, de)
+		eid, err := mc.app.FindEntryByRemoteID(mc.sourceID, de)
 		if err != nil {
 			mc.app.Logger().Error("Failed to find entry", "error", err)
 			return
 		}
 
-		de.ID = id
+		de.ID = eid
 
 		if err := mc.app.DeleteEntry(de); err != nil {
 			mc.app.Logger().Error("Failed to delete entry", "error", err)
@@ -266,7 +266,7 @@ func (mc *matrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		mc.sendMessage(roomID, isTask)
 		mc.app.Logger().Info("Calculating tasks...")
 
-		err := mc.performTasks(roomID, sender, input)
+		err := mc.performTasks(roomID)
 		if err != nil {
 			return "", fmt.Errorf("could not perform task: %w", err)
 		}

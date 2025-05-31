@@ -47,8 +47,7 @@ func (e *Entry) SetMetadata(key string, value any) {
 }
 
 func (e *Entry) SetMetadataIfNotEmpty(key string, value any) {
-	switch v := value.(type) {
-	case string:
+	if v, ok := value.(string); ok {
 		uv, err := strconv.Unquote("\"" + v + "\"")
 		if err == nil {
 			uv = strings.TrimSpace(uv)
