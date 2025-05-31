@@ -124,7 +124,7 @@ func (a *App) SetDefaults() {
 	}
 
 	if a.Config.Assistant.Name == "" {
-		a.Config.Assistant.Name = "Spark"
+		a.Config.Assistant.Name = "Spark ⚡️"
 	}
 
 	if a.Config.Assistant.Style == "" {
