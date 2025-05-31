@@ -68,7 +68,8 @@ func (a *App) configureAssistant() error {
 
 	input, err := os.Open(a.Config.AssistantFile)
 	if err != nil {
-		return err
+		a.Logger().Error("Could not open assistant file", "file", a.Config.AssistantFile, "error", err.Error())
+		return nil
 	}
 
 	rest, err := frontmatter.Parse(input, &a.Config.Assistant)
