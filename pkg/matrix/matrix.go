@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -116,12 +117,19 @@ func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
 }
 
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
-	input = strings.TrimSpace(input)
+	input = strings.ToLower(strings.TrimSpace(input))
 	switch input {
 	case "":
 		return "", nil
 	case "reset":
 		defer mc.AIData.ResetHistory()
+		return "Resetting...", nil
+	case "restart":
+		go func() {
+			time.Sleep(5 * time.Second)
+			os.Exit(1)
+		}()
+
 		return "Resetting...", nil
 	case "ping":
 		return "*pong back*", nil
