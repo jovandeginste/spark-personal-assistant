@@ -15,9 +15,11 @@ type EntryFilter struct {
 }
 
 type ChatHistory struct {
+	time    time.Time
 	Role    string
 	Content string
 }
+
 type AIData struct {
 	ExtraContext     []string
 	ChatHistory      []ChatHistory `json:",omitempty"`
@@ -27,19 +29,34 @@ type AIData struct {
 	Entries          structs.Entries
 }
 
+func (aiData *AIData) ResetHistory() {
+	aiData.ChatHistory = []ChatHistory{}
+}
+
 // CleanHistory: keep last 10 elements in aiData.ChatHistory:
 func (aiData *AIData) CleanHistory() {
-	if len(aiData.ChatHistory) < 10 {
-		return
+	h := []ChatHistory{}
+	f := time.Now().Add(-1 * time.Hour)
+
+	for i, e := range aiData.ChatHistory {
+		if i < len(aiData.ChatHistory)-10 {
+			continue
+		}
+
+		if e.time.Before(f) {
+			continue
+		}
+
+		h = append(h, e)
 	}
 
-	aiData.ChatHistory = aiData.ChatHistory[len(aiData.ChatHistory)-10:]
+	aiData.ChatHistory = h
 }
 
 func (aiData *AIData) AddChatHistory(role string, input string) {
 	aiData.ChatHistory = append(
 		aiData.ChatHistory,
-		ChatHistory{Role: role, Content: input},
+		ChatHistory{time: time.Now(), Role: role, Content: input},
 	)
 }
 

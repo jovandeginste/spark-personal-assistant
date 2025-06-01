@@ -120,6 +120,9 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 	switch input {
 	case "":
 		return "", nil
+	case "reset":
+		defer mc.AIData.ResetHistory()
+		return "Resetting...", nil
 	case "ping":
 		return "*pong back*", nil
 	}
