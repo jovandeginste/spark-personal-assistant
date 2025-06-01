@@ -40,7 +40,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 			return
 		}
 
-		mc.sendMessage(roomID, "Creating task:\n\n"+de.ToString())
+		mc.sendMessage(roomID, "Creating task:\n\n```\n"+de.ToString()+"```\n")
 		mc.AIData.AddChatHistory("assistant", "Creating task:\n\n"+de.ToString())
 	case "delete":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
@@ -56,7 +56,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 			return
 		}
 
-		mc.sendMessage(roomID, "Deleted task:\n\n"+de.ToString())
+		mc.sendMessage(roomID, "Deleted task:\n\n```\n"+de.ToString()+"```\n")
 		mc.AIData.AddChatHistory("assistant", "Deleted task:\n\n"+de.ToString())
 	}
 }
