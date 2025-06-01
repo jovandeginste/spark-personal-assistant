@@ -1,6 +1,7 @@
 package structs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
@@ -36,7 +37,7 @@ func (src *Source) RetrieveEntries() (Entries, error) {
 func (src *Source) retrieveFromJSON() (Entries, error) {
 	url, ok := src.Metadata["url"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing url")
+		return nil, errors.New("missing url")
 	}
 
 	src.logger.Info("retrieving json", "url", url)
@@ -47,7 +48,7 @@ func (src *Source) retrieveFromJSON() (Entries, error) {
 func (src *Source) retrieveFromRSS() (Entries, error) {
 	url, ok := src.Metadata["url"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing url")
+		return nil, errors.New("missing url")
 	}
 
 	src.logger.Info("retrieving rss", "url", url)
@@ -60,7 +61,7 @@ func (src *Source) retrieveFromWeather() (Entries, error) {
 
 	location, ok := src.Metadata["location"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing location")
+		return nil, errors.New("missing location")
 	}
 
 	src.logger.Info("retrieving weather", "location", location)
@@ -71,7 +72,7 @@ func (src *Source) retrieveFromWeather() (Entries, error) {
 func (src *Source) retrieveFromICal() (Entries, error) {
 	url, ok := src.Metadata["url"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing url")
+		return nil, errors.New("missing url")
 	}
 
 	collection, ok := src.Metadata["collection"].(string)
@@ -102,7 +103,7 @@ func (src *Source) retrieveFromICal() (Entries, error) {
 func (src *Source) retrieveFromVCF() (Entries, error) {
 	url, ok := src.Metadata["url"].(string)
 	if !ok {
-		return nil, fmt.Errorf("missing url")
+		return nil, errors.New("missing url")
 	}
 
 	src.logger.Info("retrieving vcf", "url", url)
