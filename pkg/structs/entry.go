@@ -1,4 +1,4 @@
-package data
+package structs
 
 import (
 	"bytes"
@@ -8,10 +8,11 @@ import (
 	"fmt"
 	"io"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aquasecurity/table"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"gorm.io/gorm"
 )
 
@@ -26,13 +27,13 @@ const (
 )
 
 type Entry struct {
-	ID         uint64         `gorm:"primaryKey" json:"-"`
-	RemoteID   string         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date       HumanTime      `gorm:"not null;index"`
-	Importance Importance     `gorm:"not null" json:",omitempty"`
-	SourceID   uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Summary    string         `gorm:"not null"`
-	Metadata   map[string]any `gorm:"serializer:json" json:",omitempty"`
+	ID         uint64              `gorm:"primaryKey" json:"-"`
+	RemoteID   string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	Date       humantime.HumanTime `gorm:"not null;index"`
+	Importance Importance          `gorm:"not null" json:",omitempty"`
+	SourceID   uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	Summary    string              `gorm:"not null"`
+	Metadata   map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
 	DateString string `gorm:"-" json:"-"`
 
@@ -48,16 +49,7 @@ func (e *Entry) SetMetadata(key string, value any) {
 }
 
 func (e *Entry) SetMetadataIfNotEmpty(key string, value any) {
-	if v, ok := value.(string); ok {
-		uv, err := strconv.Unquote("\"" + v + "\"")
-		if err == nil {
-			uv = strings.TrimSpace(uv)
-		} else {
-			uv = strings.TrimSpace(v)
-		}
-
-		value = uv
-	}
+	value = generic.CleanValue(value)
 
 	switch value {
 	case nil, "", 0:
@@ -106,14 +98,14 @@ func (e *Entry) FormattedDate() string {
 
 func parseDate(d string) (time.Time, error) {
 	if d == "" {
-		return time.Now().In(LocalTimezone).Truncate(24 * time.Hour), nil
+		return time.Now().In(humantime.LocalTimezone).Truncate(24 * time.Hour), nil
 	}
 
-	if t, err := time.ParseInLocation("2006-01-02 15:04", d, LocalTimezone); err == nil {
+	if t, err := time.ParseInLocation("2006-01-02 15:04", d, humantime.LocalTimezone); err == nil {
 		return t, nil
 	}
 
-	return time.ParseInLocation("2006-01-02", d, LocalTimezone)
+	return time.ParseInLocation("2006-01-02", d, humantime.LocalTimezone)
 }
 
 func (e *Entry) SetDate(d string) error {
@@ -122,7 +114,7 @@ func (e *Entry) SetDate(d string) error {
 		return err
 	}
 
-	e.Date = HumanTime{parsedDate}
+	e.Date = humantime.HumanTime{Time: parsedDate}
 
 	return nil
 }
@@ -152,6 +144,7 @@ func (e *Entry) ToString() string {
 
 func (e *Entry) PrintTo(w io.Writer) {
 	t := table.New(w)
+	defer t.Render()
 
 	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
@@ -166,6 +159,4 @@ func (e *Entry) PrintTo(w io.Writer) {
 	for k, v := range e.Metadata {
 		t.AddRow(k, fmt.Sprintf("%v", v))
 	}
-
-	t.Render()
 }

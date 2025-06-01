@@ -4,12 +4,12 @@ import (
 	"errors"
 	"time"
 
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/structs"
 	"gorm.io/gorm"
 )
 
 type EntryFilter struct {
-	Source    *data.Source
+	Source    *structs.Source
 	DaysBack  uint
 	DaysAhead uint
 }
@@ -24,7 +24,7 @@ type AIData struct {
 	EmployerQuestion []string      `json:",omitempty"`
 	UserData         UserData
 	EntryFilter      *EntryFilter
-	Entries          data.Entries
+	Entries          structs.Entries
 }
 
 // CleanHistory: keep last 10 elements in aiData.ChatHistory:
@@ -83,10 +83,10 @@ func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
 	return q
 }
 
-func (a *App) CurrentEntries(ef *EntryFilter) (data.Entries, error) {
+func (a *App) CurrentEntries(ef *EntryFilter) (structs.Entries, error) {
 	q := ef.Query(a.DB())
 
-	var entries data.Entries
+	var entries structs.Entries
 
 	if err := q.Order("date ASC").Find(&entries).Error; err != nil {
 		return nil, err
@@ -95,8 +95,8 @@ func (a *App) CurrentEntries(ef *EntryFilter) (data.Entries, error) {
 	return entries, nil
 }
 
-func (a *App) Entries() (data.Entries, error) {
-	var entries data.Entries
+func (a *App) Entries() (structs.Entries, error) {
+	var entries structs.Entries
 
 	if err := a.DB().
 		Preload("Source").
@@ -108,18 +108,18 @@ func (a *App) Entries() (data.Entries, error) {
 	return entries, nil
 }
 
-func (a *App) DeleteEntry(e *data.Entry) error {
+func (a *App) DeleteEntry(e *structs.Entry) error {
 	return a.DB().Delete(&e).Error
 }
 
-func (a *App) FindEntry(e *data.Entry) error {
+func (a *App) FindEntry(e *structs.Entry) error {
 	return a.DB().First(&e, e.ID).Error
 }
 
-func (a *App) FindEntryByRemoteID(sourceID uint64, e *data.Entry) (uint64, error) {
+func (a *App) FindEntryByRemoteID(sourceID uint64, e *structs.Entry) (uint64, error) {
 	rid := e.NewRemoteID()
 
-	var entry data.Entry
+	var entry structs.Entry
 
 	if err := a.DB().Where("source_id = ?", sourceID).Where("remote_id = ?", rid).First(&entry).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -132,41 +132,51 @@ func (a *App) FindEntryByRemoteID(sourceID uint64, e *data.Entry) (uint64, error
 	return entry.ID, nil
 }
 
-func (a *App) Sources() (data.Sources, error) {
-	var sources data.Sources
+func (a *App) Sources() (structs.Sources, error) {
+	var sources structs.Sources
 
 	if err := a.DB().Preload("Entries").Find(&sources).Error; err != nil {
 		return nil, err
 	}
 
+	for _, s := range sources {
+		s.SetLogger(a.Logger())
+	}
+
 	return sources, nil
 }
 
-func (a *App) CreateEntry(entry *data.Entry) error {
+func (a *App) CreateEntry(entry *structs.Entry) error {
 	a.Logger().Info("Creating new entry", "date", entry.Date, "entry", entry.Summary, "source", entry.Source.Name)
 	return a.DB().Create(entry).Error
 }
 
-func (a *App) DeleteSource(s *data.Source) error {
+func (a *App) DeleteSource(s *structs.Source) error {
 	return a.DB().Select("Entries").Delete(&s).Error
 }
 
-func (a *App) FindSourceByName(name string) (*data.Source, error) {
-	source := data.Source{Name: name}
+func (a *App) FindSourceByName(name string) (*structs.Source, error) {
+	source := structs.Source{Name: name}
 
 	if err := a.DB().Where(&source).First(&source).Error; err != nil {
 		return nil, err
 	}
 
+	source.SetLogger(a.Logger())
+
 	return &source, nil
 }
 
-func (a *App) CreateSource(src *data.Source) error {
+func (a *App) CreateSource(src *structs.Source) error {
 	a.Logger().Info("Creating new source", "source", src.Name)
 	return a.DB().Create(src).Error
 }
 
-func (a *App) FetchExistingEntries(sourceID uint64, entries data.Entries) {
+func (a *App) UpdateSource(src *structs.Source) error {
+	return a.DB().Save(&src).Error
+}
+
+func (a *App) FetchExistingEntries(sourceID uint64, entries structs.Entries) {
 	for i, e := range entries {
 		id, err := a.FindEntryByRemoteID(sourceID, &e)
 		if err != nil {
@@ -181,14 +191,14 @@ func (a *App) FetchExistingEntries(sourceID uint64, entries data.Entries) {
 	}
 }
 
-func (a *App) ReplaceSourceEntries(src *data.Source, entries data.Entries) error {
+func (a *App) ReplaceSourceEntries(src *structs.Source, entries structs.Entries) error {
 	a.Logger().Info("Replace entries for source", "entries", len(entries), "source", src.Name)
 
 	for i := range entries {
 		entries[i].SourceID = src.ID
 	}
 
-	if err := a.DB().Model(&data.Entry{}).Save(entries).Error; err != nil {
+	if err := a.DB().Model(&structs.Entry{}).Save(entries).Error; err != nil {
 		return err
 	}
 

@@ -1,4 +1,4 @@
-package data
+package structs
 
 import (
 	"io"
@@ -11,6 +11,8 @@ type Entries []Entry
 
 func (es Entries) PrintTo(w io.Writer) {
 	t := table.New(w)
+	defer t.Render()
+
 	t.AddHeaders("ID", "Date", "Title", "Importance", "Source")
 
 	for _, entry := range es {
@@ -22,6 +24,4 @@ func (es Entries) PrintTo(w io.Writer) {
 			entry.Source.Name,
 		)
 	}
-
-	t.Render()
 }

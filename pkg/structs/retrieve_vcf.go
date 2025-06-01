@@ -1,4 +1,4 @@
-package vcf
+package structs
 
 import (
 	"errors"
@@ -9,10 +9,10 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 )
 
-func BuildEntriesFromFile(file string) (data.Entries, error) {
+func BuildEntriesFromFile(file string) (Entries, error) {
 	f, err := os.Open(file)
 	if err != nil {
 		return nil, err
@@ -20,7 +20,7 @@ func BuildEntriesFromFile(file string) (data.Entries, error) {
 
 	dec := vcard.NewDecoder(f)
 
-	var entries data.Entries
+	var entries Entries
 
 	for {
 		card, err := dec.Decode()
@@ -40,8 +40,8 @@ func BuildEntriesFromFile(file string) (data.Entries, error) {
 			continue
 		}
 
-		e := data.Entry{
-			Date:    data.HumanTime{Time: bday},
+		e := Entry{
+			Date:    humantime.HumanTime{Time: bday},
 			Summary: "Birthday " + name,
 		}
 		if age > 0 {

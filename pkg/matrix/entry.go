@@ -1,7 +1,7 @@
 package matrix
 
 import (
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/structs"
 	"maunium.net/go/mautrix/id"
 )
 
@@ -13,8 +13,8 @@ type entry struct {
 	Name        string `json:"name"`
 }
 
-func (e *entry) ToEntry() *data.Entry {
-	de := &data.Entry{Summary: e.Summary}
+func (e *entry) ToEntry() *structs.Entry {
+	de := &structs.Entry{Summary: e.Summary}
 	if err := de.SetDate(e.Date); err != nil {
 		return nil
 	}
@@ -25,7 +25,7 @@ func (e *entry) ToEntry() *data.Entry {
 	return de
 }
 
-func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *data.Source) {
+func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source) {
 	de := e.ToEntry()
 	if de == nil {
 		return

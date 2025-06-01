@@ -1,4 +1,4 @@
-package data
+package structs
 
 import (
 	"bytes"
@@ -15,20 +15,20 @@ func TestSources_PrintTo(t *testing.T) {
 		{
 			name:    "Empty Sources",
 			sources: Sources{},
-			want: `┌────┬──────┬─────────────┐
-│ ID │ Name │ Description │
-└────┴──────┴─────────────┘`,
+			want: `┌────┬──────┬──────┬─────────────┐
+│ ID │ Name │ Type │ Description │
+└────┴──────┴──────┴─────────────┘`,
 		},
 		{
 			name: "Single Source",
 			sources: Sources{
 				{ID: 1, Name: "Test1", Description: "Description 1"},
 			},
-			want: `┌────┬───────┬───────────────┐
-│ ID │ Name  │  Description  │
-├────┼───────┼───────────────┤
-│ 1  │ Test1 │ Description 1 │
-└────┴───────┴───────────────┘`,
+			want: `┌────┬───────┬──────┬───────────────┐
+│ ID │ Name  │ Type │  Description  │
+├────┼───────┼──────┼───────────────┤
+│ 1  │ Test1 │      │ Description 1 │
+└────┴───────┴──────┴───────────────┘`,
 		},
 		{
 			name: "Multiple Sources",
@@ -37,15 +37,15 @@ func TestSources_PrintTo(t *testing.T) {
 				{ID: 2, Name: "Test2", Description: "Description 2"},
 				{ID: 3, Name: "LongName", Description: "A rather long description"},
 			},
-			want: `┌────┬──────────┬───────────────────────────┐
-│ ID │   Name   │        Description        │
-├────┼──────────┼───────────────────────────┤
-│ 1  │ Test1    │ Description 1             │
-├────┼──────────┼───────────────────────────┤
-│ 2  │ Test2    │ Description 2             │
-├────┼──────────┼───────────────────────────┤
-│ 3  │ LongName │ A rather long description │
-└────┴──────────┴───────────────────────────┘`,
+			want: `┌────┬──────────┬──────┬───────────────────────────┐
+│ ID │   Name   │ Type │        Description        │
+├────┼──────────┼──────┼───────────────────────────┤
+│ 1  │ Test1    │      │ Description 1             │
+├────┼──────────┼──────┼───────────────────────────┤
+│ 2  │ Test2    │      │ Description 2             │
+├────┼──────────┼──────┼───────────────────────────┤
+│ 3  │ LongName │      │ A rather long description │
+└────┴──────────┴──────┴───────────────────────────┘`,
 		},
 	}
 
@@ -80,7 +80,11 @@ func TestSource_PrintTo(t *testing.T) {
 				Description: "This is my test source",
 			},
 			want: `┌─────────────┬────────────────────────┐
+│ ID          │ 1                      │
+├─────────────┼────────────────────────┤
 │ Name        │ MySource               │
+├─────────────┼────────────────────────┤
+│ Type        │                        │
 ├─────────────┼────────────────────────┤
 │ Description │ This is my test source │
 └─────────────┴────────────────────────┘`,
@@ -92,7 +96,11 @@ func TestSource_PrintTo(t *testing.T) {
 				Name: "AnotherSource",
 			},
 			want: `┌─────────────┬───────────────┐
+│ ID          │ 2             │
+├─────────────┼───────────────┤
 │ Name        │ AnotherSource │
+├─────────────┼───────────────┤
+│ Type        │               │
 ├─────────────┼───────────────┤
 │ Description │               │
 └─────────────┴───────────────┘`,
@@ -105,7 +113,11 @@ func TestSource_PrintTo(t *testing.T) {
 				Description: "A very long description that should make the table wider",
 			},
 			want: `┌─────────────┬──────────────────────────────────────────────────────────┐
+│ ID          │ 3                                                        │
+├─────────────┼──────────────────────────────────────────────────────────┤
 │ Name        │ SourceWithLongName                                       │
+├─────────────┼──────────────────────────────────────────────────────────┤
+│ Type        │                                                          │
 ├─────────────┼──────────────────────────────────────────────────────────┤
 │ Description │ A very long description that should make the table wider │
 └─────────────┴──────────────────────────────────────────────────────────┘`,

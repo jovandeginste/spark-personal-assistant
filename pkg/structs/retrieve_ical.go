@@ -1,4 +1,4 @@
-package ical
+package structs
 
 import (
 	"bytes"
@@ -8,12 +8,12 @@ import (
 	"time"
 
 	"github.com/apognu/gocal"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"github.com/yaegashi/wtz.go"
 )
 
-func BuildEntriesFromRemote(remote string, daysBack, daysAhead uint, collection string) (data.Entries, error) {
+func BuildEntriesFromRemote(remote string, daysBack, daysAhead uint, collection string) (Entries, error) {
 	r, err := generic.GetBody(remote)
 	if err != nil {
 		return nil, err
@@ -22,7 +22,7 @@ func BuildEntriesFromRemote(remote string, daysBack, daysAhead uint, collection 
 	return BuildEntriesFromICal(r, daysBack, daysAhead, collection)
 }
 
-func BuildEntriesFromICal(r []byte, daysBack, daysAhead uint, collection string) (data.Entries, error) {
+func BuildEntriesFromICal(r []byte, daysBack, daysAhead uint, collection string) (Entries, error) {
 	in := gocal.NewParser(bytes.NewReader(r))
 	start := time.Now().Add(-time.Duration(daysBack) * 24 * time.Hour)
 	end := time.Now().Add(time.Duration(daysAhead) * 24 * time.Hour)
@@ -36,7 +36,7 @@ func BuildEntriesFromICal(r []byte, daysBack, daysAhead uint, collection string)
 		return nil, errors.New("no events")
 	}
 
-	var entries data.Entries
+	var entries Entries
 
 	hashes := map[string]bool{}
 
@@ -58,8 +58,8 @@ func BuildEntriesFromICal(r []byte, daysBack, daysAhead uint, collection string)
 	return entries, nil
 }
 
-func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error) {
-	e := &data.Entry{}
+func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
+	e := &Entry{}
 	e.SetMetadata("Collection", collection)
 
 	if s := event.Start; s != nil {
@@ -68,7 +68,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 			return nil, err
 		}
 
-		e.Date = data.HumanTime{Time: t}
+		e.Date = humantime.HumanTime{Time: t}
 	}
 
 	e.Summary = event.Summary
@@ -79,7 +79,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*data.Entry, error
 			return nil, err
 		}
 
-		d := data.HumanTime{Time: t}
+		d := humantime.HumanTime{Time: t}
 		e.SetMetadata("End", d.FormatDate())
 	}
 

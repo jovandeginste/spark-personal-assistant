@@ -1,4 +1,4 @@
-package data
+package structs
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -84,18 +85,18 @@ func TestEntry_GenerateRemoteID(t *testing.T) {
 			name:            "Generate when RemoteID is empty",
 			initialRemoteID: "",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Test summary",
 			},
 			// Calculate expected ID manually
-			expectedRemoteID: generateHash(fmt.Sprintf("%d\n%s", time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone).UTC().Unix(), "Test summary")),
+			expectedRemoteID: generateHash(fmt.Sprintf("%d\n%s", time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone).UTC().Unix(), "Test summary")),
 		},
 		{
 			name:            "Do not generate when RemoteID is already set",
 			initialRemoteID: "existing-remote-id",
 			entry: Entry{
 				RemoteID: "existing-remote-id",
-				Date:     HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:     humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary:  "Test summary",
 			},
 			expectedRemoteID: "existing-remote-id",
@@ -104,11 +105,11 @@ func TestEntry_GenerateRemoteID(t *testing.T) {
 			name:            "Generate for different data",
 			initialRemoteID: "",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 27, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 27, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Another summary",
 			},
 			// Calculate expected ID manually
-			expectedRemoteID: generateHash(fmt.Sprintf("%d\n%s", time.Date(2023, 10, 27, 12, 0, 0, 0, LocalTimezone).UTC().Unix(), "Another summary")),
+			expectedRemoteID: generateHash(fmt.Sprintf("%d\n%s", time.Date(2023, 10, 27, 12, 0, 0, 0, humantime.LocalTimezone).UTC().Unix(), "Another summary")),
 		},
 	}
 
@@ -134,11 +135,11 @@ func TestEntry_NewRemoteID(t *testing.T) {
 		{
 			name: "Same date, same summary",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			compare: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			expectEqual: true,
@@ -146,11 +147,11 @@ func TestEntry_NewRemoteID(t *testing.T) {
 		{
 			name: "Same date, different summary",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			compare: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary B",
 			},
 			expectEqual: false,
@@ -158,11 +159,11 @@ func TestEntry_NewRemoteID(t *testing.T) {
 		{
 			name: "Different date, same summary",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			compare: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 27, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 27, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			expectEqual: false,
@@ -170,11 +171,11 @@ func TestEntry_NewRemoteID(t *testing.T) {
 		{
 			name: "Different date, different summary",
 			entry: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 26, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 26, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary A",
 			},
 			compare: Entry{
-				Date:    HumanTime{time.Date(2023, 10, 27, 12, 0, 0, 0, LocalTimezone)},
+				Date:    humantime.HumanTime{Time: time.Date(2023, 10, 27, 12, 0, 0, 0, humantime.LocalTimezone)},
 				Summary: "Summary B",
 			},
 			expectEqual: false,
@@ -217,7 +218,7 @@ func TestEntry_BeforeSave(t *testing.T) {
 			name:            "RemoteID is empty, should generate",
 			initialRemoteID: "",
 			entry: Entry{
-				Date:    HumanTime{time.Now()},
+				Date:    humantime.HumanTime{Time: time.Now()},
 				Summary: "Test summary for save",
 			},
 			expectChange: true,
@@ -227,7 +228,7 @@ func TestEntry_BeforeSave(t *testing.T) {
 			initialRemoteID: "existing-id-save",
 			entry: Entry{
 				RemoteID: "existing-id-save",
-				Date:     HumanTime{time.Now()},
+				Date:     humantime.HumanTime{Time: time.Now()},
 				Summary:  "Test summary for save",
 			},
 			expectChange: false,
@@ -257,11 +258,11 @@ func TestEntry_AfterFind(t *testing.T) {
 	// This test primarily checks if FormattedDate is called and assigned.
 	// We need a HumanTime mock or structure that we can control the FormatDate output.
 	// Using the simple HumanTime wrapper defined above which formats to "YYYY-MM-DD".
-	testDate := time.Date(2023, 11, 15, 0, 0, 0, 0, LocalTimezone)
+	testDate := time.Date(2023, 11, 15, 0, 0, 0, 0, humantime.LocalTimezone)
 	expectedFormattedDate := "2023-11-15"
 
 	e := &Entry{
-		Date: HumanTime{testDate},
+		Date: humantime.HumanTime{Time: testDate},
 	}
 
 	err := e.AfterFind(nil) // Pass nil for DB as FormattedDate doesn't use it
@@ -273,11 +274,11 @@ func TestEntry_AfterFind(t *testing.T) {
 func TestEntry_FormattedDate(t *testing.T) {
 	// This tests that FormattedDate calls the underlying Date.FormatDate method.
 	// Using the simple HumanTime wrapper defined above which formats to "YYYY-MM-DD".
-	testDate := time.Date(2024, 1, 1, 10, 30, 0, 0, LocalTimezone)
+	testDate := time.Date(2024, 1, 1, 10, 30, 0, 0, humantime.LocalTimezone)
 	expectedFormattedDate := "2024-01-01 10:30"
 
 	e := &Entry{
-		Date: HumanTime{testDate},
+		Date: humantime.HumanTime{Time: testDate},
 	}
 
 	formattedDate := e.FormattedDate()
@@ -334,17 +335,17 @@ func Test_parseDate(t *testing.T) {
 				assert.NoError(t, err, "Did not expect an error for valid date string")
 
 				if tt.compareToday {
-					nowLocal := time.Now().In(LocalTimezone)
+					nowLocal := time.Now().In(humantime.LocalTimezone)
 					// Round both times to the nearest day for comparison
-					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, LocalTimezone)
-					parsedTimeRounded := time.Date(parsedTime.Year(), parsedTime.Month(), parsedTime.Day(), 0, 0, 0, 0, LocalTimezone)
+					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
+					parsedTimeRounded := time.Date(parsedTime.Year(), parsedTime.Month(), parsedTime.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 
 					assert.Equal(t, expectedTime, parsedTimeRounded, "Parsed date for empty string should be today's date in local timezone rounded")
 				} else {
 					assert.Equal(t, tt.expectedYear, parsedTime.Year(), "Year mismatch")
 					assert.Equal(t, tt.expectedMonth, parsedTime.Month(), "Month mismatch")
 					assert.Equal(t, tt.expectedDay, parsedTime.Day(), "Day mismatch")
-					assert.Equal(t, LocalTimezone, parsedTime.Location(), "Time should be local")
+					assert.Equal(t, humantime.LocalTimezone, parsedTime.Location(), "Time should be local")
 					// Check time components are zeroed out for parsed dates
 					assert.Equal(t, 0, parsedTime.Hour())
 					assert.Equal(t, 0, parsedTime.Minute())
@@ -368,7 +369,7 @@ func TestEntry_SetDate(t *testing.T) {
 			name:         "Valid date string",
 			dateString:   "2024-01-15",
 			expectError:  false,
-			expectedTime: time.Date(2024, 1, 15, 0, 0, 0, 0, LocalTimezone),
+			expectedTime: time.Date(2024, 1, 15, 0, 0, 0, 0, humantime.LocalTimezone),
 			compareToday: false,
 		},
 		{
@@ -396,9 +397,9 @@ func TestEntry_SetDate(t *testing.T) {
 				assert.NoError(t, err, "Did not expect an error for valid date string")
 
 				if tt.compareToday {
-					nowLocal := time.Now().In(LocalTimezone)
-					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, LocalTimezone)
-					parsedTime := time.Date(e.Date.Year(), e.Date.Month(), e.Date.Day(), 0, 0, 0, 0, LocalTimezone)
+					nowLocal := time.Now().In(humantime.LocalTimezone)
+					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
+					parsedTime := time.Date(e.Date.Year(), e.Date.Month(), e.Date.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 					assert.Equal(t, expectedTime, parsedTime, "Set date for empty string should be today's date in local timezone rounded")
 				} else {
 					assert.Equal(t, tt.expectedTime, e.Date.Time, "Set date mismatch")
@@ -485,7 +486,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			entry: Entry{
 				ID:         123,
 				RemoteID:   "remote-id-abc",
-				Date:       HumanTime{time.Date(2023, 12, 10, 0, 0, 0, 0, LocalTimezone)},
+				Date:       humantime.HumanTime{Time: time.Date(2023, 12, 10, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2023-12-10", // Populated by AfterFind, used by PrintTo
 				Importance: HIGH,
 				Summary:    "A test summary",
@@ -505,7 +506,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			entry: Entry{
 				ID:         456,
 				RemoteID:   "remote-id-def",
-				Date:       HumanTime{time.Date(2024, 1, 5, 0, 0, 0, 0, LocalTimezone)},
+				Date:       humantime.HumanTime{Time: time.Date(2024, 1, 5, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2024-01-05",
 				Importance: LOW,
 				Summary:    "Another summary",
@@ -531,7 +532,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			entry: Entry{
 				ID:         789,
 				RemoteID:   "remote-id-ghi",
-				Date:       HumanTime{time.Date(2024, 2, 20, 0, 0, 0, 0, LocalTimezone)},
+				Date:       humantime.HumanTime{Time: time.Date(2024, 2, 20, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2024-02-20",
 				Importance: MEDIUM,
 				Summary:    "Summary with no source",

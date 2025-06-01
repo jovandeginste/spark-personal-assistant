@@ -1,4 +1,4 @@
-package weather
+package structs
 
 import (
 	"encoding/json"
@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/google/go-querystring/query"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 )
 
@@ -29,13 +29,13 @@ var (
 	}
 )
 
-func GetWeatherData(location string) (data.Entries, error) {
+func GetWeatherData(location string) (Entries, error) {
 	weatherData, err := getWeatherData(location)
 	if err != nil {
 		return nil, err
 	}
 
-	entries := make(data.Entries, len(weatherData.Daily.Time))
+	entries := make(Entries, len(weatherData.Daily.Time))
 
 	for day := range len(weatherData.Daily.Time) {
 		e, err := newEventFromOpenMeteo(weatherData, location, day)
@@ -99,7 +99,7 @@ func getWeatherData(location string) (*WeatherData, error) {
 	return &d, nil
 }
 
-func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Entry, error) {
+func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*Entry, error) {
 	allDays := wd.Daily
 	eDate := allDays.Time[day]
 
@@ -108,8 +108,8 @@ func newEventFromOpenMeteo(wd *WeatherData, location string, day int) (*data.Ent
 		return nil, err
 	}
 
-	e := &data.Entry{
-		Date:    data.HumanTime{Time: parsedDate},
+	e := &Entry{
+		Date:    humantime.HumanTime{Time: parsedDate},
 		Summary: fmt.Sprintf("Weather for %s in %s", parsedDate.Format("Monday"), location),
 	}
 

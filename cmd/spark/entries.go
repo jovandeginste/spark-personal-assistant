@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/structs"
 	"github.com/spf13/cobra"
 )
 
@@ -35,7 +35,7 @@ func (c *cli) deleteEntryCmd() *cobra.Command {
 				return err
 			}
 
-			e := &data.Entry{ID: id}
+			e := &structs.Entry{ID: id}
 
 			if err := c.app.FindEntry(e); err != nil {
 				return err
@@ -66,7 +66,7 @@ func (c *cli) showEntryCmd() *cobra.Command {
 				return err
 			}
 
-			e := &data.Entry{ID: id}
+			e := &structs.Entry{ID: id}
 
 			if err := c.app.FindEntry(e); err != nil {
 				return err
@@ -83,7 +83,7 @@ func (c *cli) showEntryCmd() *cobra.Command {
 
 func (c *cli) addEntryCmd() *cobra.Command {
 	var (
-		e data.Entry
+		e structs.Entry
 		d string
 		i string
 		s string
@@ -121,7 +121,7 @@ func (c *cli) addEntryCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&e.Summary, "title", "t", "", "Title of the entry")
-	cmd.Flags().StringVarP(&i, "importance", "i", string(data.MEDIUM), "Importance of the entry")
+	cmd.Flags().StringVarP(&i, "importance", "i", string(structs.MEDIUM), "Importance of the entry")
 	cmd.Flags().StringVarP(&d, "date", "d", "", "Date of the entry")
 	cmd.Flags().StringVarP(&s, "source", "s", "manual", "Source of the entry")
 

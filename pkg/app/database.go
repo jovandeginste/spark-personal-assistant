@@ -3,7 +3,7 @@ package app
 import (
 	"github.com/glebarez/sqlite"
 	sloggorm "github.com/imdatngo/slog-gorm"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/structs"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -19,7 +19,7 @@ func (a *App) DB() *gorm.DB {
 
 func (a *App) Migrate() error {
 	return a.db.AutoMigrate(
-		data.Source{}, data.Entry{},
+		structs.Source{}, structs.Entry{},
 	)
 }
 

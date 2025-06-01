@@ -39,10 +39,6 @@ func (c *cli) root() *cobra.Command {
 	cmd.AddCommand(c.md2htmlCmd())
 	cmd.AddCommand(c.md2textCmd())
 	cmd.AddCommand(c.md2speechCmd())
-	cmd.AddCommand(c.weatherCmd())
-	cmd.AddCommand(c.icalCmd())
-	cmd.AddCommand(c.vcfCmd())
-	cmd.AddCommand(c.rssCmd())
 
 	sparkConfig, ok := os.LookupEnv("SPARK_CONFIG")
 	if !ok {
