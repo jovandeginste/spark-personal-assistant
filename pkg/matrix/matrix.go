@@ -47,6 +47,7 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 			"sender", evt.Sender.String(),
 			"type", evt.Type.String(),
 			"id", evt.ID.String(),
+			"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
 			"body", body,
 		)
 
