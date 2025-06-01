@@ -30,13 +30,13 @@ var promptPreamble = []string{
 	"The following entries consist a list of items.",
 	"Entries without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
-	"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 }
 
 func (a AssistantConfig) PromptPreamble() []string {
 	prompt := []string{
-		fmt.Sprintf("Your name is %s.", a.Name),
-		fmt.Sprintf("Use the following style: %s.", a.Style),
+		"Your name is: " + a.Name,
+		"Use the following style: " + a.Style,
+		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 	}
 
 	return append(prompt, promptPreamble...)

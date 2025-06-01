@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
 	"errors"
@@ -139,6 +140,14 @@ func (e *Entry) SetImportance(i string) error {
 	}
 
 	return nil
+}
+
+func (e *Entry) ToString() string {
+	b := bytes.Buffer{}
+
+	e.PrintTo(&b)
+
+	return b.String()
 }
 
 func (e *Entry) PrintTo(w io.Writer) {

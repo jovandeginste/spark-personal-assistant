@@ -1,8 +1,6 @@
 package matrix
 
 import (
-	"fmt"
-
 	"github.com/jovandeginste/spark-personal-assistant/pkg/data"
 	"maunium.net/go/mautrix/id"
 )
@@ -41,8 +39,9 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *data.Source) {
 			mc.App.Logger().Error("Failed to create entry", "error", err)
 			return
 		}
-		mc.AIData.AddChatHistory("assistant", fmt.Sprintf("added task: %v", e))
-		mc.sendMessage(roomID, fmt.Sprintf("Creating task: %+v", de))
+
+		mc.sendMessage(roomID, "Creating task:\n\n"+de.ToString())
+		mc.AIData.AddChatHistory("assistant", "Creating task:\n\n"+de.ToString())
 	case "delete":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
 		if err != nil {
@@ -57,7 +56,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *data.Source) {
 			return
 		}
 
-		mc.AIData.AddChatHistory("assistant", fmt.Sprintf("deleted task: %v", e))
-		mc.sendMessage(roomID, fmt.Sprintf("Deleting task: %+v", de))
+		mc.sendMessage(roomID, "Deleted task:\n\n"+de.ToString())
+		mc.AIData.AddChatHistory("assistant", "Deleted task:\n\n"+de.ToString())
 	}
 }
