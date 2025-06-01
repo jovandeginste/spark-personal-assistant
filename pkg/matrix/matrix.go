@@ -130,7 +130,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 			os.Exit(1)
 		}()
 
-		return "Resetting...", nil
+		return "Restarting...", nil
 	case "ping":
 		return "*pong back*", nil
 	}
