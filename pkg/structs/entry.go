@@ -69,6 +69,7 @@ func (e *Entry) GenerateRemoteID() {
 
 func (e *Entry) BeforeSave(_ *gorm.DB) error {
 	e.GenerateRemoteID()
+	e.DateString = e.FormattedDate()
 
 	return nil
 }
@@ -148,7 +149,7 @@ func (e *Entry) PrintTo(w io.Writer) {
 
 	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
-	t.AddRow("Data", e.DateString)
+	t.AddRow("Date", e.DateString)
 	t.AddRow("Summary", e.Summary)
 	t.AddRow("Importance", string(e.Importance))
 

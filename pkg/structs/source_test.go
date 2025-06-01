@@ -15,20 +15,20 @@ func TestSources_PrintTo(t *testing.T) {
 		{
 			name:    "Empty Sources",
 			sources: Sources{},
-			want: `┌────┬──────┬──────┬─────────────┐
-│ ID │ Name │ Type │ Description │
-└────┴──────┴──────┴─────────────┘`,
+			want: `┌────┬──────┬──────┬─────────────┬───────┐
+│ ID │ Name │ Type │ Description │ Valid │
+└────┴──────┴──────┴─────────────┴───────┘`,
 		},
 		{
 			name: "Single Source",
 			sources: Sources{
 				{ID: 1, Name: "Test1", Description: "Description 1"},
 			},
-			want: `┌────┬───────┬──────┬───────────────┐
-│ ID │ Name  │ Type │  Description  │
-├────┼───────┼──────┼───────────────┤
-│ 1  │ Test1 │      │ Description 1 │
-└────┴───────┴──────┴───────────────┘`,
+			want: `┌────┬───────┬──────┬───────────────┬───────┐
+│ ID │ Name  │ Type │  Description  │ Valid │
+├────┼───────┼──────┼───────────────┼───────┤
+│ 1  │ Test1 │      │ Description 1 │ ✅    │
+└────┴───────┴──────┴───────────────┴───────┘`,
 		},
 		{
 			name: "Multiple Sources",
@@ -37,15 +37,15 @@ func TestSources_PrintTo(t *testing.T) {
 				{ID: 2, Name: "Test2", Description: "Description 2"},
 				{ID: 3, Name: "LongName", Description: "A rather long description"},
 			},
-			want: `┌────┬──────────┬──────┬───────────────────────────┐
-│ ID │   Name   │ Type │        Description        │
-├────┼──────────┼──────┼───────────────────────────┤
-│ 1  │ Test1    │      │ Description 1             │
-├────┼──────────┼──────┼───────────────────────────┤
-│ 2  │ Test2    │      │ Description 2             │
-├────┼──────────┼──────┼───────────────────────────┤
-│ 3  │ LongName │      │ A rather long description │
-└────┴──────────┴──────┴───────────────────────────┘`,
+			want: `┌────┬──────────┬──────┬───────────────────────────┬───────┐
+│ ID │   Name   │ Type │        Description        │ Valid │
+├────┼──────────┼──────┼───────────────────────────┼───────┤
+│ 1  │ Test1    │      │ Description 1             │ ✅    │
+├────┼──────────┼──────┼───────────────────────────┼───────┤
+│ 2  │ Test2    │      │ Description 2             │ ✅    │
+├────┼──────────┼──────┼───────────────────────────┼───────┤
+│ 3  │ LongName │      │ A rather long description │ ✅    │
+└────┴──────────┴──────┴───────────────────────────┴───────┘`,
 		},
 	}
 

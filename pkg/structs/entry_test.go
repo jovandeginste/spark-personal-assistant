@@ -495,7 +495,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			expectedSubstrings: []string{
 				"ID", "123",
 				"Remote ID", "remote-id-abc",
-				"Data", "2023-12-10",
+				"Date", "2023-12-10",
 				"Summary", "A test summary",
 				"Importance", "high",
 				"Source", "Test Source",
@@ -519,7 +519,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			expectedSubstrings: []string{
 				"ID", "456",
 				"Remote ID", "remote-id-def",
-				"Data", "2024-01-05",
+				"Date", "2024-01-05",
 				"Summary", "Another summary",
 				"Importance", "low",
 				"Source", "Another Source",
@@ -542,7 +542,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			expectedSubstrings: []string{
 				"ID", "789",
 				"Remote ID", "remote-id-ghi",
-				"Data", "2024-02-20",
+				"Date", "2024-02-20",
 				"Summary", "Summary with no source",
 				"Importance", "medium",
 			},
