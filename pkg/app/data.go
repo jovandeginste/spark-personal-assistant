@@ -39,7 +39,7 @@ func (aiData *AIData) CleanHistory() {
 	f := time.Now().Add(-1 * time.Hour)
 
 	for i, e := range aiData.ChatHistory {
-		if i < len(aiData.ChatHistory)-10 {
+		if i < len(aiData.ChatHistory)-100 {
 			continue
 		}
 

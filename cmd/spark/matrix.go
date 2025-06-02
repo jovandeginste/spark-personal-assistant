@@ -56,8 +56,8 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 				"name", c.app.Config.Assistant.Name,
 			)
 
-			if err := mc.Client.SetDisplayName(context.Background(), c.app.Config.Assistant.Name); err != nil {
-				mc.App.Logger().Error("Failed to set display name", "error", err)
+			if err := mc.Greet(); err != nil {
+				return err
 			}
 
 			if err := mc.Client.SyncWithContext(context.Background()); err != nil && !errors.Is(err, context.Canceled) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,6 +47,7 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 		mc.App.Logger().Info(
 			"Received message",
 			"sender", evt.Sender.String(),
+			"room_id", evt.RoomID.String(),
 			"type", evt.Type.String(),
 			"id", evt.ID.String(),
 			"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
@@ -57,6 +59,12 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 		}
 
 		if evt.Sender.String() == mc.Client.UserID.String() {
+			return
+		}
+
+		knownUser := slices.Contains(mc.App.Config.Matrix.Users, evt.Sender.String())
+		if !knownUser {
+			mc.App.Logger().Info("Unknown user - skipping", "user_id", evt.Sender.String())
 			return
 		}
 
@@ -123,14 +131,14 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		return "", nil
 	case "reset":
 		defer mc.AIData.ResetHistory()
-		return "Resetting...", nil
-	case "restart":
+		return "Resetting chat history...", nil
+	case "shutdown":
 		go func() {
 			time.Sleep(5 * time.Second)
 			os.Exit(1)
 		}()
 
-		return "Restarting...", nil
+		return "Shutting down...", nil
 	case "ping":
 		return "*pong back*", nil
 	}
@@ -245,4 +253,18 @@ func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
 	content := format.RenderMarkdown(text, true, true)
 
 	mc.msges <- msg{RoomID: roomID, Content: content}
+}
+
+func (mc *MatrixConfig) Greet() error {
+	if err := mc.Client.SetDisplayName(context.Background(), mc.App.Config.Assistant.Name); err != nil {
+		mc.App.Logger().Error("Failed to set display name", "error", err)
+	}
+
+	mc.sendMessage(mc.DefaultRoomID(), "Reporting for duty")
+
+	return nil
+}
+
+func (mc *MatrixConfig) DefaultRoomID() id.RoomID {
+	return id.RoomID(mc.App.Config.Matrix.RoomID)
 }
