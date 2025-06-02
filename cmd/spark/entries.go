@@ -41,7 +41,7 @@ func (c *cli) deleteEntryCmd() *cobra.Command {
 				return err
 			}
 
-			e.PrintTo(os.Stdout)
+			e.PrintTo(os.Stdout, false)
 
 			if err := c.app.DeleteEntry(e); err != nil {
 				return err
@@ -72,7 +72,7 @@ func (c *cli) showEntryCmd() *cobra.Command {
 				return err
 			}
 
-			e.PrintTo(os.Stdout)
+			e.PrintTo(os.Stdout, false)
 
 			return nil
 		},
@@ -114,7 +114,7 @@ func (c *cli) addEntryCmd() *cobra.Command {
 			}
 
 			c.app.Logger().Info("Entry added")
-			e.PrintTo(os.Stdout)
+			e.PrintTo(os.Stdout, false)
 
 			return nil
 		},

@@ -135,17 +135,25 @@ func (e *Entry) SetImportance(i string) error {
 	return nil
 }
 
-func (e *Entry) ToString() string {
+func (e *Entry) ToString(markdown bool) string {
 	b := bytes.Buffer{}
 
-	e.PrintTo(&b)
+	e.PrintTo(&b, markdown)
 
 	return b.String()
 }
 
-func (e *Entry) PrintTo(w io.Writer) {
+func (e *Entry) PrintTo(w io.Writer, markdown bool) {
 	t := table.New(w)
 	defer t.Render()
+
+	if markdown {
+		t.SetDividers(table.MarkdownDividers)
+
+		t.SetBorderTop(false)
+		t.SetBorderBottom(false)
+		t.SetRowLines(false)
+	}
 
 	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
