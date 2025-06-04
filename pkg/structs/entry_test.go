@@ -559,7 +559,7 @@ func TestEntry_PrintTo(t *testing.T) {
 			// Ensure DateString is set as PrintTo uses it
 			_ = e.AfterFind(nil)
 
-			e.PrintTo(&buf)
+			e.PrintTo(&buf, true)
 
 			output := buf.String()
 			// fmt.Println(output) // Uncomment to see the generated table output
