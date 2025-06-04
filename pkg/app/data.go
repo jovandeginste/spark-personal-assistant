@@ -201,7 +201,7 @@ func (a *App) FetchExistingEntries(sourceID uint64, entries structs.Entries) {
 				continue
 			}
 
-			a.logger.Error(err.Error())
+			a.Logger().Error(err.Error())
 		}
 
 		entries[i].ID = id

@@ -82,13 +82,25 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		mc.Client.UserTyping(context.Background(), roomID, false, 0)
 	}()
 
-	r, err := mc.calculateResponse(roomID, sender, input)
-	if err != nil {
-		mc.App.Logger().Error("Failed to calculate response", "error", err)
-		r = fmt.Sprintf("Error: %s", err)
+	input = strings.ToLower(strings.TrimSpace(input))
+	if input == "" {
+		return nil
 	}
 
-	mc.sendMessage(roomID, r)
+	result, err := mc.parseInput(input)
+	if err != nil {
+		return err
+	}
+
+	if result == "" {
+		result, err = mc.calculateResponse(roomID, sender, input)
+		if err != nil {
+			mc.App.Logger().Error("Failed to calculate response", "error", err)
+			result = fmt.Sprintf("Error: %s", err)
+		}
+	}
+
+	mc.sendMessage(roomID, result)
 
 	return nil
 }
@@ -124,11 +136,8 @@ func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
 	return nil
 }
 
-func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
-	input = strings.ToLower(strings.TrimSpace(input))
+func (mc *MatrixConfig) parseInput(input string) (string, error) {
 	switch input {
-	case "":
-		return "", nil
 	case "reset":
 		defer mc.AIData.ResetHistory()
 		return "Resetting chat history...", nil
@@ -139,10 +148,20 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		}()
 
 		return "Shutting down...", nil
+	case "summarize full":
+		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
+	case "summarize week":
+		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptWeek, mc.AIData)
+	case "summarize today":
+		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptToday, mc.AIData)
 	case "ping":
 		return "*pong back*", nil
+	default:
+		return "", nil
 	}
+}
 
+func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
 	mc.AIData.CleanHistory()
 
 	mc.App.Logger().Info("Parsing question...", "sender", sender)

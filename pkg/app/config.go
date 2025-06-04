@@ -21,6 +21,7 @@ type Config struct {
 	AssistantFileCLI string             `mapstructure:"-"`
 	Assistant        ai.AssistantConfig `mapstructure:"-"`
 	Matrix           MatrixConfig       `mapstructure:"matrix"`
+	Webserver        WebserverConfig    `mapstructure:"webserver"`
 }
 
 type MatrixConfig struct {
@@ -29,6 +30,11 @@ type MatrixConfig struct {
 	Password   string   `mapstructure:"password"`
 	RoomID     string   `mapstructure:"room_id"`
 	Users      []string `mapstructure:"users"`
+}
+
+type WebserverConfig struct {
+	Enabled bool   `mapstructure:"enabled"`
+	Bind    string `mapstructure:"bind"`
 }
 
 type UserData struct {
@@ -121,6 +127,10 @@ func (a *App) setDatabasePath() error {
 }
 
 func (a *App) SetDefaults() {
+	if a.Config.Webserver.Bind == "" {
+		a.Config.Webserver.Bind = ":8080"
+	}
+
 	if a.Config.Database.File == "" {
 		a.Config.Database.File = "spark.db"
 	}

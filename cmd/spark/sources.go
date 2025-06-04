@@ -32,36 +32,7 @@ func (c *cli) updateSourcesCmd() *cobra.Command {
 		Short: "Update the entries of all source",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			sources, err := c.app.Sources()
-			if err != nil {
-				return err
-			}
-
-			for _, src := range sources {
-				c.app.Logger().Info("Updating entries", "source", src.Name)
-
-				entries, err := src.RetrieveEntries()
-				if err != nil {
-					return err
-				}
-
-				if len(entries) == 0 {
-					c.app.Logger().Info("No entries found", "source", src.Name)
-					return nil
-				}
-
-				c.app.Logger().Info("Entries retrieved", "source", src.Name, "count", len(entries))
-
-				c.app.FetchExistingEntries(src.ID, entries)
-
-				if err := c.app.ReplaceSourceEntries(&src, entries); err != nil {
-					return err
-				}
-
-				c.app.Logger().Info("Entries updated", "source", src.Name, "count", len(entries))
-			}
-
-			return nil
+			return c.app.UpdateSources()
 		},
 	}
 

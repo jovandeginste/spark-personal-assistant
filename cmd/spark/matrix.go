@@ -60,6 +60,10 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 				return err
 			}
 
+			if mc.App.Config.Webserver.Enabled {
+				mc.ServeHTTP()
+			}
+
 			if err := mc.Client.SyncWithContext(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
 				c.app.Logger().Error("Failed to sync", "error", err)
 			}
