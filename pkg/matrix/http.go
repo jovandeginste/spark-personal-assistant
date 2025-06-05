@@ -47,8 +47,6 @@ func (mc *MatrixConfig) prompt(c echo.Context) error {
 }
 
 func (mc *MatrixConfig) updateSources(c echo.Context) error {
-	mc.sendMessage(mc.DefaultRoomID(), "Updating all sources")
-
 	if err := mc.App.UpdateSources(); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
