@@ -18,6 +18,8 @@ type AssistantConfig struct {
 	Name      string `mapstructure:"name"`
 	Style     string `mapstructure:"style"`
 	StyleFile string `mapstructure:"style_file"`
+	Language  string `mapstructure:"language"`
+	File      string `mapstructure:"file"`
 }
 
 type Client interface {

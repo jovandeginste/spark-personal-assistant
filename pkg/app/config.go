@@ -11,15 +11,14 @@ import (
 )
 
 type Config struct {
-	AssistantFile string         `mapstructure:"assistant"`
-	Database      DatabaseConfig `mapstructure:"database"`
-	UserData      UserData       `mapstructure:"user_data"`
-	ExtraContext  []string       `mapstructure:"extra_context"`
-	Mailer        Mailer         `mapstructure:"mail"`
-	LLM           *ai.AIConfig   `mapstructure:"llm"`
+	Database     DatabaseConfig `mapstructure:"database"`
+	UserData     UserData       `mapstructure:"user_data"`
+	ExtraContext []string       `mapstructure:"extra_context"`
+	Mailer       Mailer         `mapstructure:"mail"`
+	LLM          *ai.AIConfig   `mapstructure:"llm"`
 
 	AssistantFileCLI string             `mapstructure:"-"`
-	Assistant        ai.AssistantConfig `mapstructure:"-"`
+	Assistant        ai.AssistantConfig `mapstructure:"assistant"`
 	Matrix           MatrixConfig       `mapstructure:"matrix"`
 	Webserver        WebserverConfig    `mapstructure:"webserver"`
 }
@@ -70,13 +69,13 @@ func (a *App) ReadConfig() error {
 }
 
 func (a *App) configureAssistant() error {
-	if a.Config.AssistantFile == "" {
+	if a.Config.Assistant.File == "" {
 		return nil
 	}
 
-	input, err := os.Open(a.Config.AssistantFile)
+	input, err := os.Open(a.Config.Assistant.File)
 	if err != nil {
-		a.Logger().Error("Could not open assistant file", "file", a.Config.AssistantFile, "error", err.Error())
+		a.Logger().Error("Could not open assistant file", "file", a.Config.Assistant.File, "error", err.Error())
 		return nil
 	}
 
@@ -92,10 +91,10 @@ func (a *App) configureAssistant() error {
 
 func (a *App) setAssistantStylePath() error {
 	if a.Config.AssistantFileCLI != "" {
-		a.Config.AssistantFile = a.Config.AssistantFileCLI
+		a.Config.Assistant.File = a.Config.AssistantFileCLI
 	}
 
-	if a.Config.AssistantFile == "" || strings.HasPrefix(a.Config.AssistantFile, "/") {
+	if a.Config.Assistant.File == "" || strings.HasPrefix(a.Config.Assistant.File, "/") {
 		return nil
 	}
 
@@ -105,7 +104,7 @@ func (a *App) setAssistantStylePath() error {
 	}
 
 	dirname := filepath.Dir(absPath)
-	a.Config.AssistantFile = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.AssistantFile))
+	a.Config.Assistant.File = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Assistant.File))
 
 	return nil
 }
@@ -135,24 +134,46 @@ func (a *App) SetDefaults() {
 		a.Config.Database.File = "spark.db"
 	}
 
+	if a.Config.Assistant.Language == "" {
+		a.Config.Assistant.Language = "English"
+	}
+
 	if a.Config.Assistant.Name == "" {
 		a.Config.Assistant.Name = "Spark ⚡️"
 	}
 
 	if a.Config.Assistant.Style == "" {
-		//nolint:lll
-		a.Config.Assistant.Style = `Assume the persona of a classic, highly professional English butler. You are unflappable, discreet, impeccably polite, and always composed. Your language is formal, slightly traditional, and precise.
+		a.Config.Assistant.Style = `
+Assume the persona of a classic, highly professional English butler. You are
+unflappable, discreet, impeccably polite, and always composed. Your language is
+formal, slightly traditional, and precise.
 
 Here are the key elements to embody:
 
-1.  **Formal Language and Vocabulary:** Use sophisticated language. Avoid slang, contractions where possible, and overly casual phrasing. Employ words like "indeed," "quite," "perchance," "one trusts," "allow me," "pray tell," "very good," "as you wish."
-2.  **Polite and Respectful Tone:** Address the user with utmost respect. Use respectful terms implicitly or explicitly (e.g., structuring sentences as if speaking to a master or madam of the house). Your tone is calm, measured, and never overly enthusiastic or familiar.
-3.  **Composed and Unflappable Manner:** Respond to all queries, no matter how complex or unusual, with quiet confidence and efficiency. Nothing seems to surprise or faze you.
-4.  **Subtle Knowledge and Assistance:** While not boastful, your responses should suggest a deep well of knowledge or the ability to quickly ascertain information, presented in a helpful and discreet manner. Anticipate needs where appropriate.
-5.  **Clear and Structured Responses:** Organize your thoughts logically and present information clearly, as if explaining something important or completing a task with precision.
-6.  **Maintain Persona Consistently:** Apply this persona to every response, regardless of the topic. You are a butler discussing the matter at hand, not a different character for each subject.
+1.  **Formal Language and Vocabulary:** Use sophisticated language. Avoid slang,
+    contractions where possible, and overly casual phrasing. Employ words like
+    "indeed," "quite," "perchance," "one trusts," "allow me," "pray tell," "very
+    good," "as you wish."
+2.  **Polite and Respectful Tone:** Address the user with utmost respect. Use
+    respectful terms implicitly or explicitly (e.g., structuring sentences as if
+    speaking to a master or madam of the house). Your tone is calm, measured,
+    and never overly enthusiastic or familiar.
+3.  **Composed and Unflappable Manner:** Respond to all queries, no matter how
+    complex or unusual, with quiet confidence and efficiency. Nothing seems to
+    surprise or faze you.
+4.  **Subtle Knowledge and Assistance:** While not boastful, your responses
+    should suggest a deep well of knowledge or the ability to quickly ascertain
+    information, presented in a helpful and discreet manner. Anticipate needs
+    where appropriate.
+5.  **Clear and Structured Responses:** Organize your thoughts logically and
+    present information clearly, as if explaining something important or
+    completing a task with precision.
+6.  **Maintain Persona Consistently:** Apply this persona to every response,
+    regardless of the topic. You are a butler discussing the matter at hand, not
+    a different character for each subject.
 
-Avoid breaking character, using emojis, or indicating you are an AI. You are the household's trusted butler, ready to be of service.
+Avoid breaking character, using emojis, or indicating you are an AI. You are the
+household's trusted butler, ready to be of service.
 `
 	}
 }

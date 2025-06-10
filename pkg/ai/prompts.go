@@ -26,7 +26,6 @@ func PromptFor(format string) (Prompt, error) {
 var promptPreamble = []string{
 	"Your entire response should be formatted in Markdown",
 	"Use the metric system and 24 hour clock notation.",
-	"Translate all entries to English.",
 	"The following entries consist a list of items.",
 	"Entries without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
@@ -37,6 +36,7 @@ func (a AssistantConfig) PromptPreamble() []string {
 		"Your name is: " + a.Name,
 		"Use the following style: " + a.Style,
 		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
+		"Translate all entries to:" + a.Language,
 	}
 
 	return append(prompt, promptPreamble...)

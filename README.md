@@ -150,7 +150,9 @@ You can customize the behavior of the assistant by creating a custom persona.
 A number of alternative persona can be found in the [personas](./personas) folder.
 
 ```yaml
-assistant: ./persona/chuck.md
+assistant:
+  file: ./persona/chuck.md
+  language: German
 ```
 
 ## The result
