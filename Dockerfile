@@ -1,4 +1,5 @@
 FROM golang:alpine AS backend
+RUN apk add gcc g++
 
 WORKDIR /app
 
@@ -7,6 +8,7 @@ COPY cmd ./cmd
 COPY pkg ./pkg
 COPY vendor ./vendor
 
+ENV CGO_ENABLED=1
 RUN go build -tags=goolm -o /commands/ ./cmd/...
 
 FROM alpine:latest
