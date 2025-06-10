@@ -105,7 +105,7 @@ func PromptWeek(assistant AssistantConfig, data any) ([]string, error) {
 
 	c := append(assistant.PromptPreamble(),
 		[]string{
-			"Only include this week's entries.",
+			"Only include the following week's entries.",
 			"Compile a schedule and a summarized overview of todo's, and reminders.",
 			"Information:",
 			string(j),
