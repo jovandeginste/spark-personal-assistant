@@ -14,6 +14,10 @@ type HumanTime struct {
 	time.Time
 }
 
+func (ct *HumanTime) DateOnly() bool {
+	return ct.Hour() == 0 && ct.Minute() == 0
+}
+
 func (ct *HumanTime) MarshalJSON() ([]byte, error) {
 	// Handle nil pointer if necessary, though often you might want a zero time instead
 	if ct == nil || ct.IsZero() {
@@ -109,7 +113,7 @@ func (ct *HumanTime) Scan(value any) error {
 }
 
 func (ct *HumanTime) FormatDate() string {
-	if ct.Hour() == 0 && ct.Minute() == 0 {
+	if ct.DateOnly() {
 		return ct.In(LocalTimezone).Format("2006-01-02")
 	}
 

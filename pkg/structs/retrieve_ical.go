@@ -80,6 +80,10 @@ func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
 		}
 
 		d := humantime.HumanTime{Time: t}
+		if d.DateOnly() && e.Date != d {
+			d.Time = d.Time.Add(-24 * time.Hour)
+		}
+
 		e.SetMetadata("End", d.FormatDate())
 	}
 
