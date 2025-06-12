@@ -43,7 +43,7 @@ func (c *cli) printCmd() *cobra.Command {
 				return err
 			}
 
-			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant)
+			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
 			}
@@ -53,6 +53,7 @@ func (c *cli) printCmd() *cobra.Command {
 				"type", c.app.Config.LLM.Type,
 				"model", c.app.Config.LLM.Model,
 				"name", c.app.Config.Assistant.Name,
+				"language", c.app.Config.Assistant.Language,
 			)
 
 			spinner := pin.New("Thinking...",
@@ -108,7 +109,7 @@ func (c *cli) chatCmd() *cobra.Command {
 				return err
 			}
 
-			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant)
+			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
 			}
@@ -118,6 +119,7 @@ func (c *cli) chatCmd() *cobra.Command {
 				"type", c.app.Config.LLM.Type,
 				"model", c.app.Config.LLM.Model,
 				"name", c.app.Config.Assistant.Name,
+				"language", c.app.Config.Assistant.Language,
 			)
 
 			rl, err := readline.New("> ")

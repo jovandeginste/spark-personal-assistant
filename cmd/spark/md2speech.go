@@ -35,7 +35,7 @@ func (c *cli) md2speechCmd() *cobra.Command {
 
 			c.app.Logger().Info("Generating speech...")
 
-			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant)
+			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
 			}

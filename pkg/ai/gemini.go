@@ -2,7 +2,7 @@ package ai
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"time"
 
 	"google.golang.org/genai"
@@ -14,6 +14,11 @@ type geminiClient struct {
 	ttsModel  string
 	ttsVoice  string
 	assistant AssistantConfig
+	logger    *slog.Logger
+}
+
+func (c geminiClient) Logger() *slog.Logger {
+	return c.logger
 }
 
 func (c geminiClient) APIKey() string {
@@ -40,6 +45,8 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 }
 
 func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+	c.Logger().Info("Fetching result from AI...")
+
 	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
@@ -56,7 +63,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
 		if err != nil {
 			if i < 10 {
-				fmt.Println("Retrying in 30 seconds...")
+				c.Logger().Warn("Retrying in 30 seconds...", "error", err)
 				time.Sleep(30 * time.Second)
 				continue
 			}

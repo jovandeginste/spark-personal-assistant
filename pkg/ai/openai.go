@@ -2,8 +2,8 @@ package ai
 
 import (
 	"context"
-	"fmt"
 	"io"
+	"log/slog"
 	"time"
 
 	"github.com/openai/openai-go"
@@ -16,6 +16,11 @@ type openaiClient struct {
 	ttsModel  string
 	ttsVoice  string
 	assistant AssistantConfig
+	logger    *slog.Logger
+}
+
+func (c openaiClient) Logger() *slog.Logger {
+	return c.logger
 }
 
 func (c openaiClient) APIKey() string {
@@ -42,6 +47,8 @@ func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMe
 }
 
 func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+	c.Logger().Info("Fetching result from AI...")
+
 	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err
@@ -58,7 +65,7 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		})
 		if err != nil {
 			if i < 10 {
-				fmt.Println("Retrying in 30 seconds...")
+				c.Logger().Warn("Retrying in 30 seconds...", "error", err)
 				time.Sleep(30 * time.Second)
 				continue
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/ollama/ollama/api"
@@ -12,6 +13,11 @@ import (
 type ollamaClient struct {
 	model     string
 	assistant AssistantConfig
+	logger    *slog.Logger
+}
+
+func (c ollamaClient) Logger() *slog.Logger {
+	return c.logger
 }
 
 func (c ollamaClient) APIKey() string {
@@ -32,6 +38,8 @@ func (c ollamaClient) convertPrompt(p Prompt, data any) (string, error) {
 }
 
 func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+	c.Logger().Info("Fetching result from AI...")
+
 	prompt, err := c.convertPrompt(p, data)
 	if err != nil {
 		return "", err

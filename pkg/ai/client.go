@@ -27,9 +27,10 @@ type Client interface {
 	Model() string
 	GeneratePrompt(context.Context, Prompt, any) (string, error)
 	GenerateSpeech(context.Context, string) ([]byte, error)
+	Logger() *slog.Logger
 }
 
-func NewClient(cc *AIConfig, ac AssistantConfig) (Client, error) {
+func NewClient(cc *AIConfig, ac AssistantConfig, l *slog.Logger) (Client, error) {
 	var c Client
 
 	switch cc.Type {
@@ -40,6 +41,7 @@ func NewClient(cc *AIConfig, ac AssistantConfig) (Client, error) {
 			ttsModel:  cc.TTSModel,
 			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
+			logger:    l.With("ai_backend", "gemini"),
 		}
 	case "openai":
 		c = openaiClient{
@@ -48,10 +50,15 @@ func NewClient(cc *AIConfig, ac AssistantConfig) (Client, error) {
 			ttsModel:  cc.TTSModel,
 			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
+			logger:    l.With("ai_backend", "openai"),
 		}
 	case "ollama":
-		slog.Info("ollama does not work yet - input size is too large?")
-		c = ollamaClient{model: cc.Model, assistant: ac}
+		l.Warn("ollama does not work yet - input size is too large?")
+		c = ollamaClient{
+			model:     cc.Model,
+			assistant: ac,
+			logger:    l.With("ai_backend", "ollama"),
+		}
 	default:
 		return nil, fmt.Errorf("unknown type: %s", cc.Type)
 	}
