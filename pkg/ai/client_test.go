@@ -2,6 +2,7 @@ package ai
 
 import (
 	"fmt"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,7 +86,7 @@ func TestNewClient(t *testing.T) {
 				}
 			}()
 
-			client, err := NewClient(tt.aiConfig, tt.assistantConfig)
+			client, err := NewClient(tt.aiConfig, tt.assistantConfig, slog.Default())
 
 			if tt.expectError {
 				assert.Error(t, err, "Expected an error")
