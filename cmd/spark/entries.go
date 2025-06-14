@@ -85,7 +85,6 @@ func (c *cli) addEntryCmd() *cobra.Command {
 	var (
 		e structs.Entry
 		d string
-		i string
 		s string
 	)
 
@@ -105,10 +104,6 @@ func (c *cli) addEntryCmd() *cobra.Command {
 				return err
 			}
 
-			if err := e.SetImportance(i); err != nil {
-				return err
-			}
-
 			if err := c.app.CreateEntry(&e); err != nil {
 				return err
 			}
@@ -121,7 +116,6 @@ func (c *cli) addEntryCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&e.Summary, "title", "t", "", "Title of the entry")
-	cmd.Flags().StringVarP(&i, "importance", "i", string(structs.MEDIUM), "Importance of the entry")
 	cmd.Flags().StringVarP(&d, "date", "d", "", "Date of the entry")
 	cmd.Flags().StringVarP(&s, "source", "s", "manual", "Source of the entry")
 

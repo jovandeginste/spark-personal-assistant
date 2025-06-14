@@ -10,7 +10,6 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestEntry_SetMetadata(t *testing.T) {
@@ -409,72 +408,6 @@ func TestEntry_SetDate(t *testing.T) {
 	}
 }
 
-func TestEntry_SetImportance(t *testing.T) {
-	tests := []struct {
-		name               string
-		importanceString   string
-		expectError        bool
-		expectedImportance Importance
-		expectedErrText    string
-	}{
-		{
-			name:               "Set LOW",
-			importanceString:   "low",
-			expectError:        false,
-			expectedImportance: LOW,
-		},
-		{
-			name:               "Set MEDIUM",
-			importanceString:   "medium",
-			expectError:        false,
-			expectedImportance: MEDIUM,
-		},
-		{
-			name:               "Set HIGH",
-			importanceString:   "high",
-			expectError:        false,
-			expectedImportance: HIGH,
-		},
-		{
-			name:               "Set invalid string",
-			importanceString:   "critical",
-			expectError:        true,
-			expectedImportance: "", // Should remain zero value or previous value, but check error
-			expectedErrText:    "invalid importance: critical",
-		},
-		{
-			name:               "Set case-insensitive (should fail)", // Current implementation is case-sensitive
-			importanceString:   "Low",
-			expectError:        true,
-			expectedImportance: "",
-			expectedErrText:    "invalid importance: Low",
-		},
-		{
-			name:               "Set empty string",
-			importanceString:   "",
-			expectError:        true,
-			expectedImportance: "",
-			expectedErrText:    "invalid importance: ",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			e := &Entry{} // Start with zero importance
-			err := e.SetImportance(tt.importanceString)
-
-			if tt.expectError {
-				require.Error(t, err, "Expected an error for importance string '%s'", tt.importanceString)
-				assert.ErrorContains(t, err, tt.expectedErrText, "Error message mismatch")
-				assert.Equal(t, Importance(""), e.Importance, "Importance should not change on error") // Assuming zero value on error
-			} else {
-				assert.NoError(t, err, "Did not expect an error for importance string '%s'", tt.importanceString)
-				assert.Equal(t, tt.expectedImportance, e.Importance, "Importance mismatch")
-			}
-		})
-	}
-}
-
 func TestEntry_PrintTo(t *testing.T) {
 	tests := []struct {
 		name               string
@@ -488,7 +421,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				RemoteID:   "remote-id-abc",
 				Date:       humantime.HumanTime{Time: time.Date(2023, 12, 10, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2023-12-10", // Populated by AfterFind, used by PrintTo
-				Importance: HIGH,
 				Summary:    "A test summary",
 				Source:     &Source{Name: "Test Source"},
 			},
@@ -497,7 +429,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				"Remote ID", "remote-id-abc",
 				"Date", "2023-12-10",
 				"Summary", "A test summary",
-				"Importance", "high",
 				"Source", "Test Source",
 			},
 		},
@@ -508,7 +439,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				RemoteID:   "remote-id-def",
 				Date:       humantime.HumanTime{Time: time.Date(2024, 1, 5, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2024-01-05",
-				Importance: LOW,
 				Summary:    "Another summary",
 				Source:     &Source{Name: "Another Source"},
 				Metadata: map[string]any{
@@ -521,7 +451,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				"Remote ID", "remote-id-def",
 				"Date", "2024-01-05",
 				"Summary", "Another summary",
-				"Importance", "low",
 				"Source", "Another Source",
 				"key1", "value1",
 				"key2", "99", // Metadata values are fmt.Sprintf("%v", v)
@@ -534,7 +463,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				RemoteID:   "remote-id-ghi",
 				Date:       humantime.HumanTime{Time: time.Date(2024, 2, 20, 0, 0, 0, 0, humantime.LocalTimezone)},
 				DateString: "2024-02-20",
-				Importance: MEDIUM,
 				Summary:    "Summary with no source",
 				Source:     nil, // Source is nil
 				Metadata:   nil, // Metadata is nil
@@ -544,7 +472,6 @@ func TestEntry_PrintTo(t *testing.T) {
 				"Remote ID", "remote-id-ghi",
 				"Date", "2024-02-20",
 				"Summary", "Summary with no source",
-				"Importance", "medium",
 			},
 			// No metadata keys expected
 		},

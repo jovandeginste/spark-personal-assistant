@@ -19,9 +19,9 @@ func TestEntries_PrintTo(t *testing.T) {
 		{
 			name:    "empty entries",
 			entries: Entries{},
-			expectedOut: `┌────┬──────┬───────┬────────────┬────────┐
-│ ID │ Date │ Title │ Importance │ Source │
-└────┴──────┴───────┴────────────┴────────┘`, // Empty table with headers
+			expectedOut: `┌────┬──────┬───────┬────────┐
+│ ID │ Date │ Title │ Source │
+└────┴──────┴───────┴────────┘`, // Empty table with headers
 		},
 		{
 			name: "multiple entries",
@@ -30,7 +30,6 @@ func TestEntries_PrintTo(t *testing.T) {
 					ID:         1,
 					DateString: "2023-10-26",
 					Summary:    "Test Summary 1",
-					Importance: "High",
 					Source: &Source{
 						Name: "Source A",
 					},
@@ -39,7 +38,6 @@ func TestEntries_PrintTo(t *testing.T) {
 					ID:         2,
 					DateString: "2023-10-27",
 					Summary:    "Test Summary 2",
-					Importance: "Medium",
 					Source: &Source{
 						Name: "Source B",
 					},
@@ -48,21 +46,20 @@ func TestEntries_PrintTo(t *testing.T) {
 					ID:         3,
 					DateString: "2023-10-28",
 					Summary:    "Another test entry",
-					Importance: "Low",
 					Source: &Source{
 						Name: "Source A",
 					},
 				},
 			},
-			expectedOut: `┌────┬────────────┬────────────────────┬────────────┬──────────┐
-│ ID │    Date    │       Title        │ Importance │  Source  │
-├────┼────────────┼────────────────────┼────────────┼──────────┤
-│ 1  │ 2023-10-26 │ Test Summary 1     │ High       │ Source A │
-├────┼────────────┼────────────────────┼────────────┼──────────┤
-│ 2  │ 2023-10-27 │ Test Summary 2     │ Medium     │ Source B │
-├────┼────────────┼────────────────────┼────────────┼──────────┤
-│ 3  │ 2023-10-28 │ Another test entry │ Low        │ Source A │
-└────┴────────────┴────────────────────┴────────────┴──────────┘`,
+			expectedOut: `┌────┬────────────┬────────────────────┬──────────┐
+│ ID │    Date    │       Title        │  Source  │
+├────┼────────────┼────────────────────┼──────────┤
+│ 1  │ 2023-10-26 │ Test Summary 1     │ Source A │
+├────┼────────────┼────────────────────┼──────────┤
+│ 2  │ 2023-10-27 │ Test Summary 2     │ Source B │
+├────┼────────────┼────────────────────┼──────────┤
+│ 3  │ 2023-10-28 │ Another test entry │ Source A │
+└────┴────────────┴────────────────────┴──────────┘`,
 		},
 		{
 			name: "single entry",
@@ -71,17 +68,16 @@ func TestEntries_PrintTo(t *testing.T) {
 					ID:         10,
 					DateString: "2024-01-01",
 					Summary:    "Single Entry Test",
-					Importance: "Critical",
 					Source: &Source{
 						Name: "Solo Source",
 					},
 				},
 			},
-			expectedOut: `┌────┬────────────┬───────────────────┬────────────┬─────────────┐
-│ ID │    Date    │       Title       │ Importance │   Source    │
-├────┼────────────┼───────────────────┼────────────┼─────────────┤
-│ 10 │ 2024-01-01 │ Single Entry Test │ Critical   │ Solo Source │
-└────┴────────────┴───────────────────┴────────────┴─────────────┘`,
+			expectedOut: `┌────┬────────────┬───────────────────┬─────────────┐
+│ ID │    Date    │       Title       │   Source    │
+├────┼────────────┼───────────────────┼─────────────┤
+│ 10 │ 2024-01-01 │ Single Entry Test │ Solo Source │
+└────┴────────────┴───────────────────┴─────────────┘`,
 		},
 		{
 			name: "entry with empty fields",
@@ -90,17 +86,16 @@ func TestEntries_PrintTo(t *testing.T) {
 					ID:         99,
 					DateString: "",
 					Summary:    "",
-					Importance: "",
 					Source: &Source{
 						Name: "",
 					},
 				},
 			},
-			expectedOut: `┌────┬──────┬───────┬────────────┬────────┐
-│ ID │ Date │ Title │ Importance │ Source │
-├────┼──────┼───────┼────────────┼────────┤
-│ 99 │      │       │            │        │
-└────┴──────┴───────┴────────────┴────────┘`,
+			expectedOut: `┌────┬──────┬───────┬────────┐
+│ ID │ Date │ Title │ Source │
+├────┼──────┼───────┼────────┤
+│ 99 │      │       │        │
+└────┴──────┴───────┴────────┘`,
 		},
 	}
 
@@ -129,7 +124,7 @@ func TestEntries_PrintTo(t *testing.T) {
 func generateEmptyTableString() string {
 	var buf bytes.Buffer
 	t := table.New(&buf)
-	t.AddHeaders("ID", "Date", "Title", "Importance", "Source")
+	t.AddHeaders("ID", "Date", "Title", "Source")
 	t.Render()
 
 	return buf.String()

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"crypto/sha512"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"io"
 	"strconv"
@@ -16,24 +15,13 @@ import (
 	"gorm.io/gorm"
 )
 
-type Importance string
-
-var ErrInvalidImportance = errors.New("invalid importance")
-
-const (
-	LOW    Importance = "low"
-	MEDIUM Importance = "medium"
-	HIGH   Importance = "high"
-)
-
 type Entry struct {
-	ID         uint64              `gorm:"primaryKey" json:"-"`
-	RemoteID   string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date       humantime.HumanTime `gorm:"not null;index"`
-	Importance Importance          `gorm:"not null" json:",omitempty"`
-	SourceID   uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Summary    string              `gorm:"not null"`
-	Metadata   map[string]any      `gorm:"serializer:json" json:",omitempty"`
+	ID       uint64              `gorm:"primaryKey" json:"-"`
+	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	Date     humantime.HumanTime `gorm:"not null;index"`
+	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	Summary  string              `gorm:"not null"`
+	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
 	DateString string `gorm:"-" json:"-"`
 
@@ -120,21 +108,6 @@ func (e *Entry) SetDate(d string) error {
 	return nil
 }
 
-func (e *Entry) SetImportance(i string) error {
-	switch Importance(i) {
-	case LOW:
-		e.Importance = LOW
-	case MEDIUM:
-		e.Importance = MEDIUM
-	case HIGH:
-		e.Importance = HIGH
-	default:
-		return fmt.Errorf("%w: %s", ErrInvalidImportance, i)
-	}
-
-	return nil
-}
-
 func (e *Entry) ToString(markdown bool) string {
 	b := bytes.Buffer{}
 
@@ -159,7 +132,6 @@ func (e *Entry) PrintTo(w io.Writer, markdown bool) {
 	t.AddRow("Remote ID", e.RemoteID)
 	t.AddRow("Date", e.DateString)
 	t.AddRow("Summary", e.Summary)
-	t.AddRow("Importance", string(e.Importance))
 
 	if e.Source != nil {
 		t.AddRow("Source", e.Source.Name)
