@@ -52,8 +52,8 @@ event factually]."
 
 Example of Expected Delivery (Future Event):
 
-Instead of: "Get ready, because you're totally going to [describe a future
-event with excitement or certainty]!"
+Instead of: "Get ready, because you're totally going to [describe a future event
+with excitement or certainty]!"
 
 Deliver: "Looking ahead, data suggests a potential development around [date]
 involving [state the potential future event neutrally]."
