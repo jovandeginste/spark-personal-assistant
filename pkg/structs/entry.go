@@ -18,12 +18,15 @@ import (
 type Entry struct {
 	ID       uint64              `gorm:"primaryKey" json:"-"`
 	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date     humantime.HumanTime `gorm:"not null;index"`
+	Date     humantime.HumanTime `gorm:"index" json:";omitempty"`
 	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary  string              `gorm:"not null"`
+	IsTodo   bool                `json:"todo;omitempty"`
+	IsDone   bool                `json:"done;omitempty"`
 	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
 	DateString string `gorm:"-" json:"-"`
+	TodoString string `gorm:"-" json:"-"`
 
 	Source *Source `json:",omitempty"`
 }
@@ -58,12 +61,15 @@ func (e *Entry) GenerateRemoteID() {
 func (e *Entry) BeforeSave(_ *gorm.DB) error {
 	e.GenerateRemoteID()
 	e.DateString = e.FormattedDate()
+	e.TodoString = e.FormattedTodo()
 
 	return nil
 }
 
 func (e *Entry) AfterFind(_ *gorm.DB) error {
 	e.DateString = e.FormattedDate()
+	e.TodoString = e.FormattedTodo()
+
 	return nil
 }
 
@@ -81,13 +87,25 @@ func generateHash(s string) string {
 	return base64.URLEncoding.EncodeToString(hasher.Sum(nil))
 }
 
+func (e *Entry) FormattedTodo() string {
+	if !e.IsTodo {
+		return ""
+	}
+
+	if e.IsDone {
+		return "[x]"
+	}
+
+	return "[ ]"
+}
+
 func (e *Entry) FormattedDate() string {
 	return e.Date.FormatDate()
 }
 
 func parseDate(d string) (time.Time, error) {
 	if d == "" {
-		return time.Now().In(humantime.LocalTimezone).Truncate(24 * time.Hour), nil
+		return time.Time{}, nil
 	}
 
 	if t, err := time.ParseInLocation("2006-01-02 15:04", d, humantime.LocalTimezone); err == nil {
@@ -128,10 +146,13 @@ func (e *Entry) PrintTo(w io.Writer, markdown bool) {
 		t.SetRowLines(false)
 	}
 
+	t.AddHeaders("Key", "Value")
+
 	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
 	t.AddRow("Date", e.DateString)
 	t.AddRow("Summary", e.Summary)
+	t.AddRow("TODO", e.TodoString)
 
 	if e.Source != nil {
 		t.AddRow("Source", e.Source.Name)

@@ -84,7 +84,7 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 func (ct HumanTime) Value() (driver.Value, error) {
 	// Check if the time is zero. You might want to store zero times as NULL in the database.
 	if ct.IsZero() {
-		return time.Time{}, nil // Return nil for zero time -> NULL in database
+		return nil, nil // Return nil for zero time -> NULL in database
 	}
 
 	// Return the embedded time.Time. GORM/database driver knows how to handle this.
@@ -113,6 +113,10 @@ func (ct *HumanTime) Scan(value any) error {
 }
 
 func (ct *HumanTime) FormatDate() string {
+	if ct.IsZero() {
+		return "(no date)"
+	}
+
 	if ct.DateOnly() {
 		return ct.In(LocalTimezone).Format("2006-01-02")
 	}

@@ -293,7 +293,7 @@ func Test_parseDate(t *testing.T) {
 		expectedYear  int
 		expectedMonth time.Month
 		expectedDay   int
-		compareToday  bool // Special handling for ""
+		compareZero   bool // Special handling for ""
 	}{
 		{
 			name:          "Valid date",
@@ -302,25 +302,22 @@ func Test_parseDate(t *testing.T) {
 			expectedYear:  2023,
 			expectedMonth: time.October,
 			expectedDay:   26,
-			compareToday:  false,
 		},
 		{
-			name:         "Empty string",
-			dateString:   "",
-			expectError:  false,
-			compareToday: true, // Expect today's date rounded
+			name:        "Empty string",
+			dateString:  "",
+			expectError: false,
+			compareZero: true, // Expect zero date
 		},
 		{
-			name:         "Invalid format",
-			dateString:   "10/26/2023",
-			expectError:  true,
-			compareToday: false,
+			name:        "Invalid format",
+			dateString:  "10/26/2023",
+			expectError: true,
 		},
 		{
-			name:         "Invalid date",
-			dateString:   "2023-02-30", // Feb has only 28/29 days
-			expectError:  true,
-			compareToday: false,
+			name:        "Invalid date",
+			dateString:  "2023-02-30", // Feb has only 28/29 days
+			expectError: true,
 		},
 	}
 
@@ -333,13 +330,13 @@ func Test_parseDate(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "Did not expect an error for valid date string")
 
-				if tt.compareToday {
-					nowLocal := time.Now().In(humantime.LocalTimezone)
+				if tt.compareZero {
+					nowLocal := time.Time{}
 					// Round both times to the nearest day for comparison
 					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 					parsedTimeRounded := time.Date(parsedTime.Year(), parsedTime.Month(), parsedTime.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 
-					assert.Equal(t, expectedTime, parsedTimeRounded, "Parsed date for empty string should be today's date in local timezone rounded")
+					assert.Equal(t, expectedTime, parsedTimeRounded, "Parsed date for empty string should be the zero time")
 				} else {
 					assert.Equal(t, tt.expectedYear, parsedTime.Year(), "Year mismatch")
 					assert.Equal(t, tt.expectedMonth, parsedTime.Month(), "Month mismatch")
@@ -362,26 +359,24 @@ func TestEntry_SetDate(t *testing.T) {
 		dateString   string
 		expectError  bool
 		expectedTime time.Time // Expected time if no error, for specific dates
-		compareToday bool      // Whether to compare with today's date rounded
+		compareZero  bool      // Whether to compare with zero date
 	}{
 		{
 			name:         "Valid date string",
 			dateString:   "2024-01-15",
 			expectError:  false,
 			expectedTime: time.Date(2024, 1, 15, 0, 0, 0, 0, humantime.LocalTimezone),
-			compareToday: false,
 		},
 		{
-			name:         "Empty string",
-			dateString:   "",
-			expectError:  false,
-			compareToday: true, // Expect today's date in local timezone rounded
+			name:        "Empty string",
+			dateString:  "",
+			expectError: false,
+			compareZero: true, // Expect zero date
 		},
 		{
-			name:         "Invalid date string",
-			dateString:   "invalid-date",
-			expectError:  true,
-			compareToday: false,
+			name:        "Invalid date string",
+			dateString:  "invalid-date",
+			expectError: true,
 		},
 	}
 
@@ -395,11 +390,11 @@ func TestEntry_SetDate(t *testing.T) {
 			} else {
 				assert.NoError(t, err, "Did not expect an error for valid date string")
 
-				if tt.compareToday {
-					nowLocal := time.Now().In(humantime.LocalTimezone)
+				if tt.compareZero {
+					nowLocal := time.Time{}
 					expectedTime := time.Date(nowLocal.Year(), nowLocal.Month(), nowLocal.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 					parsedTime := time.Date(e.Date.Year(), e.Date.Month(), e.Date.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
-					assert.Equal(t, expectedTime, parsedTime, "Set date for empty string should be today's date in local timezone rounded")
+					assert.Equal(t, expectedTime, parsedTime, "Parsed date for empty string should be the zero time")
 				} else {
 					assert.Equal(t, tt.expectedTime, e.Date.Time, "Set date mismatch")
 				}

@@ -11,10 +11,11 @@ type entry struct {
 	Summary     string `json:"summary"`
 	Description string `json:"description"`
 	Name        string `json:"name"`
+	IsTodo      bool   `json:"todo"`
 }
 
 func (e *entry) ToEntry() *structs.Entry {
-	de := &structs.Entry{Summary: e.Summary}
+	de := &structs.Entry{Summary: e.Summary, IsTodo: e.IsTodo}
 	if err := de.SetDate(e.Date); err != nil {
 		return nil
 	}
@@ -60,5 +61,23 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		deStr := de.ToString(true)
 		mc.sendMessage(roomID, "Deleted task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Deleted task:\n\n"+deStr)
+	case "finished":
+		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
+		if err != nil {
+			mc.App.Logger().Error("Failed to find entry", "error", err)
+			return
+		}
+
+		de.ID = eid
+
+		de.IsDone = true
+		if err := mc.App.UpdateEntry(de); err != nil {
+			mc.App.Logger().Error("Failed to update entry", "error", err)
+			return
+		}
+
+		deStr := de.ToString(true)
+		mc.sendMessage(roomID, "Finished task:\n\n"+deStr)
+		mc.AIData.AddChatHistory("assistant", "Finished task:\n\n"+deStr)
 	}
 }

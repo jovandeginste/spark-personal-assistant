@@ -161,6 +161,15 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 	}
 }
 
+func (mc *MatrixConfig) checkIfTask(input string) (bool, string) {
+	if strings.HasPrefix(input, "!") {
+		input = strings.TrimLeft(input, "!")
+		return true, "New task: " + input
+	}
+
+	return false, input
+}
+
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
 	mc.AIData.CleanHistory()
 
@@ -171,13 +180,9 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		return "", err
 	}
 
-	isTask, err := mc.AIClient.GeneratePrompt(context.Background(), ai.PromptCheckTask, mc.AIData.EmployerQuestion)
-	if err != nil {
-		return "", err
-	}
-
-	if isTask = strings.TrimSpace(isTask); isTask != "0" {
-		mc.sendMessage(roomID, isTask)
+	isTask, reInput := mc.checkIfTask(input)
+	if isTask {
+		mc.sendMessage(roomID, reInput)
 		mc.App.Logger().Info("Calculating tasks...")
 
 		err := mc.performTasks(roomID)

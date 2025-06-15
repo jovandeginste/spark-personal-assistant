@@ -199,7 +199,7 @@ func TestHumanTime_Value(t *testing.T) {
 		{
 			name:          "Zero time",
 			ht:            HumanTime{},
-			expectedValue: time.Time{}, // Or potentially nil depending on driver interpretation of zero time{}
+			expectedValue: nil, // Or potentially nil depending on driver interpretation of zero time{}
 			// The code returns time.Time{}, which database/sql drivers often map to NULL or a specific zero time.
 			// Let's test for time.Time{} as returned by the code.
 		},
@@ -351,7 +351,7 @@ func TestHumanTime_FormatDate(t *testing.T) {
 		{
 			name:     "Zero time", // FormatDate doesn't special case zero time, depends on embedded Time's method
 			ht:       HumanTime{Time: time.Time{}},
-			expected: "0001-01-01", // Default zero time format
+			expected: "(no date)", // Default zero time format
 		},
 	}
 

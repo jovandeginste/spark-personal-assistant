@@ -91,17 +91,23 @@ func (ef *EntryFilter) To() time.Time {
 }
 
 func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
-	q = q.Where("date >= ?", ef.From()).Where("date <= ?", ef.To())
+	q = q.Where(
+		q.Where(
+			q.Where("date is null").Where("is_todo = ?", true).Where("is_done = ?", false),
+		).Or(
+			q.Where("date >= ?", ef.From()).Where("date <= ?", ef.To()),
+		),
+	)
 
-	if ef.Source != nil {
-		q = q.Where("source_id = ?", ef.Source.ID)
+	if ef.Source == nil {
+		return q
 	}
 
-	return q
+	return q.Where("source_id = ?", ef.Source.ID)
 }
 
 func (a *App) CurrentEntries(ef *EntryFilter) (structs.Entries, error) {
-	q := ef.Query(a.DB())
+	q := ef.Query(a.Query())
 
 	var entries structs.Entries
 
@@ -115,7 +121,7 @@ func (a *App) CurrentEntries(ef *EntryFilter) (structs.Entries, error) {
 func (a *App) Entries() (structs.Entries, error) {
 	var entries structs.Entries
 
-	if err := a.DB().
+	if err := a.Query().
 		Preload("Source").
 		Order("date ASC").
 		Find(&entries).Error; err != nil {
@@ -125,12 +131,16 @@ func (a *App) Entries() (structs.Entries, error) {
 	return entries, nil
 }
 
+func (a *App) UpdateEntry(e *structs.Entry) error {
+	return a.Query().Save(&e).Error
+}
+
 func (a *App) DeleteEntry(e *structs.Entry) error {
-	return a.DB().Delete(&e).Error
+	return a.Query().Delete(&e).Error
 }
 
 func (a *App) FindEntry(e *structs.Entry) error {
-	return a.DB().First(&e, e.ID).Error
+	return a.Query().First(&e, e.ID).Error
 }
 
 func (a *App) FindEntryByRemoteID(sourceID uint64, e *structs.Entry) (uint64, error) {
@@ -138,7 +148,7 @@ func (a *App) FindEntryByRemoteID(sourceID uint64, e *structs.Entry) (uint64, er
 
 	var entry structs.Entry
 
-	if err := a.DB().Where("source_id = ?", sourceID).Where("remote_id = ?", rid).First(&entry).Error; err != nil {
+	if err := a.Query().Where("source_id = ?", sourceID).Where("remote_id = ?", rid).First(&entry).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return 0, nil
 		}
@@ -152,7 +162,7 @@ func (a *App) FindEntryByRemoteID(sourceID uint64, e *structs.Entry) (uint64, er
 func (a *App) Sources() (structs.Sources, error) {
 	var sources structs.Sources
 
-	if err := a.DB().Preload("Entries").Find(&sources).Error; err != nil {
+	if err := a.Query().Preload("Entries").Find(&sources).Error; err != nil {
 		return nil, err
 	}
 
@@ -165,17 +175,17 @@ func (a *App) Sources() (structs.Sources, error) {
 
 func (a *App) CreateEntry(entry *structs.Entry) error {
 	a.Logger().Info("Creating new entry", "date", entry.Date, "entry", entry.Summary, "source", entry.Source.Name)
-	return a.DB().Create(entry).Error
+	return a.Query().Create(entry).Error
 }
 
 func (a *App) DeleteSource(s *structs.Source) error {
-	return a.DB().Select("Entries").Delete(&s).Error
+	return a.Query().Select("Entries").Delete(&s).Error
 }
 
 func (a *App) FindSourceByName(name string) (*structs.Source, error) {
 	source := structs.Source{Name: name}
 
-	if err := a.DB().Where(&source).First(&source).Error; err != nil {
+	if err := a.Query().Where(&source).First(&source).Error; err != nil {
 		return nil, err
 	}
 
@@ -186,11 +196,11 @@ func (a *App) FindSourceByName(name string) (*structs.Source, error) {
 
 func (a *App) CreateSource(src *structs.Source) error {
 	a.Logger().Info("Creating new source", "source", src.Name)
-	return a.DB().Create(src).Error
+	return a.Query().Create(src).Error
 }
 
 func (a *App) UpdateSource(src *structs.Source) error {
-	return a.DB().Save(&src).Error
+	return a.Query().Save(&src).Error
 }
 
 func (a *App) FetchExistingEntries(sourceID uint64, entries structs.Entries) {
@@ -215,9 +225,9 @@ func (a *App) ReplaceSourceEntries(src *structs.Source, entries structs.Entries)
 		entries[i].SourceID = src.ID
 	}
 
-	if err := a.DB().Model(&structs.Entry{}).Save(entries).Error; err != nil {
+	if err := a.Query().Model(&structs.Entry{}).Save(entries).Error; err != nil {
 		return err
 	}
 
-	return a.DB().Model(&src).Association("Entries").Unscoped().Replace(entries)
+	return a.Query().Model(&src).Association("Entries").Unscoped().Replace(entries)
 }

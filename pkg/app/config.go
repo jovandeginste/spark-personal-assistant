@@ -79,12 +79,24 @@ func (a *App) configureAssistant() error {
 		return nil
 	}
 
-	rest, err := frontmatter.Parse(input, &a.Config.Assistant)
+	var assistantFromFile ai.AssistantConfig
+
+	rest, err := frontmatter.Parse(input, &assistantFromFile)
 	if err != nil {
 		return err
 	}
 
-	a.Config.Assistant.Style = string(rest)
+	if a.Config.Assistant.Name == "" {
+		a.Config.Assistant.Name = assistantFromFile.Name
+	}
+
+	if a.Config.Assistant.Language == "" {
+		a.Config.Assistant.Language = assistantFromFile.Language
+	}
+
+	if a.Config.Assistant.Style != "" {
+		a.Config.Assistant.Style = string(rest)
+	}
 
 	return nil
 }

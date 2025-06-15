@@ -19,9 +19,9 @@ func TestEntries_PrintTo(t *testing.T) {
 		{
 			name:    "empty entries",
 			entries: Entries{},
-			expectedOut: `┌────┬──────┬───────┬────────┐
-│ ID │ Date │ Title │ Source │
-└────┴──────┴───────┴────────┘`, // Empty table with headers
+			expectedOut: `┌────┬──────┬───────┬──────┬────────┐
+│ ID │ Date │ Title │ TODO │ Source │
+└────┴──────┴───────┴──────┴────────┘`, // Empty table with headers
 		},
 		{
 			name: "multiple entries",
@@ -51,15 +51,15 @@ func TestEntries_PrintTo(t *testing.T) {
 					},
 				},
 			},
-			expectedOut: `┌────┬────────────┬────────────────────┬──────────┐
-│ ID │    Date    │       Title        │  Source  │
-├────┼────────────┼────────────────────┼──────────┤
-│ 1  │ 2023-10-26 │ Test Summary 1     │ Source A │
-├────┼────────────┼────────────────────┼──────────┤
-│ 2  │ 2023-10-27 │ Test Summary 2     │ Source B │
-├────┼────────────┼────────────────────┼──────────┤
-│ 3  │ 2023-10-28 │ Another test entry │ Source A │
-└────┴────────────┴────────────────────┴──────────┘`,
+			expectedOut: `┌────┬────────────┬────────────────────┬──────┬──────────┐
+│ ID │    Date    │       Title        │ TODO │  Source  │
+├────┼────────────┼────────────────────┼──────┼──────────┤
+│ 1  │ 2023-10-26 │ Test Summary 1     │      │ Source A │
+├────┼────────────┼────────────────────┼──────┼──────────┤
+│ 2  │ 2023-10-27 │ Test Summary 2     │      │ Source B │
+├────┼────────────┼────────────────────┼──────┼──────────┤
+│ 3  │ 2023-10-28 │ Another test entry │      │ Source A │
+└────┴────────────┴────────────────────┴──────┴──────────┘`,
 		},
 		{
 			name: "single entry",
@@ -73,11 +73,11 @@ func TestEntries_PrintTo(t *testing.T) {
 					},
 				},
 			},
-			expectedOut: `┌────┬────────────┬───────────────────┬─────────────┐
-│ ID │    Date    │       Title       │   Source    │
-├────┼────────────┼───────────────────┼─────────────┤
-│ 10 │ 2024-01-01 │ Single Entry Test │ Solo Source │
-└────┴────────────┴───────────────────┴─────────────┘`,
+			expectedOut: `┌────┬────────────┬───────────────────┬──────┬─────────────┐
+│ ID │    Date    │       Title       │ TODO │   Source    │
+├────┼────────────┼───────────────────┼──────┼─────────────┤
+│ 10 │ 2024-01-01 │ Single Entry Test │      │ Solo Source │
+└────┴────────────┴───────────────────┴──────┴─────────────┘`,
 		},
 		{
 			name: "entry with empty fields",
@@ -91,11 +91,11 @@ func TestEntries_PrintTo(t *testing.T) {
 					},
 				},
 			},
-			expectedOut: `┌────┬──────┬───────┬────────┐
-│ ID │ Date │ Title │ Source │
-├────┼──────┼───────┼────────┤
-│ 99 │      │       │        │
-└────┴──────┴───────┴────────┘`,
+			expectedOut: `┌────┬──────┬───────┬──────┬────────┐
+│ ID │ Date │ Title │ TODO │ Source │
+├────┼──────┼───────┼──────┼────────┤
+│ 99 │      │       │      │        │
+└────┴──────┴───────┴──────┴────────┘`,
 		},
 	}
 
@@ -124,7 +124,7 @@ func TestEntries_PrintTo(t *testing.T) {
 func generateEmptyTableString() string {
 	var buf bytes.Buffer
 	t := table.New(&buf)
-	t.AddHeaders("ID", "Date", "Title", "Source")
+	t.AddHeaders("ID", "Date", "Title", "TODO", "Source")
 	t.Render()
 
 	return buf.String()

@@ -17,10 +17,19 @@ func (a *App) DB() *gorm.DB {
 	return a.db.Preload(clause.Associations)
 }
 
+func (a *App) Query() *gorm.DB {
+	return a.DB().Session(&gorm.Session{}).Debug()
+}
+
 func (a *App) Migrate() error {
-	return a.db.AutoMigrate(
-		structs.Source{}, structs.Entry{},
-	)
+	a.Logger().Info("Migrating database")
+
+	err := a.db.AutoMigrate(structs.Source{}, structs.Entry{})
+	if err != nil {
+		return err
+	}
+
+	return a.db.Migrator().DropColumn(&structs.Entry{}, "importance")
 }
 
 func (a *App) initializeDatabase() error {
