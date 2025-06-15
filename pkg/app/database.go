@@ -34,7 +34,9 @@ func (a *App) Migrate() error {
 
 func (a *App) initializeDatabase() error {
 	c := &gorm.Config{
-		Logger: sloggorm.NewWithConfig(sloggorm.NewConfig(a.Logger().Handler())),
+		Logger: sloggorm.NewWithConfig(sloggorm.NewConfig(
+			a.Logger().With("component", "gorm").Handler(),
+		)),
 	}
 
 	db, err := gorm.Open(sqlite.Open(a.Config.Database.File), c)

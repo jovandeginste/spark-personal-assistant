@@ -94,7 +94,7 @@ func (a *App) configureAssistant() error {
 		a.Config.Assistant.Language = assistantFromFile.Language
 	}
 
-	if a.Config.Assistant.Style != "" {
+	if a.Config.Assistant.Style == "" {
 		a.Config.Assistant.Style = string(rest)
 	}
 
