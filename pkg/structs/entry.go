@@ -21,8 +21,8 @@ type Entry struct {
 	Date     humantime.HumanTime `gorm:"index" json:",omitempty"`
 	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary  string              `gorm:"not null"`
-	IsTodo   bool                `json:"todo,omitempty"`
-	IsDone   bool                `json:"done,omitempty"`
+	IsTodo   bool                `json:"Todo,omitempty"`
+	IsDone   bool                `json:"Done,omitempty"`
 	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
 	DateString string `gorm:"-" json:"-"`
