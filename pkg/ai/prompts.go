@@ -29,6 +29,7 @@ var promptPreamble = []string{
 	"The following entries consist a list of items.",
 	"Entries without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
+	"You can not perform any actions, except communication with the user or creating, updating or deleting tasks in the internal source.",
 }
 
 func (a AssistantConfig) PromptPreamble() []string {

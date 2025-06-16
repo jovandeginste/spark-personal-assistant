@@ -76,7 +76,7 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
 	cmd.Flags().StringVar(&mc.Database, "database", "mautrix-example.db", "SQLite database path")
-	cmd.Flags().StringVar(&mc.Source, "source", "custom", "Name of the source to use")
+	cmd.Flags().StringVar(&mc.Source, "source", "internal", "Name of the source to use")
 	cmd.Flags().UintVarP(&mc.EF.DaysBack, "days-back", "b", 30, "Number of days in the past to include")
 	cmd.Flags().UintVarP(&mc.EF.DaysAhead, "days-ahead", "a", 90, "Number of days in the future to include")
 
