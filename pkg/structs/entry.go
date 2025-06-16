@@ -18,11 +18,11 @@ import (
 type Entry struct {
 	ID       uint64              `gorm:"primaryKey" json:"-"`
 	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date     humantime.HumanTime `gorm:"index" json:";omitempty"`
+	Date     humantime.HumanTime `gorm:"index" json:",omitempty"`
 	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary  string              `gorm:"not null"`
-	IsTodo   bool                `json:"todo;omitempty"`
-	IsDone   bool                `json:"done;omitempty"`
+	IsTodo   bool                `json:"todo,omitempty"`
+	IsDone   bool                `json:"done,omitempty"`
 	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
 	DateString string `gorm:"-" json:"-"`
