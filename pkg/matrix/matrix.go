@@ -20,9 +20,6 @@ import (
 )
 
 type MatrixConfig struct {
-	Database string
-	Source   string
-
 	SourceID     uint64
 	EF           app.EntryFilter
 	AIData       *app.AIData
@@ -106,7 +103,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 }
 
 func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
-	src, err := mc.App.FindSourceByName(mc.Source)
+	src, err := mc.App.FindSourceByName(mc.App.Config.Database.InternalSource)
 	if err != nil {
 		return err
 	}
@@ -236,7 +233,7 @@ func (mc *MatrixConfig) InitClient() error {
 }
 
 func (mc *MatrixConfig) ConfigureCryptoHelper() error {
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), mc.Database)
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), mc.App.Config.Matrix.Database)
 	if err != nil {
 		return err
 	}

@@ -28,6 +28,7 @@ type MatrixConfig struct {
 	Username   string   `mapstructure:"username"`
 	Password   string   `mapstructure:"password"`
 	RoomID     string   `mapstructure:"room_id"`
+	Database   string   `mapstructure:"database"`
 	Users      []string `mapstructure:"users"`
 }
 
@@ -53,12 +54,14 @@ func (a *App) ReadConfig() error {
 		return err
 	}
 
-	if err := a.setAssistantStylePath(); err != nil {
-		return err
-	}
-
-	if err := a.configureAssistant(); err != nil {
-		return err
+	for _, f := range []func() error{
+		a.setAssistantStylePath,
+		a.setMatrixDatabasePath,
+		a.configureAssistant,
+	} {
+		if err := f(); err != nil {
+			return err
+		}
 	}
 
 	a.SetDefaults()
@@ -97,6 +100,22 @@ func (a *App) configureAssistant() error {
 	if a.Config.Assistant.Style == "" {
 		a.Config.Assistant.Style = string(rest)
 	}
+
+	return nil
+}
+
+func (a *App) setMatrixDatabasePath() error {
+	if a.Config.Matrix.Database == "" || strings.HasPrefix(a.Config.Matrix.Database, "/") {
+		return nil
+	}
+
+	absPath, err := filepath.Abs(a.ConfigFile)
+	if err != nil {
+		return err
+	}
+
+	dirname := filepath.Dir(absPath)
+	a.Config.Matrix.Database = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Matrix.Database))
 
 	return nil
 }
