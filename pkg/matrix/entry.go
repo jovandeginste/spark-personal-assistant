@@ -69,8 +69,9 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		de.ID = eid
-
+		de.IsTodo = true
 		de.IsDone = true
+
 		if err := mc.App.UpdateEntry(de); err != nil {
 			mc.App.Logger().Error("Failed to update entry", "error", err)
 			return
