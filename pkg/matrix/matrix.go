@@ -161,7 +161,7 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 func (mc *MatrixConfig) checkIfTask(input string) (bool, string) {
 	if strings.HasPrefix(input, "!") {
 		input = strings.TrimLeft(input, "!")
-		return true, "New task: " + input
+		return true, input
 	}
 
 	return false, input
@@ -177,16 +177,19 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		return "", err
 	}
 
-	isTask, reInput := mc.checkIfTask(input)
+	isTask, _ := mc.checkIfTask(input)
 	if isTask {
-		mc.sendNotice(roomID, reInput)
-		mc.App.Logger().Info("Calculating tasks...")
+		mc.AIData.ResetHistory()
+
+		mc.sendNotice(roomID, "Calculating tasks...")
 
 		err := mc.performTasks(roomID)
 		if err != nil {
 			return "", fmt.Errorf("could not perform task: %w", err)
 		}
 	}
+
+	mc.sendNotice(roomID, "Calculating response...")
 
 	md, err := mc.AIClient.GeneratePrompt(context.Background(), ai.PromptCustom, mc.AIData)
 	if err != nil {
@@ -278,6 +281,7 @@ func (mc *MatrixConfig) send(roomID id.RoomID, msgType event.MessageType, text s
 }
 
 func (mc *MatrixConfig) sendNotice(roomID id.RoomID, text string) {
+	mc.App.Logger().Info(text)
 	mc.send(roomID, event.MsgNotice, text)
 }
 

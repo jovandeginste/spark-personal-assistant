@@ -1,6 +1,7 @@
 package matrix
 
 import (
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/structs"
 	"maunium.net/go/mautrix/id"
 )
@@ -42,7 +43,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendNotice(roomID, "Created task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Creating task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Created task:\n\n"+deStr)
 	case "delete":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
@@ -59,7 +60,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendNotice(roomID, "Deleted task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Deleting task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Deleted task:\n\n"+deStr)
 	case "finished":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
@@ -76,6 +77,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 
 		de.IsTodo = true
 		de.IsDone = true
+		de.SetMetadata("finished", humantime.Now())
 
 		if err := mc.App.UpdateEntry(de); err != nil {
 			mc.App.Logger().Error("Failed to update entry", "error", err)
@@ -83,7 +85,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendNotice(roomID, "Finished task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Marking task as finished:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Finished task:\n\n"+deStr)
 	}
 }
