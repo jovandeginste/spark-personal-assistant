@@ -42,7 +42,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendMessage(roomID, "Created task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Created task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Created task:\n\n"+deStr)
 	case "delete":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
@@ -59,7 +59,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendMessage(roomID, "Deleted task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Deleted task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Deleted task:\n\n"+deStr)
 	case "finished":
 		eid, err := mc.App.FindEntryByRemoteID(mc.SourceID, de)
@@ -69,6 +69,11 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		de.ID = eid
+		if err := mc.App.FindEntry(de); err != nil {
+			mc.App.Logger().Error("Failed to find entry", "error", err)
+			return
+		}
+
 		de.IsTodo = true
 		de.IsDone = true
 
@@ -78,7 +83,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 		}
 
 		deStr := de.ToString(true)
-		mc.sendMessage(roomID, "Finished task:\n\n"+deStr)
+		mc.sendNotice(roomID, "Finished task:\n\n"+deStr)
 		mc.AIData.AddChatHistory("assistant", "Finished task:\n\n"+deStr)
 	}
 }

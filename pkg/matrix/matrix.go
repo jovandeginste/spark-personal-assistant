@@ -179,7 +179,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	isTask, reInput := mc.checkIfTask(input)
 	if isTask {
-		mc.sendMessage(roomID, reInput)
+		mc.sendNotice(roomID, reInput)
 		mc.App.Logger().Info("Calculating tasks...")
 
 		err := mc.performTasks(roomID)
@@ -270,10 +270,19 @@ func (mc *MatrixConfig) InitChat() {
 	}()
 }
 
-func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
+func (mc *MatrixConfig) send(roomID id.RoomID, msgType event.MessageType, text string) {
 	content := format.RenderMarkdown(text, true, true)
+	content.MsgType = msgType
 
 	mc.msges <- msg{RoomID: roomID, Content: content}
+}
+
+func (mc *MatrixConfig) sendNotice(roomID id.RoomID, text string) {
+	mc.send(roomID, event.MsgNotice, text)
+}
+
+func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
+	mc.send(roomID, event.MsgText, text)
 }
 
 func (mc *MatrixConfig) Greet() error {
@@ -281,7 +290,7 @@ func (mc *MatrixConfig) Greet() error {
 		mc.App.Logger().Error("Failed to set display name", "error", err)
 	}
 
-	mc.sendMessage(mc.DefaultRoomID(), "Reporting for duty")
+	mc.send(mc.DefaultRoomID(), event.MsgEmote, "reporting for duty")
 
 	return nil
 }
