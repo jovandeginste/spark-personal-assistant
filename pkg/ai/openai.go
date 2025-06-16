@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"time"
@@ -36,6 +37,8 @@ func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMe
 	if err != nil {
 		return openai.ChatCompletionMessageParamUnion{}, err
 	}
+
+	c.Logger().Info("prompt size", "size", len(fmt.Sprintf("%+v", prompt)))
 
 	parts := make([]openai.ChatCompletionContentPartUnionParam, 0, len(prompt))
 

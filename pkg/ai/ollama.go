@@ -34,6 +34,8 @@ func (c ollamaClient) convertPrompt(p Prompt, data any) (string, error) {
 		return "", err
 	}
 
+	c.Logger().Info("prompt size", "size", len(fmt.Sprintf("%+v", prompt)))
+
 	return strings.Join(prompt, "\n"), nil
 }
 

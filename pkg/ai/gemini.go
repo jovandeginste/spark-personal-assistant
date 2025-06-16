@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -34,6 +35,8 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 	if err != nil {
 		return nil, err
 	}
+
+	c.Logger().Info("prompt size", "size", len(fmt.Sprintf("%+v", prompt)))
 
 	parts := make([]*genai.Part, 0, len(prompt))
 

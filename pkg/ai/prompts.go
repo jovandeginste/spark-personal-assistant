@@ -47,6 +47,7 @@ func PromptCheckTask(assistant AssistantConfig, data any) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	c := []string{
 		"Assert whether the employer's question is about creating, updating or deleting one or more tasks.",
 		"If no actions are required, answer with a single zero and nothing else.",
