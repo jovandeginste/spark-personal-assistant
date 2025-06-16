@@ -11,6 +11,7 @@ import (
 type DatabaseConfig struct {
 	File           string `mapstructure:"file"`
 	InternalSource string `mapstructure:"internal_source"`
+	Debug          bool   `mapstructure:"debug"`
 	originalFile   string
 }
 
@@ -19,18 +20,18 @@ func (a *App) DB() *gorm.DB {
 }
 
 func (a *App) Query() *gorm.DB {
-	return a.DB().Session(&gorm.Session{}).Debug()
+	return a.DB().Session(&gorm.Session{})
 }
 
 func (a *App) Migrate() error {
 	a.Logger().Info("Migrating database")
 
-	err := a.db.AutoMigrate(structs.Source{}, structs.Entry{})
+	err := a.DB().AutoMigrate(structs.Source{}, structs.Entry{})
 	if err != nil {
 		return err
 	}
 
-	return a.db.Migrator().DropColumn(&structs.Entry{}, "importance")
+	return a.DB().Migrator().DropColumn(&structs.Entry{}, "importance")
 }
 
 func (a *App) initializeDatabase() error {
@@ -46,6 +47,9 @@ func (a *App) initializeDatabase() error {
 	}
 
 	a.db = db
+	if a.Config.Database.Debug {
+		a.db = a.db.Debug()
+	}
 
 	return a.Migrate()
 }
