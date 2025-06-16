@@ -116,6 +116,8 @@ func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
 	d = strings.Replace(d, "```json", "", 1)
 	d = strings.Replace(d, "```", "", 1)
 
+	mc.App.Logger().Info("Executing tasks", "tasks", d)
+
 	var entries []entry
 
 	if err := json.Unmarshal([]byte(d), &entries); err != nil {
