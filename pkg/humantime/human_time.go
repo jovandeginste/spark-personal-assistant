@@ -14,6 +14,10 @@ type HumanTime struct {
 	time.Time
 }
 
+func Now() *HumanTime {
+	return &HumanTime{Time: time.Now().In(LocalTimezone)}
+}
+
 func (ct *HumanTime) DateOnly() bool {
 	return ct.Hour() == 0 && ct.Minute() == 0
 }
