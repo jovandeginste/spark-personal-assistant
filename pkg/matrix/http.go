@@ -37,7 +37,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 // Handler
 func (mc *MatrixConfig) prompt(c echo.Context) error {
 	prompt := c.QueryParam("prompt")
-	mc.sendMessage(mc.DefaultRoomID(), "Creating summary: "+prompt)
+	mc.sendNotice(mc.DefaultRoomID(), "Creating summary: "+prompt)
 
 	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
