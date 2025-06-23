@@ -21,7 +21,8 @@ func (mc *MatrixConfig) ServeHTTP() {
 	e.HidePort = true
 
 	// Routes
-	e.GET("/prompt", mc.prompt)
+	e.GET("/prompt", mc.summarize)
+	e.GET("/persona", mc.switchPersona)
 	e.GET("/update", mc.updateSources)
 
 	go func() {
@@ -35,7 +36,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 }
 
 // Handler
-func (mc *MatrixConfig) prompt(c echo.Context) error {
+func (mc *MatrixConfig) summarize(c echo.Context) error {
 	prompt := c.QueryParam("prompt")
 	mc.sendNotice(mc.DefaultRoomID(), "Creating summary: "+prompt)
 
@@ -52,4 +53,15 @@ func (mc *MatrixConfig) updateSources(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, "Sources updated")
+}
+
+func (mc *MatrixConfig) switchPersona(c echo.Context) error {
+	persona := c.QueryParam("persona")
+	mc.sendNotice(mc.DefaultRoomID(), "Switching to persona: "+persona)
+
+	if err := mc.sendResponse(mc.DefaultRoomID(), "web", "switch "+persona); err != nil {
+		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	return c.String(http.StatusOK, "Persona switched")
 }

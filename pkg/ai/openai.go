@@ -16,7 +16,7 @@ type openaiClient struct {
 	model     string
 	ttsModel  string
 	ttsVoice  string
-	assistant AssistantConfig
+	assistant *AssistantConfig
 	logger    *slog.Logger
 }
 

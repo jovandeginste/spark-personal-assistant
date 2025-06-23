@@ -12,7 +12,7 @@ import (
 
 type ollamaClient struct {
 	model     string
-	assistant AssistantConfig
+	assistant *AssistantConfig
 	logger    *slog.Logger
 }
 

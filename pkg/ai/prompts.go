@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-type Prompt func(assistant AssistantConfig, data any) ([]string, error)
+type Prompt func(assistant *AssistantConfig, data any) ([]string, error)
 
 func PromptFor(format string) (Prompt, error) {
 	switch format {
@@ -58,7 +58,7 @@ func PromptCheckTask(assistant AssistantConfig, data any) ([]string, error) {
 	return c, nil
 }
 
-func PromptTask(assistant AssistantConfig, data any) ([]string, error) {
+func PromptTask(assistant *AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func PromptTask(assistant AssistantConfig, data any) ([]string, error) {
 	return c, nil
 }
 
-func PromptCustom(assistant AssistantConfig, data any) ([]string, error) {
+func PromptCustom(assistant *AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -102,7 +102,7 @@ func PromptCustom(assistant AssistantConfig, data any) ([]string, error) {
 	return c, nil
 }
 
-func PromptWeek(assistant AssistantConfig, data any) ([]string, error) {
+func PromptWeek(assistant *AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -120,7 +120,7 @@ func PromptWeek(assistant AssistantConfig, data any) ([]string, error) {
 	return c, nil
 }
 
-func PromptToday(assistant AssistantConfig, data any) ([]string, error) {
+func PromptToday(assistant *AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {
 		return nil, err
@@ -137,7 +137,7 @@ func PromptToday(assistant AssistantConfig, data any) ([]string, error) {
 	return c, nil
 }
 
-func PromptFull(assistant AssistantConfig, data any) ([]string, error) {
+func PromptFull(assistant *AssistantConfig, data any) ([]string, error) {
 	j, err := json.Marshal(data)
 	if err != nil {
 		return nil, err

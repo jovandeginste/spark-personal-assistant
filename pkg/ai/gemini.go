@@ -14,7 +14,7 @@ type geminiClient struct {
 	model     string
 	ttsModel  string
 	ttsVoice  string
-	assistant AssistantConfig
+	assistant *AssistantConfig
 	logger    *slog.Logger
 }
 
@@ -48,7 +48,9 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 }
 
 func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
-	c.Logger().Info("Fetching result from AI...")
+	c.Logger().
+		With("name", c.assistant.Name).
+		Info("Fetching result from AI...")
 
 	prompt, err := c.convertPrompt(p, data)
 	if err != nil {

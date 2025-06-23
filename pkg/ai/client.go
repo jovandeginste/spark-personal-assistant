@@ -30,7 +30,7 @@ type Client interface {
 	Logger() *slog.Logger
 }
 
-func NewClient(cc *AIConfig, ac AssistantConfig, l *slog.Logger) (Client, error) {
+func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error) {
 	var c Client
 
 	switch cc.Type {

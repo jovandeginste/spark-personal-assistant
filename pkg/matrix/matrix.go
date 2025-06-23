@@ -89,15 +89,16 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		return err
 	}
 
-	if result == "" {
-		result, err = mc.calculateResponse(roomID, sender, input)
-		if err != nil {
-			mc.App.Logger().Error("Failed to calculate response", "error", err)
-			result = fmt.Sprintf("Error: %s", err)
-		}
+	if result != "" {
+		mc.sendMessage(roomID, result)
+		return nil
 	}
 
-	mc.sendMessage(roomID, result)
+	result, err = mc.calculateResponse(roomID, sender, input)
+	if err != nil {
+		mc.App.Logger().Error("Failed to calculate response", "error", err)
+		result = fmt.Sprintf("Error: %s", err)
+	}
 
 	return nil
 }
@@ -136,7 +137,9 @@ func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
 }
 
 func (mc *MatrixConfig) parseInput(input string) (string, error) {
-	switch input {
+	cmd := strings.SplitN(input, " ", 3)
+
+	switch cmd[0] {
 	case "reset":
 		defer mc.AIData.ResetHistory()
 		return "Resetting chat history...", nil
@@ -147,12 +150,30 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 		}()
 
 		return "Shutting down...", nil
-	case "summarize full":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
-	case "summarize week":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptWeek, mc.AIData)
-	case "summarize today":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptToday, mc.AIData)
+	case "switch":
+		if len(cmd) < 2 {
+			return "", nil
+		}
+
+		mc.App.SetPersona(cmd[1])
+		mc.Greet()
+
+		return "Switched to persona: " + mc.App.Config.Assistant.Name, nil
+	case "summarize":
+		if len(cmd) < 2 {
+			return "", nil
+		}
+
+		switch cmd[1] {
+		case "full":
+			return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
+		case "week":
+			return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptWeek, mc.AIData)
+		case "today":
+			return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptToday, mc.AIData)
+		default:
+			return "", nil
+		}
 	case "ping":
 		return "*pong back*", nil
 	default:

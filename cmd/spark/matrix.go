@@ -25,7 +25,7 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 
 			mc.SourceID = src.ID
 
-			aiClient, err := ai.NewClient(c.app.Config.LLM, c.app.Config.Assistant, c.app.Logger())
+			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
 			}
