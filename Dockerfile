@@ -6,6 +6,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 COPY cmd ./cmd
 COPY pkg ./pkg
+COPY personas ./personas
 COPY vendor ./vendor
 
 ENV CGO_ENABLED=1
