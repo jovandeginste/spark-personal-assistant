@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jovandeginste/spark-personal-assistant/personas"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	_ "github.com/mattn/go-sqlite3"
@@ -152,7 +153,19 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 		return "Shutting down...", nil
 	case "switch":
 		if len(cmd) < 2 {
-			return "", nil
+			pDir, err := personas.FS().ReadDir(".")
+			if err != nil {
+				return "", err
+			}
+
+			list := "All personas:\n"
+			for _, p := range pDir {
+				n := p.Name()
+				n = strings.TrimSuffix(n, ".md")
+				list += fmt.Sprintf("- %s\n", n)
+			}
+
+			return list, nil
 		}
 
 		mc.App.SetPersona(cmd[1])

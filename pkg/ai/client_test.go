@@ -86,7 +86,7 @@ func TestNewClient(t *testing.T) {
 				}
 			}()
 
-			client, err := NewClient(tt.aiConfig, tt.assistantConfig, slog.Default())
+			client, err := NewClient(tt.aiConfig, &tt.assistantConfig, slog.Default())
 
 			if tt.expectError {
 				assert.Error(t, err, "Expected an error")

@@ -33,6 +33,8 @@ type Client interface {
 func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error) {
 	var c Client
 
+	l = l.With("ai_backend", "gemini").With("name", ac.Name)
+
 	switch cc.Type {
 	case "gemini":
 		c = geminiClient{
@@ -41,7 +43,7 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 			ttsModel:  cc.TTSModel,
 			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
-			logger:    l.With("ai_backend", "gemini"),
+			logger:    l,
 		}
 	case "openai":
 		c = openaiClient{
@@ -50,14 +52,14 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 			ttsModel:  cc.TTSModel,
 			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
-			logger:    l.With("ai_backend", "openai"),
+			logger:    l,
 		}
 	case "ollama":
 		l.Warn("ollama does not work yet - input size is too large?")
 		c = ollamaClient{
 			model:     cc.Model,
 			assistant: ac,
-			logger:    l.With("ai_backend", "ollama"),
+			logger:    l,
 		}
 	default:
 		return nil, fmt.Errorf("unknown type: %s", cc.Type)
