@@ -101,6 +101,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		result = fmt.Sprintf("Error: %s", err)
 	}
 
+	mc.sendMessage(roomID, result)
 	return nil
 }
 

@@ -62,29 +62,35 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 
 	config := &genai.GenerateContentConfig{}
 
+	var result *genai.GenerateContentResponse
+
 	for i := range 10 {
-		result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
-		if err != nil {
-			if i < 10 {
-				c.Logger().Warn("Retrying in 30 seconds...", "error", err)
-				time.Sleep(30 * time.Second)
-				continue
-			}
-
-			return "", err
+		result, err = client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
+		if err == nil {
+			break
 		}
 
-		for _, c := range result.Candidates {
-			if len(c.Content.Parts) == 0 {
-				continue
-			}
-
-			for _, part := range c.Content.Parts {
-				return part.Text, nil
-			}
+		if i < 10 {
+			c.Logger().Warn("Retrying in 30 seconds...", "error", err)
+			time.Sleep(30 * time.Second)
+			continue
 		}
+
+		c.Logger().Error("Failed to generate prompt", "error", err)
+		return "", err
 	}
 
+	c.Logger().Info("Parsing results")
+
+	for _, c := range result.Candidates {
+		if len(c.Content.Parts) == 0 {
+			continue
+		}
+
+		return c.Content.Parts[0].Text, nil
+	}
+
+	c.Logger().Info("No result")
 	return "", nil
 }
 
