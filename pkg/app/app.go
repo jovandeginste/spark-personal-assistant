@@ -61,7 +61,7 @@ func (a *App) UpdateSources() error {
 
 		if len(entries) == 0 {
 			a.Logger().Info("No entries found", "source", src.Name)
-			return nil
+			continue
 		}
 
 		a.Logger().Info("Entries retrieved", "source", src.Name, "count", len(entries))
