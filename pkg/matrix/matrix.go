@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/glebarez/sqlite"
 	"github.com/jovandeginste/spark-personal-assistant/personas"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
-	_ "github.com/mattn/go-sqlite3"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"

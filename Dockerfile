@@ -9,7 +9,6 @@ COPY pkg ./pkg
 COPY personas ./personas
 COPY vendor ./vendor
 
-ENV CGO_ENABLED=1
 RUN go build -tags=goolm -o /commands/ ./cmd/...
 
 FROM alpine:latest
