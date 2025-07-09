@@ -56,7 +56,8 @@ func (a *App) UpdateSources() error {
 
 		entries, err := src.RetrieveEntries()
 		if err != nil {
-			return err
+			a.Logger().Error("could not update source", "source", src.Name, "error", err)
+			continue
 		}
 
 		if len(entries) == 0 {

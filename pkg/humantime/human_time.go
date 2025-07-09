@@ -22,6 +22,10 @@ func (ct *HumanTime) DateOnly() bool {
 	return ct.Hour() == 0 && ct.Minute() == 0
 }
 
+func (ct *HumanTime) IsToday() bool {
+	return ct.Format("2006-01-02") == time.Now().In(LocalTimezone).Format("2006-01-02")
+}
+
 func (ct *HumanTime) MarshalJSON() ([]byte, error) {
 	// Handle nil pointer if necessary, though often you might want a zero time instead
 	if ct == nil || ct.IsZero() {

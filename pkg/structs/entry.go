@@ -19,14 +19,16 @@ type Entry struct {
 	ID       uint64              `gorm:"primaryKey" json:"-"`
 	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Date     humantime.HumanTime `gorm:"index" json:",omitempty"`
+	DateEnd  humantime.HumanTime `json:",omitempty"`
 	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Summary  string              `gorm:"not null"`
 	IsTodo   bool                `json:"Todo,omitempty"`
 	IsDone   bool                `json:"Done,omitempty"`
 	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
 
-	DateString string `gorm:"-" json:"-"`
-	TodoString string `gorm:"-" json:"-"`
+	DateString    string `gorm:"-" json:"-"`
+	DateEndString string `gorm:"-" json:"-"`
+	TodoString    string `gorm:"-" json:"-"`
 
 	Source *Source `json:",omitempty"`
 }
@@ -60,17 +62,48 @@ func (e *Entry) GenerateRemoteID() {
 
 func (e *Entry) BeforeSave(_ *gorm.DB) error {
 	e.GenerateRemoteID()
+
+	if e.DateEnd.Time.IsZero() {
+		e.DateEnd = e.Date
+	}
+
 	e.DateString = e.FormattedDate()
+	e.DateEndString = e.FormattedDateEnd()
 	e.TodoString = e.FormattedTodo()
 
 	return nil
 }
 
 func (e *Entry) AfterFind(_ *gorm.DB) error {
+	if e.DateEnd.Time.IsZero() {
+		e.DateEnd = e.Date
+	}
+
 	e.DateString = e.FormattedDate()
+	e.DateEndString = e.FormattedDateEnd()
 	e.TodoString = e.FormattedTodo()
 
 	return nil
+}
+
+func (e *Entry) DateRange() string {
+	if e.DateEnd.Time == e.Date.Time {
+		return e.DateString
+	}
+
+	if e.EndsSameDay() {
+		return e.DateString + " - " + e.DateEnd.Format("15:04")
+	}
+
+	if !e.Date.IsToday() && !e.DateEnd.IsToday() {
+		return e.Date.Format("2006-01-02") + " - " + e.DateEnd.Format("2006-01-02")
+	}
+
+	return e.DateString + " - " + e.DateEndString
+}
+
+func (e *Entry) EndsSameDay() bool {
+	return e.DateEnd.Format("2006-01-02") == e.Date.Format("2006-01-02")
 }
 
 func (e *Entry) NewRemoteID() string {
@@ -97,6 +130,10 @@ func (e *Entry) FormattedTodo() string {
 	}
 
 	return "[ ]"
+}
+
+func (e *Entry) FormattedDateEnd() string {
+	return e.DateEnd.FormatDate()
 }
 
 func (e *Entry) FormattedDate() string {
@@ -151,6 +188,7 @@ func (e *Entry) PrintTo(w io.Writer, markdown bool) {
 	t.AddRow("ID", strconv.FormatUint(e.ID, 10))
 	t.AddRow("Remote ID", e.RemoteID)
 	t.AddRow("Date", e.DateString)
+	t.AddRow("Date end", e.DateEndString)
 	t.AddRow("Summary", e.Summary)
 	t.AddRow("TODO", e.TodoString)
 

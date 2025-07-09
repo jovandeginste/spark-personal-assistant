@@ -84,7 +84,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
 			d.Time = d.Time.Add(-24 * time.Hour)
 		}
 
-		e.SetMetadata("End", d.FormatDate())
+		e.DateEnd = d
 	}
 
 	if event.Start != nil && event.End != nil {

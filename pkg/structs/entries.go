@@ -18,7 +18,7 @@ func (es Entries) PrintTo(w io.Writer) {
 	for _, entry := range es {
 		t.AddRow(
 			strconv.FormatUint(entry.ID, 10),
-			entry.DateString,
+			entry.DateRange(),
 			entry.Summary,
 			entry.TodoString,
 			entry.Source.Name,

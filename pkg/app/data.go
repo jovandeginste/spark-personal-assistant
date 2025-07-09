@@ -95,7 +95,11 @@ func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
 		q.Where(
 			q.Where("date is null").Where("is_todo = ?", true).Where("is_done = ?", false),
 		).Or(
-			q.Where("date >= ?", ef.From()).Where("date <= ?", ef.To()),
+			q.Where("date <= ?", ef.To()).Where("date >= ?", ef.From()),
+		).Or(
+			q.Where("date <= ?", ef.To()).Where("date_end >= ?", ef.To()),
+		).Or(
+			q.Where("date <= ?", ef.From()).Where("date_end >= ?", ef.From()),
 		),
 	)
 
