@@ -93,13 +93,9 @@ func (ef *EntryFilter) To() time.Time {
 func (ef *EntryFilter) Query(q *gorm.DB) *gorm.DB {
 	q = q.Where(
 		q.Where(
-			q.Where("date is null").Where("is_todo = ?", true).Where("is_done = ?", false),
+			q.Where("date IS NULL").Where("is_todo = ?", true).Where("is_done = ?", false),
 		).Or(
-			q.Where("date <= ?", ef.To()).Where("date >= ?", ef.From()),
-		).Or(
-			q.Where("date <= ?", ef.To()).Where("date_end >= ?", ef.To()),
-		).Or(
-			q.Where("date <= ?", ef.From()).Where("date_end >= ?", ef.From()),
+			q.Where("date <= ?", ef.To()).Where("date_end >= ?", ef.From()),
 		),
 	)
 
