@@ -77,7 +77,7 @@ func (e *entry) Execute(mc *MatrixConfig, roomID id.RoomID, src *structs.Source)
 
 		de.IsTodo = true
 		de.IsDone = true
-		de.SetMetadata("finished", humantime.Now().FormatDate())
+		de.DateEnd = *humantime.Now()
 
 		if err := mc.App.UpdateEntry(de); err != nil {
 			mc.App.Logger().Error("Failed to update entry", "error", err)
