@@ -29,7 +29,7 @@ import (
 	"strings"
 )
 
-func listFilesConfigToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listFilesConfigToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromPageSize := getValueByPath(fromObject, []string{"pageSize"})
@@ -45,12 +45,12 @@ func listFilesConfigToMldev(ac *apiClient, fromObject map[string]any, parentObje
 	return toObject, nil
 }
 
-func listFilesParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listFilesParametersToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = listFilesConfigToMldev(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = listFilesConfigToMldev(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -61,7 +61,7 @@ func listFilesParametersToMldev(ac *apiClient, fromObject map[string]any, parent
 	return toObject, nil
 }
 
-func fileStatusToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func fileStatusToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromDetails := getValueByPath(fromObject, []string{"details"})
@@ -82,7 +82,7 @@ func fileStatusToMldev(ac *apiClient, fromObject map[string]any, parentObject ma
 	return toObject, nil
 }
 
-func fileToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func fileToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
@@ -152,7 +152,7 @@ func fileToMldev(ac *apiClient, fromObject map[string]any, parentObject map[stri
 
 	fromError := getValueByPath(fromObject, []string{"error"})
 	if fromError != nil {
-		fromError, err = fileStatusToMldev(ac, fromError.(map[string]any), toObject)
+		fromError, err = fileStatusToMldev(fromError.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -163,12 +163,12 @@ func fileToMldev(ac *apiClient, fromObject map[string]any, parentObject map[stri
 	return toObject, nil
 }
 
-func createFileParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func createFileParametersToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromFile := getValueByPath(fromObject, []string{"file"})
 	if fromFile != nil {
-		fromFile, err = fileToMldev(ac, fromFile.(map[string]any), toObject)
+		fromFile, err = fileToMldev(fromFile.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -184,12 +184,12 @@ func createFileParametersToMldev(ac *apiClient, fromObject map[string]any, paren
 	return toObject, nil
 }
 
-func getFileParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func getFileParametersToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
 	if fromName != nil {
-		fromName, err = tFileName(ac, fromName)
+		fromName, err = tFileName(fromName)
 		if err != nil {
 			return nil, err
 		}
@@ -205,12 +205,12 @@ func getFileParametersToMldev(ac *apiClient, fromObject map[string]any, parentOb
 	return toObject, nil
 }
 
-func deleteFileParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func deleteFileParametersToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
 	if fromName != nil {
-		fromName, err = tFileName(ac, fromName)
+		fromName, err = tFileName(fromName)
 		if err != nil {
 			return nil, err
 		}
@@ -226,7 +226,7 @@ func deleteFileParametersToMldev(ac *apiClient, fromObject map[string]any, paren
 	return toObject, nil
 }
 
-func fileStatusFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func fileStatusFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromDetails := getValueByPath(fromObject, []string{"details"})
@@ -247,7 +247,7 @@ func fileStatusFromMldev(ac *apiClient, fromObject map[string]any, parentObject 
 	return toObject, nil
 }
 
-func fileFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func fileFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
@@ -317,7 +317,7 @@ func fileFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[st
 
 	fromError := getValueByPath(fromObject, []string{"error"})
 	if fromError != nil {
-		fromError, err = fileStatusFromMldev(ac, fromError.(map[string]any), toObject)
+		fromError, err = fileStatusFromMldev(fromError.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -328,7 +328,7 @@ func fileFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[st
 	return toObject, nil
 }
 
-func listFilesResponseFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listFilesResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromNextPageToken := getValueByPath(fromObject, []string{"nextPageToken"})
@@ -338,7 +338,7 @@ func listFilesResponseFromMldev(ac *apiClient, fromObject map[string]any, parent
 
 	fromFiles := getValueByPath(fromObject, []string{"files"})
 	if fromFiles != nil {
-		fromFiles, err = applyConverterToSlice(ac, fromFiles.([]any), fileFromMldev)
+		fromFiles, err = applyConverterToSlice(fromFiles.([]any), fileFromMldev)
 		if err != nil {
 			return nil, err
 		}
@@ -349,7 +349,7 @@ func listFilesResponseFromMldev(ac *apiClient, fromObject map[string]any, parent
 	return toObject, nil
 }
 
-func createFileResponseFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func createFileResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromHttpHeaders := getValueByPath(fromObject, []string{"httpHeaders"})
@@ -360,7 +360,7 @@ func createFileResponseFromMldev(ac *apiClient, fromObject map[string]any, paren
 	return toObject, nil
 }
 
-func deleteFileResponseFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func deleteFileResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	return toObject, nil
@@ -377,16 +377,18 @@ func (m Files) list(ctx context.Context, config *ListFilesConfig) (*ListFilesRes
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(ListFilesResponse)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method List is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
@@ -396,7 +398,7 @@ func (m Files) list(ctx context.Context, config *ListFilesConfig) (*ListFilesRes
 		fromConverter = listFilesResponseFromMldev
 	}
 
-	body, err := toConverter(m.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -430,7 +432,7 @@ func (m Files) list(ctx context.Context, config *ListFilesConfig) (*ListFilesRes
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -448,16 +450,18 @@ func (m Files) create(ctx context.Context, file *File, config *CreateFileConfig)
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(CreateFileResponse)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method Create is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
@@ -467,7 +471,7 @@ func (m Files) create(ctx context.Context, file *File, config *CreateFileConfig)
 		fromConverter = createFileResponseFromMldev
 	}
 
-	body, err := toConverter(m.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -501,7 +505,7 @@ func (m Files) create(ctx context.Context, file *File, config *CreateFileConfig)
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -519,16 +523,18 @@ func (m Files) Get(ctx context.Context, name string, config *GetFileConfig) (*Fi
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(File)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method Get is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
@@ -538,7 +544,7 @@ func (m Files) Get(ctx context.Context, name string, config *GetFileConfig) (*Fi
 		fromConverter = fileFromMldev
 	}
 
-	body, err := toConverter(m.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -572,7 +578,7 @@ func (m Files) Get(ctx context.Context, name string, config *GetFileConfig) (*Fi
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -590,16 +596,18 @@ func (m Files) Delete(ctx context.Context, name string, config *DeleteFileConfig
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(DeleteFileResponse)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method Delete is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
@@ -609,7 +617,7 @@ func (m Files) Delete(ctx context.Context, name string, config *DeleteFileConfig
 		fromConverter = deleteFileResponseFromMldev
 	}
 
-	body, err := toConverter(m.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -643,7 +651,7 @@ func (m Files) Delete(ctx context.Context, name string, config *DeleteFileConfig
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -706,7 +714,7 @@ func (m Files) Download(ctx context.Context, uri DownloadURI, config *DownloadFi
 	if uri.uri() == "" {
 		return nil, fmt.Errorf("the resource doesn't support download")
 	}
-	fileName, err := tFileName(m.apiClient, uri.uri())
+	fileName, err := tFileName(uri.uri())
 	if err != nil {
 		return nil, err
 	}

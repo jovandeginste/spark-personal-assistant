@@ -1,7 +1,7 @@
-# cloud.google.com/go v0.121.0
+# cloud.google.com/go v0.121.3
 ## explicit; go 1.23.0
 cloud.google.com/go/civil
-# cloud.google.com/go/auth v0.16.1
+# cloud.google.com/go/auth v0.16.2
 ## explicit; go 1.23.0
 cloud.google.com/go/auth
 cloud.google.com/go/auth/credentials
@@ -16,8 +16,8 @@ cloud.google.com/go/auth/internal/credsfile
 cloud.google.com/go/auth/internal/jwt
 cloud.google.com/go/auth/internal/transport
 cloud.google.com/go/auth/internal/transport/cert
-# cloud.google.com/go/compute/metadata v0.6.0
-## explicit; go 1.21
+# cloud.google.com/go/compute/metadata v0.7.0
+## explicit; go 1.23.0
 cloud.google.com/go/compute/metadata
 # filippo.io/edwards25519 v1.1.0
 ## explicit; go 1.20
@@ -90,14 +90,14 @@ github.com/go-audio/riff
 # github.com/go-audio/wav v1.1.0
 ## explicit; go 1.13
 github.com/go-audio/wav
-# github.com/go-logr/logr v1.4.2
+# github.com/go-logr/logr v1.4.3
 ## explicit; go 1.18
 github.com/go-logr/logr
 github.com/go-logr/logr/funcr
 # github.com/go-logr/stdr v1.2.2
 ## explicit; go 1.16
 github.com/go-logr/stdr
-# github.com/go-viper/mapstructure/v2 v2.2.1
+# github.com/go-viper/mapstructure/v2 v2.3.0
 ## explicit; go 1.18
 github.com/go-viper/mapstructure/v2
 github.com/go-viper/mapstructure/v2/internal/errors
@@ -147,8 +147,8 @@ github.com/google/uuid
 ## explicit; go 1.23.0
 github.com/googleapis/enterprise-certificate-proxy/client
 github.com/googleapis/enterprise-certificate-proxy/client/util
-# github.com/googleapis/gax-go/v2 v2.14.1
-## explicit; go 1.21
+# github.com/googleapis/gax-go/v2 v2.15.0
+## explicit; go 1.23.0
 github.com/googleapis/gax-go/v2/internallog
 github.com/googleapis/gax-go/v2/internallog/internal
 # github.com/gorilla/websocket v1.5.3
@@ -166,7 +166,7 @@ github.com/jinzhu/inflection
 # github.com/jinzhu/now v1.1.5
 ## explicit; go 1.12
 github.com/jinzhu/now
-# github.com/jovandeginste/workout-tracker/v2 v2.2.3-0.20250425120601-2cfaa95db35d
+# github.com/jovandeginste/workout-tracker/v2 v2.4.0
 ## explicit; go 1.24.1
 github.com/jovandeginste/workout-tracker/v2/pkg/geocoder
 # github.com/json-iterator/go v1.1.12
@@ -213,14 +213,15 @@ github.com/modern-go/reflect2
 # github.com/ncruces/go-strftime v0.1.9
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
-# github.com/ollama/ollama v0.6.8
+# github.com/ollama/ollama v0.9.6
 ## explicit; go 1.24.0
 github.com/ollama/ollama/api
+github.com/ollama/ollama/auth
 github.com/ollama/ollama/envconfig
 github.com/ollama/ollama/format
 github.com/ollama/ollama/types/model
 github.com/ollama/ollama/version
-# github.com/openai/openai-go v0.1.0-beta.10
+# github.com/openai/openai-go v1.10.1
 ## explicit; go 1.21
 github.com/openai/openai-go
 github.com/openai/openai-go/internal
@@ -231,16 +232,17 @@ github.com/openai/openai-go/internal/apiquery
 github.com/openai/openai-go/internal/encoding/json
 github.com/openai/openai-go/internal/encoding/json/sentinel
 github.com/openai/openai-go/internal/encoding/json/shims
-github.com/openai/openai-go/internal/param
+github.com/openai/openai-go/internal/paramutil
 github.com/openai/openai-go/internal/requestconfig
 github.com/openai/openai-go/option
 github.com/openai/openai-go/packages/pagination
 github.com/openai/openai-go/packages/param
-github.com/openai/openai-go/packages/resp
+github.com/openai/openai-go/packages/respjson
 github.com/openai/openai-go/packages/ssestream
 github.com/openai/openai-go/responses
 github.com/openai/openai-go/shared
 github.com/openai/openai-go/shared/constant
+github.com/openai/openai-go/webhooks
 # github.com/orcaman/writerseeker v0.0.0-20200621085525-1d3f536ff85e
 ## explicit
 github.com/orcaman/writerseeker
@@ -283,9 +285,10 @@ github.com/sourcegraph/conc/panics
 github.com/spf13/afero
 github.com/spf13/afero/internal/common
 github.com/spf13/afero/mem
-# github.com/spf13/cast v1.8.0
-## explicit; go 1.19
+# github.com/spf13/cast v1.9.2
+## explicit; go 1.21.0
 github.com/spf13/cast
+github.com/spf13/cast/internal
 # github.com/spf13/cobra v1.9.1
 ## explicit; go 1.15
 github.com/spf13/cobra
@@ -335,7 +338,7 @@ github.com/yaegashi/wtz.go
 # github.com/yarlson/pin v0.9.1
 ## explicit; go 1.11
 github.com/yarlson/pin
-# github.com/yuin/goldmark v1.7.11
+# github.com/yuin/goldmark v1.7.12
 ## explicit; go 1.22
 github.com/yuin/goldmark
 github.com/yuin/goldmark/ast
@@ -346,7 +349,7 @@ github.com/yuin/goldmark/renderer
 github.com/yuin/goldmark/renderer/html
 github.com/yuin/goldmark/text
 github.com/yuin/goldmark/util
-# go.mau.fi/util v0.8.7
+# go.mau.fi/util v0.8.8
 ## explicit; go 1.23.0
 go.mau.fi/util/base58
 go.mau.fi/util/confusable
@@ -370,32 +373,33 @@ go.mau.fi/util/retryafter
 ## explicit; go 1.22.0
 go.opentelemetry.io/auto/sdk
 go.opentelemetry.io/auto/sdk/internal/telemetry
-# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.62.0
+## explicit; go 1.23.0
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/request
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconv
 go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp/internal/semconvutil
-# go.opentelemetry.io/otel v1.35.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/otel v1.37.0
+## explicit; go 1.23.0
 go.opentelemetry.io/otel
 go.opentelemetry.io/otel/attribute
+go.opentelemetry.io/otel/attribute/internal
 go.opentelemetry.io/otel/baggage
 go.opentelemetry.io/otel/codes
-go.opentelemetry.io/otel/internal
-go.opentelemetry.io/otel/internal/attribute
 go.opentelemetry.io/otel/internal/baggage
 go.opentelemetry.io/otel/internal/global
 go.opentelemetry.io/otel/propagation
 go.opentelemetry.io/otel/semconv/v1.20.0
 go.opentelemetry.io/otel/semconv/v1.26.0
-# go.opentelemetry.io/otel/metric v1.35.0
-## explicit; go 1.22.0
+go.opentelemetry.io/otel/semconv/v1.34.0
+go.opentelemetry.io/otel/semconv/v1.34.0/httpconv
+# go.opentelemetry.io/otel/metric v1.37.0
+## explicit; go 1.23.0
 go.opentelemetry.io/otel/metric
 go.opentelemetry.io/otel/metric/embedded
 go.opentelemetry.io/otel/metric/noop
-# go.opentelemetry.io/otel/trace v1.35.0
-## explicit; go 1.22.0
+# go.opentelemetry.io/otel/trace v1.37.0
+## explicit; go 1.23.0
 go.opentelemetry.io/otel/trace
 go.opentelemetry.io/otel/trace/embedded
 go.opentelemetry.io/otel/trace/internal/telemetry
@@ -403,10 +407,11 @@ go.opentelemetry.io/otel/trace/noop
 # go.uber.org/multierr v1.11.0
 ## explicit; go 1.19
 go.uber.org/multierr
-# golang.org/x/crypto v0.38.0
+# golang.org/x/crypto v0.40.0
 ## explicit; go 1.23.0
 golang.org/x/crypto/acme
 golang.org/x/crypto/acme/autocert
+golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/chacha20poly1305
 golang.org/x/crypto/cryptobyte
@@ -416,11 +421,13 @@ golang.org/x/crypto/hkdf
 golang.org/x/crypto/internal/alias
 golang.org/x/crypto/internal/poly1305
 golang.org/x/crypto/pbkdf2
-# golang.org/x/exp v0.0.0-20250506013437-ce4c2cf36ca6
+golang.org/x/crypto/ssh
+golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
+# golang.org/x/exp v0.0.0-20250711185948-6ae5c78190dc
 ## explicit; go 1.23.0
 golang.org/x/exp/constraints
 golang.org/x/exp/maps
-# golang.org/x/net v0.40.0
+# golang.org/x/net v0.42.0
 ## explicit; go 1.23.0
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -433,17 +440,17 @@ golang.org/x/net/idna
 golang.org/x/net/internal/httpcommon
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.33.0
+# golang.org/x/sys v0.34.0
 ## explicit; go 1.23.0
 golang.org/x/sys/cpu
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.32.0
+# golang.org/x/term v0.33.0
 ## explicit; go 1.23.0
 golang.org/x/term
-# golang.org/x/text v0.25.0
+# golang.org/x/text v0.27.0
 ## explicit; go 1.23.0
 golang.org/x/text/cases
 golang.org/x/text/encoding
@@ -467,17 +474,17 @@ golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
-# golang.org/x/time v0.11.0
+# golang.org/x/time v0.12.0
 ## explicit; go 1.23.0
 golang.org/x/time/rate
-# google.golang.org/genai v1.4.0
+# google.golang.org/genai v1.15.0
 ## explicit; go 1.23
 google.golang.org/genai
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20250505200425-f936aa4a68b2
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20250707201910-8d1bb00bc6a7
 ## explicit; go 1.23.0
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.72.0
-## explicit; go 1.23
+# google.golang.org/grpc v1.73.0
+## explicit; go 1.23.0
 google.golang.org/grpc
 google.golang.org/grpc/attributes
 google.golang.org/grpc/backoff
@@ -585,7 +592,7 @@ gopkg.in/yaml.v2
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
-# gorm.io/gorm v1.26.1
+# gorm.io/gorm v1.30.0
 ## explicit; go 1.18
 gorm.io/gorm
 gorm.io/gorm/callbacks
@@ -596,7 +603,7 @@ gorm.io/gorm/logger
 gorm.io/gorm/migrator
 gorm.io/gorm/schema
 gorm.io/gorm/utils
-# maunium.net/go/mautrix v0.24.0
+# maunium.net/go/mautrix v0.24.1
 ## explicit; go 1.23.0
 maunium.net/go/mautrix
 maunium.net/go/mautrix/crypto
@@ -630,7 +637,7 @@ maunium.net/go/mautrix/format/mdext
 maunium.net/go/mautrix/id
 maunium.net/go/mautrix/pushrules
 maunium.net/go/mautrix/sqlstatestore
-# modernc.org/libc v1.65.3
+# modernc.org/libc v1.66.3
 ## explicit; go 1.23.0
 modernc.org/libc
 modernc.org/libc/errno
@@ -661,9 +668,9 @@ modernc.org/libc/wctype
 # modernc.org/mathutil v1.7.1
 ## explicit; go 1.21
 modernc.org/mathutil
-# modernc.org/memory v1.10.0
+# modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.37.0
+# modernc.org/sqlite v1.38.0
 ## explicit; go 1.23.0
 modernc.org/sqlite/lib

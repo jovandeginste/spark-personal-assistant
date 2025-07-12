@@ -23,7 +23,7 @@ import (
 	"net/http"
 )
 
-func createCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func createCachedContentConfigToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromTtl := getValueByPath(fromObject, []string{"ttl"})
@@ -43,12 +43,12 @@ func createCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, 
 
 	fromContents := getValueByPath(fromObject, []string{"contents"})
 	if fromContents != nil {
-		fromContents, err = tContents(ac, fromContents)
+		fromContents, err = tContents(fromContents)
 		if err != nil {
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSlice(ac, fromContents.([]any), contentToMldev)
+		fromContents, err = applyConverterToSlice(fromContents.([]any), contentToMldev)
 		if err != nil {
 			return nil, err
 		}
@@ -58,12 +58,12 @@ func createCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, 
 
 	fromSystemInstruction := getValueByPath(fromObject, []string{"systemInstruction"})
 	if fromSystemInstruction != nil {
-		fromSystemInstruction, err = tContent(ac, fromSystemInstruction)
+		fromSystemInstruction, err = tContent(fromSystemInstruction)
 		if err != nil {
 			return nil, err
 		}
 
-		fromSystemInstruction, err = contentToMldev(ac, fromSystemInstruction.(map[string]any), toObject)
+		fromSystemInstruction, err = contentToMldev(fromSystemInstruction.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -73,7 +73,7 @@ func createCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, 
 
 	fromTools := getValueByPath(fromObject, []string{"tools"})
 	if fromTools != nil {
-		fromTools, err = applyConverterToSlice(ac, fromTools.([]any), toolToMldev)
+		fromTools, err = applyConverterToSlice(fromTools.([]any), toolToMldev)
 		if err != nil {
 			return nil, err
 		}
@@ -83,12 +83,16 @@ func createCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, 
 
 	fromToolConfig := getValueByPath(fromObject, []string{"toolConfig"})
 	if fromToolConfig != nil {
-		fromToolConfig, err = toolConfigToMldev(ac, fromToolConfig.(map[string]any), toObject)
+		fromToolConfig, err = toolConfigToMldev(fromToolConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
 
 		setValueByPath(parentObject, []string{"toolConfig"}, fromToolConfig)
+	}
+
+	if getValueByPath(fromObject, []string{"kmsKeyName"}) != nil {
+		return nil, fmt.Errorf("kmsKeyName parameter is not supported in Gemini API")
 	}
 
 	return toObject, nil
@@ -109,7 +113,7 @@ func createCachedContentParametersToMldev(ac *apiClient, fromObject map[string]a
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = createCachedContentConfigToMldev(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = createCachedContentConfigToMldev(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -162,7 +166,7 @@ func deleteCachedContentParametersToMldev(ac *apiClient, fromObject map[string]a
 	return toObject, nil
 }
 
-func updateCachedContentConfigToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func updateCachedContentConfigToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromTtl := getValueByPath(fromObject, []string{"ttl"})
@@ -193,7 +197,7 @@ func updateCachedContentParametersToMldev(ac *apiClient, fromObject map[string]a
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = updateCachedContentConfigToMldev(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = updateCachedContentConfigToMldev(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -204,7 +208,7 @@ func updateCachedContentParametersToMldev(ac *apiClient, fromObject map[string]a
 	return toObject, nil
 }
 
-func listCachedContentsConfigToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsConfigToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromPageSize := getValueByPath(fromObject, []string{"pageSize"})
@@ -220,12 +224,12 @@ func listCachedContentsConfigToMldev(ac *apiClient, fromObject map[string]any, p
 	return toObject, nil
 }
 
-func listCachedContentsParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsParametersToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = listCachedContentsConfigToMldev(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = listCachedContentsConfigToMldev(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +240,7 @@ func listCachedContentsParametersToMldev(ac *apiClient, fromObject map[string]an
 	return toObject, nil
 }
 
-func createCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func createCachedContentConfigToVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromTtl := getValueByPath(fromObject, []string{"ttl"})
@@ -256,12 +260,12 @@ func createCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any,
 
 	fromContents := getValueByPath(fromObject, []string{"contents"})
 	if fromContents != nil {
-		fromContents, err = tContents(ac, fromContents)
+		fromContents, err = tContents(fromContents)
 		if err != nil {
 			return nil, err
 		}
 
-		fromContents, err = applyConverterToSlice(ac, fromContents.([]any), contentToVertex)
+		fromContents, err = applyConverterToSlice(fromContents.([]any), contentToVertex)
 		if err != nil {
 			return nil, err
 		}
@@ -271,12 +275,12 @@ func createCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any,
 
 	fromSystemInstruction := getValueByPath(fromObject, []string{"systemInstruction"})
 	if fromSystemInstruction != nil {
-		fromSystemInstruction, err = tContent(ac, fromSystemInstruction)
+		fromSystemInstruction, err = tContent(fromSystemInstruction)
 		if err != nil {
 			return nil, err
 		}
 
-		fromSystemInstruction, err = contentToVertex(ac, fromSystemInstruction.(map[string]any), toObject)
+		fromSystemInstruction, err = contentToVertex(fromSystemInstruction.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -286,7 +290,7 @@ func createCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any,
 
 	fromTools := getValueByPath(fromObject, []string{"tools"})
 	if fromTools != nil {
-		fromTools, err = applyConverterToSlice(ac, fromTools.([]any), toolToVertex)
+		fromTools, err = applyConverterToSlice(fromTools.([]any), toolToVertex)
 		if err != nil {
 			return nil, err
 		}
@@ -296,12 +300,17 @@ func createCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any,
 
 	fromToolConfig := getValueByPath(fromObject, []string{"toolConfig"})
 	if fromToolConfig != nil {
-		fromToolConfig, err = toolConfigToVertex(ac, fromToolConfig.(map[string]any), toObject)
+		fromToolConfig, err = toolConfigToVertex(fromToolConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
 
 		setValueByPath(parentObject, []string{"toolConfig"}, fromToolConfig)
+	}
+
+	fromKmsKeyName := getValueByPath(fromObject, []string{"kmsKeyName"})
+	if fromKmsKeyName != nil {
+		setValueByPath(parentObject, []string{"encryption_spec", "kmsKeyName"}, fromKmsKeyName)
 	}
 
 	return toObject, nil
@@ -322,7 +331,7 @@ func createCachedContentParametersToVertex(ac *apiClient, fromObject map[string]
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = createCachedContentConfigToVertex(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = createCachedContentConfigToVertex(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -375,7 +384,7 @@ func deleteCachedContentParametersToVertex(ac *apiClient, fromObject map[string]
 	return toObject, nil
 }
 
-func updateCachedContentConfigToVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func updateCachedContentConfigToVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromTtl := getValueByPath(fromObject, []string{"ttl"})
@@ -406,7 +415,7 @@ func updateCachedContentParametersToVertex(ac *apiClient, fromObject map[string]
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = updateCachedContentConfigToVertex(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = updateCachedContentConfigToVertex(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -417,7 +426,7 @@ func updateCachedContentParametersToVertex(ac *apiClient, fromObject map[string]
 	return toObject, nil
 }
 
-func listCachedContentsConfigToVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsConfigToVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromPageSize := getValueByPath(fromObject, []string{"pageSize"})
@@ -433,12 +442,12 @@ func listCachedContentsConfigToVertex(ac *apiClient, fromObject map[string]any, 
 	return toObject, nil
 }
 
-func listCachedContentsParametersToVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsParametersToVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromConfig := getValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
-		fromConfig, err = listCachedContentsConfigToVertex(ac, fromConfig.(map[string]any), toObject)
+		fromConfig, err = listCachedContentsConfigToVertex(fromConfig.(map[string]any), toObject)
 		if err != nil {
 			return nil, err
 		}
@@ -449,7 +458,7 @@ func listCachedContentsParametersToVertex(ac *apiClient, fromObject map[string]a
 	return toObject, nil
 }
 
-func cachedContentFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func cachedContentFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
@@ -490,13 +499,13 @@ func cachedContentFromMldev(ac *apiClient, fromObject map[string]any, parentObje
 	return toObject, nil
 }
 
-func deleteCachedContentResponseFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func deleteCachedContentResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	return toObject, nil
 }
 
-func listCachedContentsResponseFromMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromNextPageToken := getValueByPath(fromObject, []string{"nextPageToken"})
@@ -506,7 +515,7 @@ func listCachedContentsResponseFromMldev(ac *apiClient, fromObject map[string]an
 
 	fromCachedContents := getValueByPath(fromObject, []string{"cachedContents"})
 	if fromCachedContents != nil {
-		fromCachedContents, err = applyConverterToSlice(ac, fromCachedContents.([]any), cachedContentFromMldev)
+		fromCachedContents, err = applyConverterToSlice(fromCachedContents.([]any), cachedContentFromMldev)
 		if err != nil {
 			return nil, err
 		}
@@ -517,7 +526,7 @@ func listCachedContentsResponseFromMldev(ac *apiClient, fromObject map[string]an
 	return toObject, nil
 }
 
-func cachedContentFromVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func cachedContentFromVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromName := getValueByPath(fromObject, []string{"name"})
@@ -558,13 +567,13 @@ func cachedContentFromVertex(ac *apiClient, fromObject map[string]any, parentObj
 	return toObject, nil
 }
 
-func deleteCachedContentResponseFromVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func deleteCachedContentResponseFromVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	return toObject, nil
 }
 
-func listCachedContentsResponseFromVertex(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+func listCachedContentsResponseFromVertex(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
 	fromNextPageToken := getValueByPath(fromObject, []string{"nextPageToken"})
@@ -574,7 +583,7 @@ func listCachedContentsResponseFromVertex(ac *apiClient, fromObject map[string]a
 
 	fromCachedContents := getValueByPath(fromObject, []string{"cachedContents"})
 	if fromCachedContents != nil {
-		fromCachedContents, err = applyConverterToSlice(ac, fromCachedContents.([]any), cachedContentFromVertex)
+		fromCachedContents, err = applyConverterToSlice(fromCachedContents.([]any), cachedContentFromVertex)
 		if err != nil {
 			return nil, err
 		}
@@ -600,15 +609,17 @@ func (m Caches) Create(ctx context.Context, model string, config *CreateCachedCo
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(CachedContent)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = createCachedContentParametersToVertex
@@ -652,7 +663,7 @@ func (m Caches) Create(ctx context.Context, model string, config *CreateCachedCo
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -671,15 +682,17 @@ func (m Caches) Get(ctx context.Context, name string, config *GetCachedContentCo
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(CachedContent)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = getCachedContentParametersToVertex
@@ -723,7 +736,7 @@ func (m Caches) Get(ctx context.Context, name string, config *GetCachedContentCo
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -742,15 +755,17 @@ func (m Caches) Delete(ctx context.Context, name string, config *DeleteCachedCon
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(DeleteCachedContentResponse)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = deleteCachedContentParametersToVertex
@@ -794,7 +809,7 @@ func (m Caches) Delete(ctx context.Context, name string, config *DeleteCachedCon
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -813,15 +828,17 @@ func (m Caches) Update(ctx context.Context, name string, config *UpdateCachedCon
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(CachedContent)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = updateCachedContentParametersToVertex
@@ -865,7 +882,7 @@ func (m Caches) Update(ctx context.Context, name string, config *UpdateCachedCon
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -883,16 +900,18 @@ func (m Caches) list(ctx context.Context, config *ListCachedContentsConfig) (*Li
 	deepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
-	if config == nil {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, nil)
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
 	} else {
-		httpOptions = mergeHTTPOptions(m.apiClient.clientConfig, config.HTTPOptions)
-		config.HTTPOptions = nil
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
 	}
 	var response = new(ListCachedContentsResponse)
 	var responseMap map[string]any
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if m.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = listCachedContentsParametersToVertex
 		fromConverter = listCachedContentsResponseFromVertex
@@ -901,7 +920,7 @@ func (m Caches) list(ctx context.Context, config *ListCachedContentsConfig) (*Li
 		fromConverter = listCachedContentsResponseFromMldev
 	}
 
-	body, err := toConverter(m.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -935,7 +954,7 @@ func (m Caches) list(ctx context.Context, config *ListCachedContentsConfig) (*Li
 	if err != nil {
 		return nil, err
 	}
-	responseMap, err = fromConverter(m.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -19,7 +19,7 @@ import (
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/pagination"
 	"github.com/openai/openai-go/packages/param"
-	"github.com/openai/openai-go/packages/resp"
+	"github.com/openai/openai-go/packages/respjson"
 	"github.com/openai/openai-go/shared/constant"
 )
 
@@ -134,13 +134,12 @@ type FileDeleted struct {
 	ID      string        `json:"id,required"`
 	Deleted bool          `json:"deleted,required"`
 	Object  constant.File `json:"object,required"`
-	// Metadata for the response, check the presence of optional fields with the
-	// [resp.Field.IsPresent] method.
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		ID          resp.Field
-		Deleted     resp.Field
-		Object      resp.Field
-		ExtraFields map[string]resp.Field
+		ID          respjson.Field
+		Deleted     respjson.Field
+		Object      respjson.Field
+		ExtraFields map[string]respjson.Field
 		raw         string
 	} `json:"-"`
 }
@@ -164,11 +163,11 @@ type FileObject struct {
 	// The object type, which is always `file`.
 	Object constant.File `json:"object,required"`
 	// The intended purpose of the file. Supported values are `assistants`,
-	// `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`
-	// and `vision`.
+	// `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`,
+	// `vision`, and `user_data`.
 	//
 	// Any of "assistants", "assistants_output", "batch", "batch_output", "fine-tune",
-	// "fine-tune-results", "vision".
+	// "fine-tune-results", "vision", "user_data".
 	Purpose FileObjectPurpose `json:"purpose,required"`
 	// Deprecated. The current status of the file, which can be either `uploaded`,
 	// `processed`, or `error`.
@@ -184,19 +183,18 @@ type FileObject struct {
 	//
 	// Deprecated: deprecated
 	StatusDetails string `json:"status_details"`
-	// Metadata for the response, check the presence of optional fields with the
-	// [resp.Field.IsPresent] method.
+	// JSON contains metadata for fields, check presence with [respjson.Field.Valid].
 	JSON struct {
-		ID            resp.Field
-		Bytes         resp.Field
-		CreatedAt     resp.Field
-		Filename      resp.Field
-		Object        resp.Field
-		Purpose       resp.Field
-		Status        resp.Field
-		ExpiresAt     resp.Field
-		StatusDetails resp.Field
-		ExtraFields   map[string]resp.Field
+		ID            respjson.Field
+		Bytes         respjson.Field
+		CreatedAt     respjson.Field
+		Filename      respjson.Field
+		Object        respjson.Field
+		Purpose       respjson.Field
+		Status        respjson.Field
+		ExpiresAt     respjson.Field
+		StatusDetails respjson.Field
+		ExtraFields   map[string]respjson.Field
 		raw           string
 	} `json:"-"`
 }
@@ -208,8 +206,8 @@ func (r *FileObject) UnmarshalJSON(data []byte) error {
 }
 
 // The intended purpose of the file. Supported values are `assistants`,
-// `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`
-// and `vision`.
+// `assistants_output`, `batch`, `batch_output`, `fine-tune`, `fine-tune-results`,
+// `vision`, and `user_data`.
 type FileObjectPurpose string
 
 const (
@@ -220,6 +218,7 @@ const (
 	FileObjectPurposeFineTune         FileObjectPurpose = "fine-tune"
 	FileObjectPurposeFineTuneResults  FileObjectPurpose = "fine-tune-results"
 	FileObjectPurposeVision           FileObjectPurpose = "vision"
+	FileObjectPurposeUserData         FileObjectPurpose = "user_data"
 )
 
 // Deprecated. The current status of the file, which can be either `uploaded`,
@@ -249,7 +248,7 @@ const (
 
 type FileNewParams struct {
 	// The File object (not file name) to be uploaded.
-	File io.Reader `json:"file,required" format:"binary"`
+	File io.Reader `json:"file,omitzero,required" format:"binary"`
 	// The intended purpose of the uploaded file. One of: - `assistants`: Used in the
 	// Assistants API - `batch`: Used in the Batch API - `fine-tune`: Used for
 	// fine-tuning - `vision`: Images used for vision fine-tuning - `user_data`:
@@ -260,14 +259,13 @@ type FileNewParams struct {
 	paramObj
 }
 
-// IsPresent returns true if the field's value is not omitted and not the JSON
-// "null". To check if this field is omitted, use [param.IsOmitted].
-func (f FileNewParams) IsPresent() bool { return !param.IsOmitted(f) && !f.IsNull() }
-
 func (r FileNewParams) MarshalMultipart() (data []byte, contentType string, err error) {
 	buf := bytes.NewBuffer(nil)
 	writer := multipart.NewWriter(buf)
 	err = apiform.MarshalRoot(r, writer)
+	if err == nil {
+		err = apiform.WriteExtras(writer, r.ExtraFields())
+	}
 	if err != nil {
 		writer.Close()
 		return nil, "", err
@@ -297,10 +295,6 @@ type FileListParams struct {
 	Order FileListParamsOrder `query:"order,omitzero" json:"-"`
 	paramObj
 }
-
-// IsPresent returns true if the field's value is not omitted and not the JSON
-// "null". To check if this field is omitted, use [param.IsOmitted].
-func (f FileListParams) IsPresent() bool { return !param.IsOmitted(f) && !f.IsNull() }
 
 // URLQuery serializes [FileListParams]'s query parameters as `url.Values`.
 func (r FileListParams) URLQuery() (v url.Values, err error) {

@@ -6,6 +6,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/openai/openai-go/internal/apijson"
 	"github.com/openai/openai-go/internal/requestconfig"
 	"github.com/openai/openai-go/option"
 	"github.com/openai/openai-go/packages/param"
@@ -69,16 +70,20 @@ type AudioSpeechNewParams struct {
 	//
 	// Any of "mp3", "opus", "aac", "flac", "wav", "pcm".
 	ResponseFormat AudioSpeechNewParamsResponseFormat `json:"response_format,omitzero"`
+	// The format to stream the audio in. Supported formats are `sse` and `audio`.
+	// `sse` is not supported for `tts-1` or `tts-1-hd`.
+	//
+	// Any of "sse", "audio".
+	StreamFormat AudioSpeechNewParamsStreamFormat `json:"stream_format,omitzero"`
 	paramObj
 }
-
-// IsPresent returns true if the field's value is not omitted and not the JSON
-// "null". To check if this field is omitted, use [param.IsOmitted].
-func (f AudioSpeechNewParams) IsPresent() bool { return !param.IsOmitted(f) && !f.IsNull() }
 
 func (r AudioSpeechNewParams) MarshalJSON() (data []byte, err error) {
 	type shadow AudioSpeechNewParams
 	return param.MarshalObject(r, (*shadow)(&r))
+}
+func (r *AudioSpeechNewParams) UnmarshalJSON(data []byte) error {
+	return apijson.UnmarshalRoot(data, r)
 }
 
 // The voice to use when generating the audio. Supported voices are `alloy`, `ash`,
@@ -112,4 +117,13 @@ const (
 	AudioSpeechNewParamsResponseFormatFLAC AudioSpeechNewParamsResponseFormat = "flac"
 	AudioSpeechNewParamsResponseFormatWAV  AudioSpeechNewParamsResponseFormat = "wav"
 	AudioSpeechNewParamsResponseFormatPCM  AudioSpeechNewParamsResponseFormat = "pcm"
+)
+
+// The format to stream the audio in. Supported formats are `sse` and `audio`.
+// `sse` is not supported for `tts-1` or `tts-1-hd`.
+type AudioSpeechNewParamsStreamFormat string
+
+const (
+	AudioSpeechNewParamsStreamFormatSSE   AudioSpeechNewParamsStreamFormat = "sse"
+	AudioSpeechNewParamsStreamFormatAudio AudioSpeechNewParamsStreamFormat = "audio"
 )

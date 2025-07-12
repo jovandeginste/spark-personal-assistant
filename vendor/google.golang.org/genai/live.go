@@ -191,13 +191,13 @@ func (s *Session) SendRealtimeInput(input LiveRealtimeInput) error {
 		return err
 	}
 
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if s.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = liveSendRealtimeInputParametersToVertex
 	} else {
 		toConverter = liveSendRealtimeInputParametersToMldev
 	}
-	body, err := toConverter(s.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return err
 	}
@@ -235,13 +235,13 @@ func (s *Session) send(input *LiveClientMessage) error {
 		return err
 	}
 
-	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if s.apiClient.clientConfig.Backend == BackendVertexAI {
 		toConverter = liveClientMessageToVertex
 	} else {
 		toConverter = liveClientMessageToMldev
 	}
-	body, err := toConverter(s.apiClient, parameterMap, nil)
+	body, err := toConverter(parameterMap, nil)
 	if err != nil {
 		return err
 	}
@@ -273,13 +273,13 @@ func (s *Session) Receive() (*LiveServerMessage, error) {
 		return nil, fmt.Errorf("received error in response: %v", string(msgBytes))
 	}
 
-	var fromConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if s.apiClient.clientConfig.Backend == BackendVertexAI {
 		fromConverter = liveServerMessageFromVertex
 	} else {
 		fromConverter = liveServerMessageFromMldev
 	}
-	responseMap, err = fromConverter(s.apiClient, responseMap, nil)
+	responseMap, err = fromConverter(responseMap, nil)
 	if err != nil {
 		return nil, err
 	}

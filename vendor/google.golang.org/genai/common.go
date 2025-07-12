@@ -34,9 +34,11 @@ import (
 //	genai.GenerateContentConfig{Temperature: genai.Ptr(0.5)}
 func Ptr[T any](t T) *T { return &t }
 
-type converterFunc func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+type converterFuncWithClient func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
 
-type transformerFunc[T any] func(*apiClient, T) (T, error)
+type converterFunc func(map[string]any, map[string]any) (map[string]any, error)
+
+type transformerFunc[T any] func(T) (T, error)
 
 // setValueByPath handles setting values within nested maps, including handling array-like structures.
 //
@@ -184,8 +186,8 @@ func formatMap(template string, variables map[string]any) (string, error) {
 	return buffer.String(), nil
 }
 
-// applyConverterToSlice calls converter function to each element of the slice.
-func applyConverterToSlice(ac *apiClient, inputs []any, converter converterFunc) ([]map[string]any, error) {
+// applyConverterToSlice calls converter function (with API client) to each element of the slice.
+func applyConverterToSliceWithClient(ac *apiClient, inputs []any, converter converterFuncWithClient) ([]map[string]any, error) {
 	var outputs []map[string]any
 	for _, object := range inputs {
 		object, err := converter(ac, object.(map[string]any), nil)
@@ -197,11 +199,24 @@ func applyConverterToSlice(ac *apiClient, inputs []any, converter converterFunc)
 	return outputs, nil
 }
 
+// applyConverterToSlice calls converter function to each element of the slice.
+func applyConverterToSlice(inputs []any, converter converterFunc) ([]map[string]any, error) {
+	var outputs []map[string]any
+	for _, object := range inputs {
+		object, err := converter(object.(map[string]any), nil)
+		if err != nil {
+			return nil, err
+		}
+		outputs = append(outputs, object)
+	}
+	return outputs, nil
+}
+
 // applyItemTransformerToSlice calls item transformer function to each element of the slice.
-func applyItemTransformerToSlice[T any](ac *apiClient, inputs []T, itemTransformer transformerFunc[T]) ([]T, error) {
+func applyItemTransformerToSlice[T any](inputs []T, itemTransformer transformerFunc[T]) ([]T, error) {
 	var outputs []T
 	for _, input := range inputs {
-		object, err := itemTransformer(ac, input)
+		object, err := itemTransformer(input)
 		if err != nil {
 			return nil, err
 		}
@@ -276,18 +291,21 @@ func mergeHTTPOptions(clientConfig *ClientConfig, configHTTPOptions *HTTPOptions
 		clientHTTPOptions = &(clientConfig.HTTPOptions)
 	}
 
+	// TODO(b/422842863): Implement a more flexible HTTPOptions merger.
 	result := HTTPOptions{}
 	if clientHTTPOptions == nil && configHTTPOptions == nil {
 		return nil
 	} else if clientHTTPOptions == nil {
 		result = HTTPOptions{
-			BaseURL:    configHTTPOptions.BaseURL,
-			APIVersion: configHTTPOptions.APIVersion,
+			BaseURL:               configHTTPOptions.BaseURL,
+			APIVersion:            configHTTPOptions.APIVersion,
+			ExtrasRequestProvider: configHTTPOptions.ExtrasRequestProvider,
 		}
 	} else {
 		result = HTTPOptions{
-			BaseURL:    clientHTTPOptions.BaseURL,
-			APIVersion: clientHTTPOptions.APIVersion,
+			BaseURL:               clientHTTPOptions.BaseURL,
+			APIVersion:            clientHTTPOptions.APIVersion,
+			ExtrasRequestProvider: clientHTTPOptions.ExtrasRequestProvider,
 		}
 	}
 
@@ -297,6 +315,9 @@ func mergeHTTPOptions(clientConfig *ClientConfig, configHTTPOptions *HTTPOptions
 		}
 		if configHTTPOptions.APIVersion != "" {
 			result.APIVersion = configHTTPOptions.APIVersion
+		}
+		if configHTTPOptions.ExtrasRequestProvider != nil {
+			result.ExtrasRequestProvider = configHTTPOptions.ExtrasRequestProvider
 		}
 	}
 	result.Headers = mergeHeaders(clientHTTPOptions, configHTTPOptions)

@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"log"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -101,31 +102,44 @@ func tCachesModel(ac *apiClient, origin any) (string, error) {
 	return tModelFullName(ac, origin)
 }
 
-func tContent(_ *apiClient, content any) (any, error) {
+func tContent(content any) (any, error) {
 	return content, nil
 }
 
-func tContents(_ *apiClient, contents any) (any, error) {
+func tContents(contents any) (any, error) {
 	return contents, nil
 }
 
-func tTool(_ *apiClient, tool any) (any, error) {
+func tTool(tool any) (any, error) {
 	return tool, nil
 }
 
-func tTools(_ *apiClient, tools any) (any, error) {
+func tTools(tools any) (any, error) {
 	return tools, nil
 }
 
-func tSchema(apiClient *apiClient, origin any) (any, error) {
+func tSchema(origin any) (any, error) {
 	return origin, nil
 }
 
-func tSpeechConfig(_ *apiClient, speechConfig any) (any, error) {
+func tSpeechConfig(speechConfig any) (any, error) {
 	return speechConfig, nil
 }
 
-func tBytes(_ *apiClient, fromImageBytes any) (any, error) {
+func tLiveSpeechConfig(speechConfig any) (any, error) {
+	switch config := speechConfig.(type) {
+	case map[string]any:
+		if _, ok := config["multiSpeakerVoiceConfig"]; ok {
+			return nil, fmt.Errorf("multiSpeakerVoiceConfig is not supported in the live API")
+		}
+		return config, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unsupported speechConfig type: %T", speechConfig)
+	}
+}
+func tBytes(fromImageBytes any) (any, error) {
 	// TODO(b/389133914): Remove dummy bytes converter.
 	return fromImageBytes, nil
 }
@@ -171,7 +185,7 @@ func tModelsURL(ac *apiClient, baseModels any) (string, error) {
 	}
 }
 
-func tExtractModels(ac *apiClient, response any) (any, error) {
+func tExtractModels(response any) (any, error) {
 	switch response := response.(type) {
 	case map[string]any:
 		if models, ok := response["models"]; ok {
@@ -189,7 +203,7 @@ func tExtractModels(ac *apiClient, response any) (any, error) {
 	}
 }
 
-func tFileName(ac *apiClient, name any) (string, error) {
+func tFileName(name any) (string, error) {
 	switch name := name.(type) {
 	case string:
 		{
@@ -215,7 +229,7 @@ func tFileName(ac *apiClient, name any) (string, error) {
 	}
 }
 
-func tBlobs(ac *apiClient, blobs any) (any, error) {
+func tBlobs(blobs any) (any, error) {
 	switch blobs := blobs.(type) {
 	case []any:
 		// The only use case of this tBlobs function is for LiveSendRealtimeInputParameters.Media field.
@@ -225,7 +239,7 @@ func tBlobs(ac *apiClient, blobs any) (any, error) {
 		// applyConverterToSlice(ac, blobs, tBlob)
 		return nil, fmt.Errorf("unimplemented")
 	default:
-		blob, err := tBlob(ac, blobs)
+		blob, err := tBlob(blobs)
 		if err != nil {
 			return nil, err
 		}
@@ -233,11 +247,11 @@ func tBlobs(ac *apiClient, blobs any) (any, error) {
 	}
 }
 
-func tBlob(ac *apiClient, blob any) (any, error) {
+func tBlob(blob any) (any, error) {
 	return blob, nil
 }
 
-func tImageBlob(ac *apiClient, blob any) (any, error) {
+func tImageBlob(blob any) (any, error) {
 	switch blob := blob.(type) {
 	case map[string]any:
 		if strings.HasPrefix(blob["mimeType"].(string), "image/") {
@@ -249,7 +263,7 @@ func tImageBlob(ac *apiClient, blob any) (any, error) {
 	}
 }
 
-func tAudioBlob(ac *apiClient, blob any) (any, error) {
+func tAudioBlob(blob any) (any, error) {
 	switch blob := blob.(type) {
 	case map[string]any:
 		if strings.HasPrefix(blob["mimeType"].(string), "audio/") {
@@ -258,5 +272,54 @@ func tAudioBlob(ac *apiClient, blob any) (any, error) {
 		return nil, fmt.Errorf("Unsupported mime type: %s", blob["mimeType"])
 	default:
 		return nil, fmt.Errorf("tAudioBlob: blob is not a map")
+	}
+}
+
+func tBatchJobSource(src any) (any, error) {
+	return src, nil
+}
+
+func tBatchJobDestination(dest any) (any, error) {
+	return dest, nil
+}
+
+func tBatchJobName(ac *apiClient, name any) (any, error) {
+	var (
+		mldevBatchPattern  = regexp.MustCompile("batches/[^/]+$")
+		vertexBatchPattern = regexp.MustCompile("^projects/[^/]+/locations/[^/]+/batchPredictionJobs/[^/]+$")
+	)
+	// Convert any to string.
+	nameStr := name.(string)
+	if ac.clientConfig.Backend == BackendVertexAI {
+		if vertexBatchPattern.MatchString(nameStr) {
+			parts := strings.Split(nameStr, "/")
+			return parts[len(parts)-1], nil
+		}
+		if _, err := strconv.Atoi(nameStr); err == nil {
+			return nameStr, nil
+		}
+		return nil, fmt.Errorf("Invalid batch job name: %s. Expected format like 'projects/id/locations/id/batchPredictionJobs/id' or 'id'", nameStr)
+	}
+	if mldevBatchPattern.MatchString(nameStr) {
+		parts := strings.Split(nameStr, "/")
+		return parts[len(parts)-1], nil
+	}
+	return nil, fmt.Errorf("Invalid batch job name: %s. Expected format like 'batches/id'", nameStr)
+}
+
+func tJobState(state any) (any, error) {
+	switch state {
+	case "BATCH_STATE_UNSPECIFIED":
+		return "JOB_STATE_UNSPECIFIED", nil
+	case "BATCH_STATE_PENDING":
+		return "JOB_STATE_PENDING", nil
+	case "BATCH_STATE_SUCCEEDED":
+		return "JOB_STATE_SUCCEEDED", nil
+	case "BATCH_STATE_FAILED":
+		return "JOB_STATE_FAILED", nil
+	case "BATCH_STATE_CANCELLED":
+		return "JOB_STATE_CANCELLED", nil
+	default:
+		return state, nil
 	}
 }

@@ -31,8 +31,9 @@ func NewDecoder(res *http.Response) Decoder {
 	if t, ok := decoderTypes[contentType]; ok {
 		decoder = t(res.Body)
 	} else {
-		scanner := bufio.NewScanner(res.Body)
-		decoder = &eventStreamDecoder{rc: res.Body, scn: scanner}
+		scn := bufio.NewScanner(res.Body)
+		scn.Buffer(nil, bufio.MaxScanTokenSize<<9)
+		decoder = &eventStreamDecoder{rc: res.Body, scn: scn}
 	}
 	return decoder
 }
@@ -161,7 +162,7 @@ func (s *Stream[T]) Next() bool {
 			s.done = true
 			continue
 		}
-		
+
 		var nxt T
 		if s.decoder.Event().Type == "" || strings.HasPrefix(s.decoder.Event().Type, "response.") {
 			ep := gjson.GetBytes(s.decoder.Event().Data, "error")
