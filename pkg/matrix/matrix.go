@@ -40,6 +40,7 @@ type msg struct {
 func (mc *MatrixConfig) ConfigureSyncer() {
 	syncer := mc.Client.Syncer.(*mautrix.DefaultSyncer)
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
+		mc.AIData.CleanHistory()
 		body := evt.Content.AsMessage().Body
 
 		mc.App.Logger().Info(
@@ -50,6 +51,7 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 			"id", evt.ID.String(),
 			"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
 			"body", body,
+			"history", len(mc.AIData.ChatHistory),
 		)
 
 		if err := mc.Client.MarkRead(context.Background(), evt.RoomID, evt.ID); err != nil {
@@ -205,8 +207,6 @@ func (mc *MatrixConfig) checkIfTask(input string) (bool, string) {
 }
 
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
-	mc.AIData.CleanHistory()
-
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
