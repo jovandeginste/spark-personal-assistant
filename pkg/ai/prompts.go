@@ -67,8 +67,10 @@ func PromptTask(assistant *AssistantConfig, data any) ([]string, error) {
 	c := []string{
 		"Execute the employer's question.",
 		"Respond with only a JSON array with the following fields for each task:",
-		"- action: one of add, delete, finished",
+		"- action: one of add, update, delete",
+		"- id: the current ID of the exiting when updating",
 		"- todo: true or false depending on whether or not the task is a todo",
+		"- done: true or false depending on whether or not the task is done",
 		"- date:",
 		"    - the date of the task must be performed",
 		"    - either YYYY-MM-DD or YYYY-MM-DD HH:MM",

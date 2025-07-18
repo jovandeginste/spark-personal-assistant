@@ -16,7 +16,7 @@ import (
 )
 
 type Entry struct {
-	ID       uint64              `gorm:"primaryKey" json:"-"`
+	ID       uint64              `gorm:"primaryKey"`
 	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
 	Date     humantime.HumanTime `gorm:"index" json:",omitempty"`
 	DateEnd  humantime.HumanTime `json:",omitempty"`

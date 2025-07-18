@@ -69,6 +69,7 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 		}
 
 		if err := mc.sendResponse(evt.RoomID, evt.Sender, body); err != nil {
+			mc.sendNotice(evt.RoomID, "Failed to send response: "+err.Error())
 			mc.App.Logger().Error("Failed to send response", "error", err)
 		}
 	})
@@ -99,8 +100,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 
 	result, err = mc.calculateResponse(roomID, sender, input)
 	if err != nil {
-		mc.App.Logger().Error("Failed to calculate response", "error", err)
-		result = fmt.Sprintf("Error: %s", err)
+		return err
 	}
 
 	mc.sendMessage(roomID, result)
@@ -216,12 +216,9 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	isTask, _ := mc.checkIfTask(input)
 	if isTask {
-		mc.AIData.ResetHistory()
-
 		mc.sendNotice(roomID, "Calculating tasks...")
 
-		err := mc.performTasks(roomID)
-		if err != nil {
+		if err := mc.performTasks(roomID); err != nil {
 			return "", fmt.Errorf("could not perform task: %w", err)
 		}
 	}
