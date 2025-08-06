@@ -4,7 +4,7 @@ I was inspired by [this post](https://www.geoffreylitt.com/2025/04/12/how-i-made
 How much work would it be to make this myself?
 
 The answer: it's only a few hours of _vibe coding_ to get to a working
-prototype. But then the come all those details...
+prototype. But then come all those details...
 
 Spark is a personal AI assistant. You store information about important (future)
 events in a local database. Spark sends this information to an AI API and
