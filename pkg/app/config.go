@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,7 @@ func (a *App) ReadConfig() error {
 	viper.SetConfigFile(a.ConfigFile)
 
 	if err := viper.ReadInConfig(); err != nil { // Handle errors reading the config file
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		if !errors.Is(err, os.ErrNotExist) {
 			return err
 		}
 	}
