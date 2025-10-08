@@ -180,6 +180,8 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 			return "", nil
 		}
 
+		mc.AIData.ResetHistory()
+
 		switch cmd[1] {
 		case "full":
 			return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
