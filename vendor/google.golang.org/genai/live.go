@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"path"
 
 	"github.com/gorilla/websocket"
 )
@@ -49,6 +50,10 @@ type Session struct {
 // model with the given configuration. It sends the initial
 // setup message and returns a [Session] object representing the connection.
 func (r *Live) Connect(context context.Context, model string, config *LiveConnectConfig) (*Session, error) {
+	// TODO: b/406076143 - Support per request HTTP options.
+	if config != nil && config.HTTPOptions != nil {
+		return nil, fmt.Errorf("live module does not support httpOptions at request-level in LiveConnectConfig yet. Please use the client-level httpOptions configuration instead")
+	}
 	httpOptions := r.apiClient.clientConfig.HTTPOptions
 	if httpOptions.APIVersion == "" {
 		return nil, fmt.Errorf("live module requires APIVersion to be set. You can set APIVersion to v1beta1 for BackendVertexAI or v1apha for BackendGeminiAPI")
@@ -64,7 +69,6 @@ func (r *Live) Connect(context context.Context, model string, config *LiveConnec
 	}
 
 	var u url.URL
-	// TODO(b/406076143): Support function level httpOptions.
 	var header http.Header = mergeHeaders(&httpOptions, nil)
 	if r.apiClient.clientConfig.Backend == BackendVertexAI {
 		token, err := r.apiClient.clientConfig.Credentials.Token(context)
@@ -75,14 +79,17 @@ func (r *Live) Connect(context context.Context, model string, config *LiveConnec
 		u = url.URL{
 			Scheme: scheme,
 			Host:   baseURL.Host,
-			Path:   fmt.Sprintf("%s/ws/google.cloud.aiplatform.%s.LlmBidiService/BidiGenerateContent", baseURL.Path, httpOptions.APIVersion),
+			Path:   path.Join(baseURL.Path, fmt.Sprintf("ws/google.cloud.aiplatform.%s.LlmBidiService/BidiGenerateContent", httpOptions.APIVersion)),
 		}
 	} else {
+		apiKey := r.apiClient.clientConfig.APIKey
+		if apiKey != "" {
+			header.Set("x-goog-api-key", apiKey)
+		}
 		u = url.URL{
-			Scheme:   scheme,
-			Host:     baseURL.Host,
-			Path:     fmt.Sprintf("%s/ws/google.ai.generativelanguage.%s.GenerativeService.BidiGenerateContent", baseURL.Path, httpOptions.APIVersion),
-			RawQuery: fmt.Sprintf("key=%s", r.apiClient.clientConfig.APIKey),
+			Scheme: scheme,
+			Host:   baseURL.Host,
+			Path:   path.Join(baseURL.Path, fmt.Sprintf("ws/google.ai.generativelanguage.%s.GenerativeService.BidiGenerateContent", httpOptions.APIVersion)),
 		}
 	}
 
@@ -276,10 +283,10 @@ func (s *Session) Receive() (*LiveServerMessage, error) {
 	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
 	if s.apiClient.clientConfig.Backend == BackendVertexAI {
 		fromConverter = liveServerMessageFromVertex
-	} else {
-		fromConverter = liveServerMessageFromMldev
 	}
-	responseMap, err = fromConverter(responseMap, nil)
+	if fromConverter != nil {
+		responseMap, err = fromConverter(responseMap, nil)
+	}
 	if err != nil {
 		return nil, err
 	}

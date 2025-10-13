@@ -26,6 +26,7 @@ import (
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"reflect"
 	"runtime"
 	"slices"
 	"strconv"
@@ -130,26 +131,29 @@ func mapToStruct[R any](input map[string]any, output *R) error {
 }
 
 func (ac *apiClient) createAPIURL(suffix, method string, httpOptions *HTTPOptions) (*url.URL, error) {
-	if ac.clientConfig.Backend == BackendVertexAI {
-		queryVertexBaseModel := ac.clientConfig.Backend == BackendVertexAI && method == http.MethodGet && strings.HasPrefix(suffix, "publishers/google/models")
-		if !strings.HasPrefix(suffix, "projects/") && !queryVertexBaseModel {
-			suffix = fmt.Sprintf("projects/%s/locations/%s/%s", ac.clientConfig.Project, ac.clientConfig.Location, suffix)
-		}
-		u, err := url.Parse(fmt.Sprintf("%s/%s/%s", httpOptions.BaseURL, httpOptions.APIVersion, suffix))
-		if err != nil {
-			return nil, fmt.Errorf("createAPIURL: error parsing Vertex AI URL: %w", err)
-		}
-		return u, nil
-	} else {
-		if !strings.Contains(suffix, fmt.Sprintf("/%s/", httpOptions.APIVersion)) {
-			suffix = fmt.Sprintf("%s/%s", httpOptions.APIVersion, suffix)
-		}
-		u, err := url.Parse(fmt.Sprintf("%s/%s", httpOptions.BaseURL, suffix))
-		if err != nil {
-			return nil, fmt.Errorf("createAPIURL: error parsing ML Dev URL: %w", err)
-		}
-		return u, nil
+	path, query, _ := strings.Cut(suffix, "?")
+
+	u, err := url.Parse(httpOptions.BaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("createAPIURL: error parsing base URL: %w", err)
 	}
+
+	var finalURL *url.URL
+	if ac.clientConfig.Backend == BackendVertexAI {
+		queryVertexBaseModel := ac.clientConfig.Backend == BackendVertexAI && method == http.MethodGet && strings.HasPrefix(path, "publishers/google/models")
+		if !strings.HasPrefix(path, "projects/") && !queryVertexBaseModel {
+			path = fmt.Sprintf("projects/%s/locations/%s/%s", ac.clientConfig.Project, ac.clientConfig.Location, path)
+		}
+		finalURL = u.JoinPath(httpOptions.APIVersion, path)
+	} else {
+		if !strings.Contains(path, fmt.Sprintf("/%s/", httpOptions.APIVersion)) {
+			path = fmt.Sprintf("%s/%s", httpOptions.APIVersion, path)
+		}
+		finalURL = u.JoinPath(path)
+	}
+
+	finalURL.RawQuery = query
+	return finalURL, nil
 }
 
 // patchHTTPOptions merges two HttpOptions objects, creating a new one.
@@ -183,6 +187,9 @@ func patchHTTPOptions(options, patchOptions HTTPOptions) (*HTTPOptions, error) {
 	}
 	if patchOptions.ExtrasRequestProvider != nil {
 		copyOption.ExtrasRequestProvider = patchOptions.ExtrasRequestProvider
+	}
+	if patchOptions.ExtraBody != nil {
+		copyOption.ExtraBody = patchOptions.ExtraBody
 	}
 	// Request timeout config overrides client timeout config.
 	// So we need a pointer type so that we know the request timeout
@@ -227,8 +234,11 @@ func buildRequest(ctx context.Context, ac *apiClient, path string, body map[stri
 		return nil, nil, err
 	}
 
+	if patchedHTTPOptions.ExtraBody != nil {
+		recursiveMapMerge(body, patchedHTTPOptions.ExtraBody)
+	}
+
 	if patchedHTTPOptions.ExtrasRequestProvider != nil {
-		log.Printf("Warning: Usage of ExtrasRequestProvider is strongly discouraged. No forward compatibility is guaranteed.")
 		body = httpOptions.ExtrasRequestProvider(body)
 	}
 
@@ -257,6 +267,36 @@ func buildRequest(ctx context.Context, ac *apiClient, path string, body map[stri
 	}
 
 	return req, patchedHTTPOptions, nil
+}
+
+// recursiveMapMerge recursively merges key-value pairs from a source map (`src`)
+// into a destination map (`dest`), modifying `dest` in-place.
+//
+// If a key exists in both maps and both corresponding values are maps
+// of type `map[string]any`, it merges them recursively. Otherwise, the value
+// from `src` overwrites the value in `dest`.
+//
+// The function logs a warning if a key's value in `dest` is overwritten by a
+// value of a different type from `src`.
+func recursiveMapMerge(dest, src map[string]any) {
+	if dest == nil || src == nil {
+		return
+	}
+	for key, value := range src {
+		targetVal, keyExists := dest[key]
+		destMap, isDestMap := targetVal.(map[string]any)
+		srcMap, isSrcMap := value.(map[string]any)
+
+		if keyExists && isDestMap && isSrcMap {
+			recursiveMapMerge(destMap, srcMap)
+		} else if keyExists && targetVal != nil && value != nil &&
+			reflect.TypeOf(targetVal) != reflect.TypeOf(value) {
+			log.Printf("Warning: Type mismatch for key '%s'. Existing type: %T, new type: %T. Overwriting.", key, targetVal, value)
+			dest[key] = value
+		} else {
+			dest[key] = value
+		}
+	}
 }
 
 // TODO(b/428730853): HTTP Client timeout should be considered.
@@ -326,13 +366,18 @@ func deserializeUnaryResponse(resp *http.Response) (map[string]any, error) {
 			return nil, fmt.Errorf("deserializeUnaryResponse: error unmarshalling response: %w\n%s", err, respBody)
 		}
 	}
-	output["httpHeaders"] = resp.Header
+
+	httpResponse := map[string]any{
+		"headers": resp.Header,
+	}
+	output["sdkHttpResponse"] = httpResponse
 	return output, nil
 }
 
 type responseStream[R any] struct {
 	r  *bufio.Scanner
 	rc io.ReadCloser
+	h  http.Header
 }
 
 func iterateResponseStream[R any](rs *responseStream[R], responseConverter func(responseMap map[string]any) (*R, error)) iter.Seq2[*R, error] {
@@ -371,7 +416,19 @@ func iterateResponseStream[R any](rs *responseStream[R], responseConverter func(
 					}
 				}
 
-				// Step 3: yield the response.
+				// Step 3: Add the sdkHttpResponse to the response.
+				v := reflect.ValueOf(resp).Elem()
+				if v.Kind() == reflect.Struct {
+					field := v.FieldByName("SDKHTTPResponse")
+					if field.IsValid() && field.CanSet() {
+						if field.IsNil() {
+							field.Set(reflect.ValueOf(&HTTPResponse{}))
+						}
+						field.Interface().(*HTTPResponse).Headers = rs.h
+					}
+				}
+
+				// Step 4: yield the response.
 				if !yield(resp, nil) {
 					return
 				}
@@ -452,6 +509,7 @@ func httpStatusOk(resp *http.Response) bool {
 
 func deserializeStreamResponse[T responseStream[R], R any](resp *http.Response, output *responseStream[R]) error {
 	if !httpStatusOk(resp) {
+		defer resp.Body.Close()
 		return newAPIError(resp)
 	}
 	output.r = bufio.NewScanner(resp.Body)
@@ -463,6 +521,7 @@ func deserializeStreamResponse[T responseStream[R], R any](resp *http.Response, 
 
 	output.r.Split(scan)
 	output.rc = resp.Body
+	output.h = resp.Header
 	return nil
 }
 

@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"log"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -102,7 +103,59 @@ func setValueByPath(data map[string]any, keys []string, value any) {
 		}
 	}
 
-	data[keys[len(keys)-1]] = value
+	finalKey := keys[len(keys)-1]
+	existingValue, exists := data[finalKey]
+
+	if exists {
+		// 1. Check if the new value is "empty" (nil, zero value, or empty collection)
+		isNewValueEmpty := false
+		if value == nil {
+			isNewValueEmpty = true
+		} else {
+			valReflect := reflect.ValueOf(value)
+			if valReflect.Kind() == reflect.Invalid { // Handles nil interface{}
+				isNewValueEmpty = true
+			} else if valReflect.IsZero() { // Covers zero values for primitives, nil for pointers/interfaces
+				isNewValueEmpty = true
+			} else if (valReflect.Kind() == reflect.Map || valReflect.Kind() == reflect.Slice) && valReflect.Len() == 0 {
+				isNewValueEmpty = true
+			}
+		}
+
+		if isNewValueEmpty {
+			// If new value is empty, do not overwrite existing non-empty value.
+			// This is triggered when handling tuning datasets.
+			return
+		}
+		if reflect.DeepEqual(value, existingValue) {
+			// Don't fail when overwriting value with same value
+			return
+		}
+		if existingMap, ok1 := existingValue.(map[string]any); ok1 {
+			if newMap, ok2 := value.(map[string]any); ok2 {
+				// Instead of overwriting dictionary with another dictionary, merge them.
+				// This is important for handling training and validation datasets in tuning.
+				for k, v := range newMap {
+					existingMap[k] = v
+				}
+				data[finalKey] = existingMap // Assign the updated map back
+			}
+		} else {
+			log.Println("Error. Cannot set value for an existing key. Key: ", finalKey, "; Existing value: ", existingValue, "; New value: ", value)
+		}
+	} else {
+		if finalKey == "_self" && reflect.TypeOf(value).Kind() == reflect.Map {
+			// Iterate through the `value` map and copy its contents to `data`.
+			if valMap, ok := value.(map[string]any); ok {
+				for k, v := range valMap {
+					data[k] = v
+				}
+			}
+		} else {
+			// If existing_data is None (or key doesn't exist), set the value directly.
+			data[finalKey] = value
+		}
+	}
 }
 
 // getValueByPath retrieves a value from a nested map or slice or struct based on a path of keys.
@@ -123,6 +176,7 @@ func getValueByPath(data any, keys []string) any {
 	var current any = data
 	for i, key := range keys {
 		if strings.HasSuffix(key, "[]") {
+
 			keyName := key[:len(key)-2]
 			switch v := current.(type) {
 			case map[string]any:
@@ -155,6 +209,62 @@ func getValueByPath(data any, keys []string) any {
 				return nil
 			}
 		}
+	}
+	return current
+}
+
+// getValueByPathOrDefault retrieves a value from a nested map or slice or struct based on a path of
+// keys, or returns a default value.
+func getValueByPathOrDefault(data any, keys []string, defaultValue any) any {
+	if len(keys) == 1 && keys[0] == "_self" {
+		return data
+	}
+	if len(keys) == 0 {
+		return defaultValue
+	}
+	var current any = data
+	for i, key := range keys {
+		if strings.HasSuffix(key, "[]") {
+
+			keyName := key[:len(key)-2]
+			switch v := current.(type) {
+			case map[string]any:
+				if sliceData, ok := v[keyName]; ok {
+					var result []any
+					switch concreteSliceData := sliceData.(type) {
+					case []map[string]any:
+						for _, d := range concreteSliceData {
+							result = append(result, getValueByPathOrDefault(d, keys[i+1:], defaultValue))
+						}
+					case []any:
+						for _, d := range concreteSliceData {
+							result = append(result, getValueByPathOrDefault(d, keys[i+1:], defaultValue))
+						}
+					default:
+						return defaultValue
+					}
+					return result
+				} else {
+					return defaultValue
+				}
+			default:
+				return defaultValue
+			}
+		} else {
+			switch v := current.(type) {
+			case map[string]any:
+				var ok bool
+				current, ok = v[key]
+				if !ok {
+					return defaultValue
+				}
+			default:
+				return defaultValue
+			}
+		}
+	}
+	if current == nil {
+		return defaultValue
 	}
 	return current
 }

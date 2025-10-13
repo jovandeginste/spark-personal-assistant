@@ -283,6 +283,10 @@ func tBatchJobDestination(dest any) (any, error) {
 	return dest, nil
 }
 
+func tRecvBatchJobDestination(dest any) (any, error) {
+	return dest, nil
+}
+
 func tBatchJobName(ac *apiClient, name any) (any, error) {
 	var (
 		mldevBatchPattern  = regexp.MustCompile("batches/[^/]+$")
@@ -313,12 +317,31 @@ func tJobState(state any) (any, error) {
 		return "JOB_STATE_UNSPECIFIED", nil
 	case "BATCH_STATE_PENDING":
 		return "JOB_STATE_PENDING", nil
+	case "BATCH_STATE_RUNNING":
+		return "JOB_STATE_RUNNING", nil
 	case "BATCH_STATE_SUCCEEDED":
 		return "JOB_STATE_SUCCEEDED", nil
 	case "BATCH_STATE_FAILED":
 		return "JOB_STATE_FAILED", nil
 	case "BATCH_STATE_CANCELLED":
 		return "JOB_STATE_CANCELLED", nil
+	case "BATCH_STATE_EXPIRED":
+		return "JOB_STATE_EXPIRED", nil
+	default:
+		return state, nil
+	}
+}
+
+func tTuningJobStatus(state any) (any, error) {
+	switch state {
+	case "STATE_UNSPECIFIED":
+		return "JOB_STATE_UNSPECIFIED", nil
+	case "CREATING":
+		return "JOB_STATE_RUNNING", nil
+	case "ACTIVE":
+		return "JOB_STATE_SUCCEEDED", nil
+	case "FAILED":
+		return "JOB_STATE_FAILED", nil
 	default:
 		return state, nil
 	}
