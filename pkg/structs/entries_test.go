@@ -103,7 +103,7 @@ func TestEntries_PrintTo(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
 
-			tt.entries.PrintTo(&buf)
+			tt.entries.PrintTo(&buf, false)
 
 			// The aquasecurity/table library adds a newline at the end.
 			// We should ensure our expected string also ends with a newline.
@@ -137,7 +137,7 @@ func TestEntries_PrintTo_ProgrammaticEmpty(t *testing.T) {
 
 		var buf bytes.Buffer
 
-		entries.PrintTo(&buf)
+		entries.PrintTo(&buf, false)
 
 		expectedOut := generateEmptyTableString()
 		actualOut := buf.String()
