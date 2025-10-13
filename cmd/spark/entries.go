@@ -147,7 +147,7 @@ func (c *cli) listEntriesCmd() *cobra.Command {
 				return err
 			}
 
-			entries.PrintTo(os.Stdout)
+			entries.PrintTo(os.Stdout, false)
 
 			return nil
 		},

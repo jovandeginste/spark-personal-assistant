@@ -9,9 +9,17 @@ import (
 
 type Entries []Entry
 
-func (es Entries) PrintTo(w io.Writer) {
+func (es Entries) PrintTo(w io.Writer, markdown bool) {
 	t := table.New(w)
 	defer t.Render()
+
+	if markdown {
+		t.SetDividers(table.MarkdownDividers)
+
+		t.SetBorderTop(false)
+		t.SetBorderBottom(false)
+		t.SetRowLines(false)
+	}
 
 	t.AddHeaders("ID", "Date", "Title", "TODO", "Source")
 

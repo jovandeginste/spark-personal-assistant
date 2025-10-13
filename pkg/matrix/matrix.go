@@ -1,6 +1,7 @@
 package matrix
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -154,6 +155,18 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 		}()
 
 		return "Shutting down...", nil
+	case "today":
+		f := &app.EntryFilter{DaysBack: 1, DaysAhead: 1}
+
+		entries, err := mc.App.CurrentEntries(f)
+		if err != nil {
+			return "", err
+		}
+
+		b := bytes.Buffer{}
+		entries.PrintTo(&b, true)
+
+		return b.String(), nil
 	case "switch":
 		if len(cmd) < 2 {
 			pDir, err := personas.FS().ReadDir(".")
