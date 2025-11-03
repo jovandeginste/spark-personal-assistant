@@ -61,6 +61,8 @@ func (aiData *AIData) AddChatHistory(role string, input string) {
 }
 
 func (aiData *AIData) UpdateEntries(a *App) error {
+	a.Logger().Info("Updating entries")
+
 	entries, err := a.CurrentEntries(aiData.EntryFilter)
 	if err != nil {
 		return err

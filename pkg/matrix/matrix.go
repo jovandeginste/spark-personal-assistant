@@ -195,6 +195,10 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 
 		mc.AIData.ResetHistory()
 
+		if err := mc.AIData.UpdateEntries(mc.App); err != nil {
+			return "", err
+		}
+
 		switch cmd[1] {
 		case "full":
 			return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
