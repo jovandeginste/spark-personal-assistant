@@ -104,16 +104,24 @@ func ValidateUserLocalpart(localpart string) error {
 	return nil
 }
 
-// ParseAndValidate parses the user ID into the localpart and server name like Parse,
-// and also validates that the localpart is allowed according to the user identifiers spec.
-func (userID UserID) ParseAndValidate() (localpart, homeserver string, err error) {
-	localpart, homeserver, err = userID.Parse()
+// ParseAndValidateStrict is a stricter version of ParseAndValidateRelaxed that checks the localpart to only allow non-historical localparts.
+// This should be used with care: there are real users still using historical localparts.
+func (userID UserID) ParseAndValidateStrict() (localpart, homeserver string, err error) {
+	localpart, homeserver, err = userID.ParseAndValidateRelaxed()
 	if err == nil {
 		err = ValidateUserLocalpart(localpart)
 	}
-	if err == nil && len(userID) > UserIDMaxLength {
+	return
+}
+
+// ParseAndValidateRelaxed parses the user ID into the localpart and server name like Parse,
+// and also validates that the user ID is not too long and that the server name is valid.
+func (userID UserID) ParseAndValidateRelaxed() (localpart, homeserver string, err error) {
+	if len(userID) > UserIDMaxLength {
 		err = ErrUserIDTooLong
+		return
 	}
+	localpart, homeserver, err = userID.Parse()
 	if err == nil && !ValidateServerName(homeserver) {
 		err = fmt.Errorf("%q %q", homeserver, ErrNoncompliantServerPart)
 	}
@@ -121,7 +129,7 @@ func (userID UserID) ParseAndValidate() (localpart, homeserver string, err error
 }
 
 func (userID UserID) ParseAndDecode() (localpart, homeserver string, err error) {
-	localpart, homeserver, err = userID.ParseAndValidate()
+	localpart, homeserver, err = userID.ParseAndValidateStrict()
 	if err == nil {
 		localpart, err = DecodeUserLocalpart(localpart)
 	}
@@ -211,15 +219,15 @@ func DecodeUserLocalpart(str string) (string, error) {
 	for i := 0; i < len(strBytes); i++ {
 		b := strBytes[i]
 		if !isValidByte(b) {
-			return "", fmt.Errorf("Byte pos %d: Invalid byte", i)
+			return "", fmt.Errorf("invalid encoded byte at position %d: %c", i, b)
 		}
 
 		if b == '_' { // next byte is a-z and should be upper-case or is another _ and should be a literal _
 			if i+1 >= len(strBytes) {
-				return "", fmt.Errorf("Byte pos %d: expected _[a-z_] encoding but ran out of string", i)
+				return "", fmt.Errorf("unexpected end of string after underscore at %d", i)
 			}
 			if !isValidEscapedChar(strBytes[i+1]) { // invalid escaping
-				return "", fmt.Errorf("Byte pos %d: expected _[a-z_] encoding", i)
+				return "", fmt.Errorf("unexpected byte %c after underscore at %d", strBytes[i+1], i)
 			}
 			if strBytes[i+1] == '_' {
 				outputBuffer.WriteByte('_')
@@ -229,7 +237,7 @@ func DecodeUserLocalpart(str string) (string, error) {
 			i++ // skip next byte since we just handled it
 		} else if b == '=' { // next 2 bytes are hex and should be buffered ready to be read as utf8
 			if i+2 >= len(strBytes) {
-				return "", fmt.Errorf("Byte pos: %d: expected quote-printable encoding but ran out of string", i)
+				return "", fmt.Errorf("unexpected end of string after equals sign at %d", i)
 			}
 			dst := make([]byte, 1)
 			_, err := hex.Decode(dst, strBytes[i+1:i+3])

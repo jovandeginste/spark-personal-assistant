@@ -20,6 +20,20 @@ type CrossSigningPublicKeysCache struct {
 	UserSigningKey id.Ed25519
 }
 
+func (mach *OlmMachine) GetOwnVerificationStatus(ctx context.Context) (hasKeys, isVerified bool, err error) {
+	pubkeys := mach.GetOwnCrossSigningPublicKeys(ctx)
+	if pubkeys != nil {
+		hasKeys = true
+		isVerified, err = mach.CryptoStore.IsKeySignedBy(
+			ctx, mach.Client.UserID, mach.GetAccount().SigningKey(), mach.Client.UserID, pubkeys.SelfSigningKey,
+		)
+		if err != nil {
+			err = fmt.Errorf("failed to check if current device is signed by own self-signing key: %w", err)
+		}
+	}
+	return
+}
+
 func (mach *OlmMachine) GetOwnCrossSigningPublicKeys(ctx context.Context) *CrossSigningPublicKeysCache {
 	if mach.crossSigningPubkeys != nil {
 		return mach.crossSigningPubkeys
@@ -49,8 +63,8 @@ func (mach *OlmMachine) GetCrossSigningPublicKeys(ctx context.Context, userID id
 	if len(dbKeys) > 0 {
 		masterKey, ok := dbKeys[id.XSUsageMaster]
 		if ok {
-			selfSigning, _ := dbKeys[id.XSUsageSelfSigning]
-			userSigning, _ := dbKeys[id.XSUsageUserSigning]
+			selfSigning := dbKeys[id.XSUsageSelfSigning]
+			userSigning := dbKeys[id.XSUsageUserSigning]
 			return &CrossSigningPublicKeysCache{
 				MasterKey:      masterKey.Key,
 				SelfSigningKey: selfSigning.Key,

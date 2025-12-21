@@ -1,5 +1,114 @@
 # Changelog
 
+## [1.40.0](https://github.com/googleapis/go-genai/compare/v1.39.0...v1.40.0) (2025-12-16)
+
+
+### Features
+
+* Add minimal and medium thinking levels. ([a7c0ed8](https://github.com/googleapis/go-genai/commit/a7c0ed8b1fcade06ffcc62a91344e36e56d17f37))
+* Add ultra high resolution to the media resolution in Parts. ([47b89eb](https://github.com/googleapis/go-genai/commit/47b89ebb0cb9531bd440afb15df14a9668142f72))
+* ephemeral token support in go ([7515bbe](https://github.com/googleapis/go-genai/commit/7515bbef37d86ac0d695c11d81c31a42cb330e7e))
+* support multi speaker for Vertex AI ([457541d](https://github.com/googleapis/go-genai/commit/457541d1839e37fe7bd588462ecb42b670a1ec1c))
+
+## [1.39.0](https://github.com/googleapis/go-genai/compare/v1.38.0...v1.39.0) (2025-12-10)
+
+
+### Features
+
+* Add enableEnhancedCivicAnswers feature in GenerateContentConfig ([dd25df7](https://github.com/googleapis/go-genai/commit/dd25df730c6060e39ab3ba9d7749d8fc75d6c8b7))
+* Add IMAGE_RECITATION and IMAGE_OTHER enum values to FinishReason ([33aa4f2](https://github.com/googleapis/go-genai/commit/33aa4f28afcea135e8f8947341ff334afc85fe70))
+* Add voice activity detection signal. ([326059c](https://github.com/googleapis/go-genai/commit/326059c108bdc628bf35d75837b1bb23b1b1fa99))
+
+## [1.38.0](https://github.com/googleapis/go-genai/compare/v1.37.0...v1.38.0) (2025-12-08)
+
+
+### Features
+
+* Support ReplicatedVoiceConfig ([fd19393](https://github.com/googleapis/go-genai/commit/fd1939328de25eda7452630c06ef57f2bcc0d5f9))
+
+## [1.37.0](https://github.com/googleapis/go-genai/compare/v1.36.0...v1.37.0) (2025-12-02)
+
+
+### Features
+
+* Add empty response for tunings.cancel() ([ace417d](https://github.com/googleapis/go-genai/commit/ace417dc92ed4a84979160cc8eacf2e0ed72f98e))
+
+## [1.36.0](https://github.com/googleapis/go-genai/compare/v1.35.0...v1.36.0) (2025-11-17)
+
+
+### Features
+
+* add display name to FunctionResponseBlob ([66bd0fb](https://github.com/googleapis/go-genai/commit/66bd0fbf3504ac9f8b01d173a14110af0fabe41d))
+* add display name to FunctionResponseFileData ([f470cff](https://github.com/googleapis/go-genai/commit/f470cff5a212cbc0fbda00177b2bfb69c56eb6b1))
+* Add generate_content_config.thinking_level ([93b2586](https://github.com/googleapis/go-genai/commit/93b2586dfb392b5f51f36cbbc9d2ac96458c2959))
+* Add image output options to ImageConfig for Vertex ([c4b28c3](https://github.com/googleapis/go-genai/commit/c4b28c34141198d96941cad4837edce76bbe764c))
+* Add part.media_resolution ([93b2586](https://github.com/googleapis/go-genai/commit/93b2586dfb392b5f51f36cbbc9d2ac96458c2959))
+* support Function call argument streaming for all languages ([dd5ec01](https://github.com/googleapis/go-genai/commit/dd5ec01f2186ad777be914f0b33a9e87a2e947d4))
+
+## [1.35.0](https://github.com/googleapis/go-genai/compare/v1.34.0...v1.35.0) (2025-11-12)
+
+
+### Features
+
+* Add `ToGenerationConfig` method to `GenerateContentConfig`. fixes [#506](https://github.com/googleapis/go-genai/issues/506) ([bd53df4](https://github.com/googleapis/go-genai/commit/bd53df47bb10e8d52dbf5cc200b9c33222947eb5))
+
+
+### Bug Fixes
+
+* Add missing fields to the model types ([9e1b329](https://github.com/googleapis/go-genai/commit/9e1b3290976f0bf0e640c49a50a8f864c93e7da4))
+* Fix base_steps parameter for recontext_image ([4f90d03](https://github.com/googleapis/go-genai/commit/4f90d03d5790fae86f3ea18601f7ce98aba99568))
+* Fix models.list() filter parameter ([f5859fd](https://github.com/googleapis/go-genai/commit/f5859fd6b36a6b5c9a6deb28434591ee58b60230))
+
+## [1.34.0](https://github.com/googleapis/go-genai/compare/v1.33.0...v1.34.0) (2025-11-05)
+
+
+### Features
+
+* Add `UseDefaultCredentials` method to `ClientConfig`. ([d15baab](https://github.com/googleapis/go-genai/commit/d15baab4f79e01d396fa4e8f707cdcd19f6ce404))
+* add complete stats to BatchJob ([0df87d7](https://github.com/googleapis/go-genai/commit/0df87d71edaa743f42665e403dd834af81fa6d33))
+* Add FileSearch tool and associated FileSearchStore management APIs ([8ce95c8](https://github.com/googleapis/go-genai/commit/8ce95c8eb5fc5b49a74b604729cc967596184850))
+* Add FileSearch tool and associated FileSearchStore management APIs ([3e0a744](https://github.com/googleapis/go-genai/commit/3e0a74410171fc42b6d94e9ca18ca2c8a2b8d6c4))
+* Add image_size to ImageConfig (Early Access Program) ([027f29c](https://github.com/googleapis/go-genai/commit/027f29ce42fc22bf4861a10a5b5f35ad6ebb77e4))
+* Added phish filtering feature. ([eb849d1](https://github.com/googleapis/go-genai/commit/eb849d1e13be374f6751fe7374ab0a58a547781c))
+
+
+### Bug Fixes
+
+* prevent nil pointer dereference panic in newAPIError function ([251f7bf](https://github.com/googleapis/go-genai/commit/251f7bf00c59b4cbbf74ad35232dce998341df75))
+* prevent nil pointer dereference panic in newAPIError function ([#468](https://github.com/googleapis/go-genai/issues/468)) ([ba15429](https://github.com/googleapis/go-genai/commit/ba15429569bdb82ecb78618afa8be2f05ed6c4e2))
+
+## [1.33.0](https://github.com/googleapis/go-genai/compare/v1.32.0...v1.33.0) (2025-10-29)
+
+
+### Features
+
+* Add safety_filter_level and person_generation for Imagen upscaling ([3d7b57a](https://github.com/googleapis/go-genai/commit/3d7b57a389322c52e2bd8901a6fae0dbdd2c3720))
+* Add support for preference optimization tuning in the SDK. ([a6db7fe](https://github.com/googleapis/go-genai/commit/a6db7fe8233501c8457ec7fb8d6b3a132bfb7944))
+* Pass file name to the backend when uploading with a file path ([6b5e4f4](https://github.com/googleapis/go-genai/commit/6b5e4f4939a8b13da27fab65731a3423191e2790))
+* support default global location when not using api key with vertexai backend ([44f01d6](https://github.com/googleapis/go-genai/commit/44f01d636bff7310bdcfcc5200118fe6ea4a5e2b))
+
+## [1.32.0](https://github.com/googleapis/go-genai/compare/v1.31.0...v1.32.0) (2025-10-21)
+
+
+### Features
+
+* Add enable_enhanced_civic_answers in GenerationConfig ([c876512](https://github.com/googleapis/go-genai/commit/c87651298d18a77e27f8daba2db0e19074408781))
+* support jailbreak in HarmCategory and BlockedReason ([65e1efc](https://github.com/googleapis/go-genai/commit/65e1efc38ca1e5f958be90eac83668b357187187))
+
+
+### Bug Fixes
+
+* change back SingleEmbedContentResponse.TokenCount to int64 due to mistake in [#557](https://github.com/googleapis/go-genai/issues/557) ([e05f15d](https://github.com/googleapis/go-genai/commit/e05f15d3df064f9ec0e79ab3b6b08fea540e7803))
+* do not append project and client for Vertex AI when using API key ([c27f13a](https://github.com/googleapis/go-genai/commit/c27f13a44e51f770bc363b6c8922f0a1cb29ae42)), closes [#564](https://github.com/googleapis/go-genai/issues/564)
+
+## [1.31.0](https://github.com/googleapis/go-genai/compare/v1.30.0...v1.31.0) (2025-10-15)
+
+
+### Features
+
+* support CreateEmebddings in batches.go ([a488476](https://github.com/googleapis/go-genai/commit/a48847605327c60c49b8276d197bb1dca443730e))
+* Support video extension for Veo on Gemini Developer API ([14ecba9](https://github.com/googleapis/go-genai/commit/14ecba9e08e02eed6c72d8bed3b381eb8f31d0fd))
+
 ## [1.30.0](https://github.com/googleapis/go-genai/compare/v1.29.0...v1.30.0) (2025-10-10)
 
 

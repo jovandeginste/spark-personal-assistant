@@ -58,6 +58,9 @@ func tModel(ac *apiClient, origin any) (string, error) {
 		if model == "" {
 			return "", fmt.Errorf("tModel: model is empty")
 		}
+		if strings.Contains(model, "?") || strings.Contains(model, "&") || strings.Contains(model, "..") {
+			return "", fmt.Errorf("tModel: invalid model parameter")
+		}
 		if ac.clientConfig.Backend == BackendVertexAI {
 			if strings.HasPrefix(model, "projects/") || strings.HasPrefix(model, "models/") || strings.HasPrefix(model, "publishers/") {
 				return model, nil

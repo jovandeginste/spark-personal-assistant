@@ -106,9 +106,25 @@ type GenerateRequest struct {
 	// before this option was introduced)
 	Think *ThinkValue `json:"think,omitempty"`
 
+	// Truncate is a boolean that, when set to true, truncates the chat history messages
+	// if the rendered prompt exceeds the context length limit.
+	Truncate *bool `json:"truncate,omitempty"`
+
+	// Shift is a boolean that, when set to true, shifts the chat history
+	// when hitting the context length limit instead of erroring.
+	Shift *bool `json:"shift,omitempty"`
+
 	// DebugRenderOnly is a debug option that, when set to true, returns the rendered
 	// template instead of calling the model.
 	DebugRenderOnly bool `json:"_debug_render_only,omitempty"`
+
+	// Logprobs specifies whether to return log probabilities of the output tokens.
+	Logprobs bool `json:"logprobs,omitempty"`
+
+	// TopLogprobs is the number of most likely tokens to return at each token position,
+	// each with an associated log probability. Only applies when Logprobs is true.
+	// Valid values are 0-20. Default is 0 (only return the selected token's logprob).
+	TopLogprobs int `json:"top_logprobs,omitempty"`
 }
 
 // ChatRequest describes a request sent by [Client.Chat].
@@ -140,9 +156,25 @@ type ChatRequest struct {
 	// for supported models.
 	Think *ThinkValue `json:"think,omitempty"`
 
+	// Truncate is a boolean that, when set to true, truncates the chat history messages
+	// if the rendered prompt exceeds the context length limit.
+	Truncate *bool `json:"truncate,omitempty"`
+
+	// Shift is a boolean that, when set to true, shifts the chat history
+	// when hitting the context length limit instead of erroring.
+	Shift *bool `json:"shift,omitempty"`
+
 	// DebugRenderOnly is a debug option that, when set to true, returns the rendered
 	// template instead of calling the model.
 	DebugRenderOnly bool `json:"_debug_render_only,omitempty"`
+
+	// Logprobs specifies whether to return log probabilities of the output tokens.
+	Logprobs bool `json:"logprobs,omitempty"`
+
+	// TopLogprobs is the number of most likely tokens to return at each token position,
+	// each with an associated log probability. Only applies when Logprobs is true.
+	// Valid values are 0-20. Default is 0 (only return the selected token's logprob).
+	TopLogprobs int `json:"top_logprobs,omitempty"`
 }
 
 type Tools []Tool
@@ -165,10 +197,11 @@ type Message struct {
 	Content string `json:"content"`
 	// Thinking contains the text that was inside thinking tags in the
 	// original model output when ChatRequest.Think is enabled.
-	Thinking  string      `json:"thinking,omitempty"`
-	Images    []ImageData `json:"images,omitempty"`
-	ToolCalls []ToolCall  `json:"tool_calls,omitempty"`
-	ToolName  string      `json:"tool_name,omitempty"`
+	Thinking   string      `json:"thinking,omitempty"`
+	Images     []ImageData `json:"images,omitempty"`
+	ToolCalls  []ToolCall  `json:"tool_calls,omitempty"`
+	ToolName   string      `json:"tool_name,omitempty"`
+	ToolCallID string      `json:"tool_call_id,omitempty"`
 }
 
 func (m *Message) UnmarshalJSON(b []byte) error {
@@ -184,11 +217,12 @@ func (m *Message) UnmarshalJSON(b []byte) error {
 }
 
 type ToolCall struct {
+	ID       string           `json:"id,omitempty"`
 	Function ToolCallFunction `json:"function"`
 }
 
 type ToolCallFunction struct {
-	Index     int                       `json:"index,omitempty"`
+	Index     int                       `json:"index"`
 	Name      string                    `json:"name"`
 	Arguments ToolCallFunctionArguments `json:"arguments"`
 }
@@ -249,11 +283,12 @@ func (pt PropertyType) String() string {
 }
 
 type ToolProperty struct {
-	AnyOf       []ToolProperty `json:"anyOf,omitempty"`
-	Type        PropertyType   `json:"type"`
-	Items       any            `json:"items,omitempty"`
-	Description string         `json:"description"`
-	Enum        []any          `json:"enum,omitempty"`
+	AnyOf       []ToolProperty          `json:"anyOf,omitempty"`
+	Type        PropertyType            `json:"type,omitempty"`
+	Items       any                     `json:"items,omitempty"`
+	Description string                  `json:"description,omitempty"`
+	Enum        []any                   `json:"enum,omitempty"`
+	Properties  map[string]ToolProperty `json:"properties,omitempty"`
 }
 
 // ToTypeScriptType converts a ToolProperty to a TypeScript type string
@@ -305,7 +340,7 @@ type ToolFunctionParameters struct {
 	Type       string                  `json:"type"`
 	Defs       any                     `json:"$defs,omitempty"`
 	Items      any                     `json:"items,omitempty"`
-	Required   []string                `json:"required"`
+	Required   []string                `json:"required,omitempty"`
 	Properties map[string]ToolProperty `json:"properties"`
 }
 
@@ -316,13 +351,34 @@ func (t *ToolFunctionParameters) String() string {
 
 type ToolFunction struct {
 	Name        string                 `json:"name"`
-	Description string                 `json:"description"`
+	Description string                 `json:"description,omitempty"`
 	Parameters  ToolFunctionParameters `json:"parameters"`
 }
 
 func (t *ToolFunction) String() string {
 	bts, _ := json.Marshal(t)
 	return string(bts)
+}
+
+// TokenLogprob represents log probability information for a single token alternative.
+type TokenLogprob struct {
+	// Token is the text representation of the token.
+	Token string `json:"token"`
+
+	// Logprob is the log probability of this token.
+	Logprob float64 `json:"logprob"`
+
+	// Bytes contains the raw byte representation of the token
+	Bytes []int `json:"bytes,omitempty"`
+}
+
+// Logprob contains log probability information for a generated token.
+type Logprob struct {
+	TokenLogprob
+
+	// TopLogprobs contains the most likely tokens and their log probabilities
+	// at this position, if requested via TopLogprobs parameter.
+	TopLogprobs []TokenLogprob `json:"top_logprobs,omitempty"`
 }
 
 // ChatResponse is the response returned by [Client.Chat]. Its fields are
@@ -350,6 +406,10 @@ type ChatResponse struct {
 	DoneReason string `json:"done_reason,omitempty"`
 
 	DebugInfo *DebugInfo `json:"_debug_info,omitempty"`
+
+	// Logprobs contains log probability information for the generated tokens,
+	// if requested via the Logprobs parameter.
+	Logprobs []Logprob `json:"logprobs,omitempty"`
 
 	Metrics
 }
@@ -659,6 +719,10 @@ type GenerateResponse struct {
 	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
 
 	DebugInfo *DebugInfo `json:"_debug_info,omitempty"`
+
+	// Logprobs contains log probability information for the generated tokens,
+	// if requested via the Logprobs parameter.
+	Logprobs []Logprob `json:"logprobs,omitempty"`
 }
 
 // ModelDetails provides details about a model.

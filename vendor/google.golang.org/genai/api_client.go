@@ -140,8 +140,8 @@ func (ac *apiClient) createAPIURL(suffix, method string, httpOptions *HTTPOption
 
 	var finalURL *url.URL
 	if ac.clientConfig.Backend == BackendVertexAI {
-		queryVertexBaseModel := ac.clientConfig.Backend == BackendVertexAI && method == http.MethodGet && strings.HasPrefix(path, "publishers/google/models")
-		if !strings.HasPrefix(path, "projects/") && !queryVertexBaseModel {
+		queryVertexBaseModel := method == http.MethodGet && strings.HasPrefix(path, "publishers/google/models")
+		if ac.clientConfig.APIKey == "" && (!strings.HasPrefix(path, "projects/") && !queryVertexBaseModel) {
 			path = fmt.Sprintf("projects/%s/locations/%s/%s", ac.clientConfig.Project, ac.clientConfig.Location, path)
 		}
 		finalURL = u.JoinPath(httpOptions.APIVersion, path)
@@ -490,7 +490,14 @@ func newAPIError(resp *http.Response) error {
 			// Handle plain text error message. File upload backend doesn't return json error message.
 			return APIError{Code: resp.StatusCode, Status: resp.Status, Message: string(body)}
 		}
-		return *respWithError.ErrorInfo
+
+		// Check if we successfully parsed an error response
+		if respWithError.ErrorInfo != nil {
+			return *respWithError.ErrorInfo
+		}
+
+		// Valid JSON but no error field - treat as generic error with body content
+		return APIError{Code: resp.StatusCode, Status: resp.Status, Message: string(body)}
 	}
 	return APIError{Code: resp.StatusCode, Status: resp.Status}
 }
@@ -557,7 +564,7 @@ func scan(data []byte, atEOF bool) (advance int, token []byte, err error) {
 	return 0, nil, nil
 }
 
-func (ac *apiClient) uploadFile(ctx context.Context, r io.Reader, uploadURL string, httpOptions *HTTPOptions) (*File, error) {
+func (ac *apiClient) upload(ctx context.Context, r io.Reader, uploadURL string, httpOptions *HTTPOptions) (map[string]any, error) {
 	var offset int64 = 0
 	var resp *http.Response
 	var respBody map[string]any
@@ -641,8 +648,37 @@ func (ac *apiClient) uploadFile(ctx context.Context, r io.Reader, uploadURL stri
 		return nil, fmt.Errorf("Failed to upload file: Upload status is not finalized")
 	}
 
+	return respBody, nil
+}
+
+func (ac *apiClient) uploadFile(ctx context.Context, r io.Reader, uploadURL string, httpOptions *HTTPOptions) (*File, error) {
+	respBody, err := ac.upload(ctx, r, uploadURL, httpOptions)
+	if err != nil {
+		return nil, err // Propagate any errors from the upload process
+	}
+	if respBody == nil {
+		return nil, fmt.Errorf("upload completed but response body was empty")
+	}
+
 	var response = new(File)
-	err := mapToStruct(respBody["file"].(map[string]any), &response)
+	err = mapToStruct(respBody["file"].(map[string]any), &response)
+	if err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (ac *apiClient) uploadToFileSearchStore(ctx context.Context, r io.Reader, uploadURL string, httpOptions *HTTPOptions) (*UploadToFileSearchStoreOperation, error) {
+	respBody, err := ac.upload(ctx, r, uploadURL, httpOptions)
+	if err != nil {
+		return nil, err // Propagate any errors from the upload process
+	}
+	if respBody == nil {
+		return nil, fmt.Errorf("upload completed but response body was empty")
+	}
+
+	var response = new(UploadToFileSearchStoreOperation)
+	err = mapToStruct(respBody, &response)
 	if err != nil {
 		return nil, err
 	}

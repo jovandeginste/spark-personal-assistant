@@ -18,6 +18,7 @@ import (
 
 	"go.mau.fi/util/exerrors"
 	"go.mau.fi/util/jsontime"
+	"go.mau.fi/util/ptr"
 	"golang.org/x/exp/constraints"
 	"golang.org/x/exp/maps"
 )
@@ -27,8 +28,10 @@ type RoomFeatures struct {
 
 	// N.B. New fields need to be added to the Hash function to be included in the deduplication hash.
 
-	Formatting FormattingFeatureMap `json:"formatting,omitempty"`
-	File       FileFeatureMap       `json:"file,omitempty"`
+	Formatting    FormattingFeatureMap `json:"formatting,omitempty"`
+	File          FileFeatureMap       `json:"file,omitempty"`
+	State         StateFeatureMap      `json:"state,omitempty"`
+	MemberActions MemberFeatureMap     `json:"member_actions,omitempty"`
 
 	MaxTextLength int `json:"max_text_length,omitempty"`
 
@@ -51,11 +54,16 @@ type RoomFeatures struct {
 	AllowedReactions     []string               `json:"allowed_reactions,omitempty"`
 	CustomEmojiReactions bool                   `json:"custom_emoji_reactions,omitempty"`
 
-	ReadReceipts        bool `json:"read_receipts,omitempty"`
-	TypingNotifications bool `json:"typing_notifications,omitempty"`
-	Archive             bool `json:"archive,omitempty"`
-	MarkAsUnread        bool `json:"mark_as_unread,omitempty"`
-	DeleteChat          bool `json:"delete_chat,omitempty"`
+	ReadReceipts          bool `json:"read_receipts,omitempty"`
+	TypingNotifications   bool `json:"typing_notifications,omitempty"`
+	Archive               bool `json:"archive,omitempty"`
+	MarkAsUnread          bool `json:"mark_as_unread,omitempty"`
+	DeleteChat            bool `json:"delete_chat,omitempty"`
+	DeleteChatForEveryone bool `json:"delete_chat_for_everyone,omitempty"`
+
+	MessageRequest *MessageRequestFeatures `json:"message_request,omitempty"`
+
+	PerMessageProfileRelay bool `json:"-"`
 }
 
 func (rf *RoomFeatures) GetID() string {
@@ -65,9 +73,76 @@ func (rf *RoomFeatures) GetID() string {
 	return base64.RawURLEncoding.EncodeToString(rf.Hash())
 }
 
+func (rf *RoomFeatures) Clone() *RoomFeatures {
+	if rf == nil {
+		return nil
+	}
+	clone := *rf
+	clone.File = clone.File.Clone()
+	clone.Formatting = maps.Clone(clone.Formatting)
+	clone.State = clone.State.Clone()
+	clone.MemberActions = clone.MemberActions.Clone()
+	clone.EditMaxAge = ptr.Clone(clone.EditMaxAge)
+	clone.DeleteMaxAge = ptr.Clone(clone.DeleteMaxAge)
+	clone.DisappearingTimer = clone.DisappearingTimer.Clone()
+	clone.AllowedReactions = slices.Clone(clone.AllowedReactions)
+	clone.MessageRequest = clone.MessageRequest.Clone()
+	return &clone
+}
+
+type MemberFeatureMap map[MemberAction]CapabilitySupportLevel
+
+func (mfm MemberFeatureMap) Clone() MemberFeatureMap {
+	return maps.Clone(mfm)
+}
+
+type MemberAction string
+
+const (
+	MemberActionBan          MemberAction = "ban"
+	MemberActionKick         MemberAction = "kick"
+	MemberActionLeave        MemberAction = "leave"
+	MemberActionRevokeInvite MemberAction = "revoke_invite"
+	MemberActionInvite       MemberAction = "invite"
+)
+
+type StateFeatureMap map[string]*StateFeatures
+
+func (sfm StateFeatureMap) Clone() StateFeatureMap {
+	dup := maps.Clone(sfm)
+	for key, value := range dup {
+		dup[key] = value.Clone()
+	}
+	return dup
+}
+
+type StateFeatures struct {
+	Level CapabilitySupportLevel `json:"level"`
+}
+
+func (sf *StateFeatures) Clone() *StateFeatures {
+	if sf == nil {
+		return nil
+	}
+	clone := *sf
+	return &clone
+}
+
+func (sf *StateFeatures) Hash() []byte {
+	return sf.Level.Hash()
+}
+
 type FormattingFeatureMap map[FormattingFeature]CapabilitySupportLevel
 
 type FileFeatureMap map[CapabilityMsgType]*FileFeatures
+
+func (ffm FileFeatureMap) Clone() FileFeatureMap {
+	dup := maps.Clone(ffm)
+	for key, value := range dup {
+		dup[key] = value.Clone()
+	}
+	return dup
+}
 
 type DisappearingTimerCapability struct {
 	Types  []DisappearingType      `json:"types"`
@@ -76,11 +151,40 @@ type DisappearingTimerCapability struct {
 	OmitEmptyTimer bool `json:"omit_empty_timer,omitempty"`
 }
 
+func (dtc *DisappearingTimerCapability) Clone() *DisappearingTimerCapability {
+	if dtc == nil {
+		return nil
+	}
+	clone := *dtc
+	clone.Types = slices.Clone(clone.Types)
+	clone.Timers = slices.Clone(clone.Timers)
+	return &clone
+}
+
 func (dtc *DisappearingTimerCapability) Supports(content *BeeperDisappearingTimer) bool {
 	if dtc == nil || content == nil || content.Type == DisappearingTypeNone {
 		return true
 	}
 	return slices.Contains(dtc.Types, content.Type) && (dtc.Timers == nil || slices.Contains(dtc.Timers, content.Timer))
+}
+
+type MessageRequestFeatures struct {
+	AcceptWithMessage CapabilitySupportLevel `json:"accept_with_message,omitempty"`
+	AcceptWithButton  CapabilitySupportLevel `json:"accept_with_button,omitempty"`
+}
+
+func (mrf *MessageRequestFeatures) Clone() *MessageRequestFeatures {
+	return ptr.Clone(mrf)
+}
+
+func (mrf *MessageRequestFeatures) Hash() []byte {
+	if mrf == nil {
+		return nil
+	}
+	hasher := sha256.New()
+	hashValue(hasher, "accept_with_message", mrf.AcceptWithMessage)
+	hashValue(hasher, "accept_with_button", mrf.AcceptWithButton)
+	return hasher.Sum(nil)
 }
 
 type CapabilityMsgType = MessageType
@@ -232,6 +336,8 @@ func (rf *RoomFeatures) Hash() []byte {
 
 	hashMap(hasher, "formatting", rf.Formatting)
 	hashMap(hasher, "file", rf.File)
+	hashMap(hasher, "state", rf.State)
+	hashMap(hasher, "member_actions", rf.MemberActions)
 
 	hashInt(hasher, "max_text_length", rf.MaxTextLength)
 
@@ -262,6 +368,8 @@ func (rf *RoomFeatures) Hash() []byte {
 	hashBool(hasher, "archive", rf.Archive)
 	hashBool(hasher, "mark_as_unread", rf.MarkAsUnread)
 	hashBool(hasher, "delete_chat", rf.DeleteChat)
+	hashBool(hasher, "delete_chat_for_everyone", rf.DeleteChatForEveryone)
+	hashValue(hasher, "message_request", rf.MessageRequest)
 
 	return hasher.Sum(nil)
 }
@@ -293,4 +401,14 @@ func (ff *FileFeatures) Hash() []byte {
 	hashInt(hasher, "max_duration", ff.MaxDuration.Get())
 	hashBool(hasher, "view_once", ff.ViewOnce)
 	return hasher.Sum(nil)
+}
+
+func (ff *FileFeatures) Clone() *FileFeatures {
+	if ff == nil {
+		return nil
+	}
+	clone := *ff
+	clone.MimeTypes = maps.Clone(clone.MimeTypes)
+	clone.MaxDuration = ptr.Clone(clone.MaxDuration)
+	return &clone
 }

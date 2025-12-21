@@ -1,3 +1,113 @@
+## v0.26.1 (2025-12-16)
+
+* **Breaking change *(mediaproxy)*** Changed `GetMediaResponseFile` to return
+  the mime type from the callback rather than in the return get media return
+  value. The callback can now also redirect the caller to a different file.
+* *(federation)* Added join/knock/leave functions
+  (thanks to [@nexy7574] in [#422]).
+* *(federation/eventauth)* Fixed various incorrect checks.
+* *(client)* Added backoff for retrying media uploads to external URLs
+  (with MSC3870).
+* *(bridgev2/config)* Added support for overriding config fields using
+  environment variables.
+* *(bridgev2/commands)* Added command to mute chat on remote network.
+* *(bridgev2)* Added interface for network connectors to redirect to a different
+  user ID when handling an invite from Matrix.
+* *(bridgev2)* Added interface for signaling message request status of portals.
+* *(bridgev2)* Changed portal creation to not backfill unless `CanBackfill` flag
+  is set in chat info.
+* *(bridgev2)* Changed Matrix reaction handling to only delete old reaction if
+  bridging the new one is successful.
+* *(bridgev2/mxmain)* Improved error message when trying to run bridge with
+  pre-megabridge database when no database migration exists.
+* *(bridgev2)* Improved reliability of database migration when enabling split
+  portals.
+* *(bridgev2)* Improved detection of orphaned DM rooms when starting new chats.
+* *(bridgev2)* Stopped sending redundant invites when joining ghosts to public
+  portal rooms.
+* *(bridgev2)* Stopped hardcoding room versions in favor of checking
+  server capabilities to determine appropriate `/createRoom` parameters.
+
+[#422]: https://github.com/mautrix/go/pull/422
+
+## v0.26.0 (2025-11-16)
+
+* *(client,appservice)* Deprecated `SendMassagedStateEvent` as `SendStateEvent`
+  has been able to do the same for a while now.
+* *(client,federation)* Added size limits for responses to make it safer to send
+  requests to untrusted servers.
+* *(client)* Added wrapper for `/admin/whois` client API
+  (thanks to [@nexy7574] in [#411]).
+* *(synapseadmin)* Added `force_purge` option to DeleteRoom
+  (thanks to [@nexy7574] in [#420]).
+* *(statestore)* Added saving join rules for rooms.
+* *(bridgev2)* Added optional automatic rollback of room state if bridging the
+  change to the remote network fails.
+* *(bridgev2)* Added management room notices if transient disconnect state
+  doesn't resolve within 3 minutes.
+* *(bridgev2)* Added interface to signal that certain participants couldn't be
+  invited when creating a group.
+* *(bridgev2)* Added `select` type for user input fields in login.
+* *(bridgev2)* Added interface to let network connector customize personal
+  filtering space.
+* *(bridgev2/matrix)* Added checks to avoid sending error messages in reply to
+  other bots.
+* *(bridgev2/matrix)* Switched to using [MSC4169] to send redactions whenever
+  possible.
+* *(bridgev2/publicmedia)* Added support for custom path prefixes, file names,
+  and encrypted files.
+* *(bridgev2/commands)* Added command to resync a single portal.
+* *(bridgev2/commands)* Added create group command.
+* *(bridgev2/config)* Added option to limit maximum number of logins.
+* *(bridgev2)* Changed ghost joining to skip unnecessary invite if portal room
+  is public.
+* *(bridgev2/disappear)* Changed read receipt handling to only start
+  disappearing timers for messages up to the read message (note: may not work in
+  all cases if the read receipt points at an unknown event).
+* *(event/reply)* Changed plaintext reply fallback removal to only happen when
+  an HTML reply fallback is removed successfully.
+* *(bridgev2/matrix)* Fixed unnecessary sleep after registering bot on first run.
+* *(crypto/goolm)* Fixed panic when processing certain malformed Olm messages.
+* *(federation)* Fixed HTTP method for sending transactions
+  (thanks to [@nexy7574] in [#426]).
+* *(federation)* Fixed response body being closed even when using `DontReadBody`
+  parameter.
+* *(federation)* Fixed validating auth for requests with query params.
+* *(federation/eventauth)* Fixed typo causing restricted joins to not work.
+
+[MSC4169]: https://github.com/matrix-org/matrix-spec-proposals/pull/4169
+[#411]: github.com/mautrix/go/pull/411
+[#420]: github.com/mautrix/go/pull/420
+[#426]: github.com/mautrix/go/pull/426
+
+## v0.25.2 (2025-10-16)
+
+* **Breaking change *(id)*** Split `UserID.ParseAndValidate` into
+  `ParseAndValidateRelaxed` and `ParseAndValidateStrict`. Strict is the old
+  behavior, but most users likely want the relaxed version, as there are real
+  users whose user IDs aren't valid under the strict rules.
+* *(crypto)* Added helper methods for generating and verifying with recovery
+  keys.
+* *(bridgev2/matrix)* Added config option to automatically generate a recovery
+  key for the bridge bot and self-sign the bridge's device.
+* *(bridgev2/matrix)* Added initial support for using appservice/MSC3202 mode
+  for encryption with standard servers like Synapse.
+* *(bridgev2)* Added optional support for implicit read receipts.
+* *(bridgev2)* Added interface for deleting chats on remote network.
+* *(bridgev2)* Added local enforcement of media duration and size limits.
+* *(bridgev2)* Extended event duration logging to log any event taking too long.
+* *(bridgev2)* Improved validation in group creation provisioning API.
+* *(event)* Added event type constant for poll end events.
+* *(client)* Added wrapper for searching user directory.
+* *(client)* Improved support for managing [MSC4140] delayed events.
+* *(crypto/helper)* Changed default sync handling to not block on waiting for
+  decryption keys. On initial sync, keys won't be requested at all by default.
+* *(crypto)* Fixed olm unwedging not working (regressed in v0.25.1).
+* *(bridgev2)* Fixed various bugs with migrating to split portals.
+* *(event)* Fixed poll start events having incorrect null `m.relates_to`.
+* *(client)* Fixed `RespUserProfile` losing standard fields when re-marshaling.
+* *(federation)* Fixed various bugs in event auth.
+
 ## v0.25.1 (2025-09-16)
 
 * *(client)* Fixed HTTP method of delete devices API call

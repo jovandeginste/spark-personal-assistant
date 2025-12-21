@@ -62,6 +62,63 @@ func getOperationParametersToVertex(fromObject map[string]any, parentObject map[
 	return toObject, nil
 }
 
+func uploadToFileSearchStoreOperationFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromName := getValueByPath(fromObject, []string{"name"})
+	if fromName != nil {
+		setValueByPath(toObject, []string{"name"}, fromName)
+	}
+
+	fromMetadata := getValueByPath(fromObject, []string{"metadata"})
+	if fromMetadata != nil {
+		setValueByPath(toObject, []string{"metadata"}, fromMetadata)
+	}
+
+	fromDone := getValueByPath(fromObject, []string{"done"})
+	if fromDone != nil {
+		setValueByPath(toObject, []string{"done"}, fromDone)
+	}
+
+	fromError := getValueByPath(fromObject, []string{"error"})
+	if fromError != nil {
+		setValueByPath(toObject, []string{"error"}, fromError)
+	}
+
+	fromResponse := getValueByPath(fromObject, []string{"response"})
+	if fromResponse != nil {
+		fromResponse, err = uploadToFileSearchStoreResponseFromMldev(fromResponse.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"response"}, fromResponse)
+	}
+
+	return toObject, nil
+}
+
+func uploadToFileSearchStoreResponseFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromSdkHttpResponse := getValueByPath(fromObject, []string{"sdkHttpResponse"})
+	if fromSdkHttpResponse != nil {
+		setValueByPath(toObject, []string{"sdkHttpResponse"}, fromSdkHttpResponse)
+	}
+
+	fromParent := getValueByPath(fromObject, []string{"parent"})
+	if fromParent != nil {
+		setValueByPath(toObject, []string{"parent"}, fromParent)
+	}
+
+	fromDocumentName := getValueByPath(fromObject, []string{"documentName"})
+	if fromDocumentName != nil {
+		setValueByPath(toObject, []string{"documentName"}, fromDocumentName)
+	}
+
+	return toObject, nil
+}
+
 // Operations provides methods for managing the long-running operations.
 // You don't need to initiate this struct. Create a client instance via NewClient, and
 // then access Operations through client.Operations field.
@@ -232,6 +289,168 @@ func (m Operations) fetchPredictVideosOperation(ctx context.Context, operationNa
 	return response, nil
 }
 
+func (m Operations) getUploadToFileSearchStoreOperation(ctx context.Context, operationName string, config *GetOperationConfig) (*UploadToFileSearchStoreOperation, error) {
+	parameterMap := make(map[string]any)
+
+	kwargs := map[string]any{"operationName": operationName, "config": config}
+	deepMarshal(kwargs, &parameterMap)
+
+	var httpOptions *HTTPOptions
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
+	} else {
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
+	}
+	var response = new(UploadToFileSearchStoreOperation)
+	var responseMap map[string]any
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		toConverter = getOperationParametersToVertex
+
+	} else {
+		toConverter = getOperationParametersToMldev
+		fromConverter = uploadToFileSearchStoreOperationFromMldev
+	}
+
+	body, err := toConverter(parameterMap, nil)
+	if err != nil {
+		return nil, err
+	}
+	var path string
+	var urlParams map[string]any
+	if _, ok := body["_url"]; ok {
+		urlParams = body["_url"].(map[string]any)
+		delete(body, "_url")
+	}
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		path, err = formatMap("{operationName}", urlParams)
+	} else {
+		path, err = formatMap("{operationName}", urlParams)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
+	}
+	if _, ok := body["_query"]; ok {
+		query, err := createURLQuery(body["_query"].(map[string]any))
+		if err != nil {
+			return nil, err
+		}
+		path += "?" + query
+		delete(body, "_query")
+	}
+	responseMap, err = sendRequest(ctx, m.apiClient, path, http.MethodGet, body, httpOptions)
+	if err != nil {
+		return nil, err
+	}
+	if fromConverter != nil {
+		responseMap, err = fromConverter(responseMap, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = mapToStruct(responseMap, response)
+	if err != nil {
+		return nil, err
+	}
+
+	if field, ok := reflect.TypeOf(response).Elem().FieldByName("SDKHTTPResponse"); ok {
+		{
+			if reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").IsValid() {
+				{
+					reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").Set(reflect.Zero(field.Type))
+				}
+			}
+		}
+	}
+
+	return response, nil
+}
+
+func (m Operations) getImportFileOperation(ctx context.Context, operationName string, config *GetOperationConfig) (*ImportFileOperation, error) {
+	parameterMap := make(map[string]any)
+
+	kwargs := map[string]any{"operationName": operationName, "config": config}
+	deepMarshal(kwargs, &parameterMap)
+
+	var httpOptions *HTTPOptions
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
+	} else {
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
+	}
+	var response = new(ImportFileOperation)
+	var responseMap map[string]any
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(map[string]any, map[string]any) (map[string]any, error)
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		toConverter = getOperationParametersToVertex
+
+	} else {
+		toConverter = getOperationParametersToMldev
+		fromConverter = importFileOperationFromMldev
+	}
+
+	body, err := toConverter(parameterMap, nil)
+	if err != nil {
+		return nil, err
+	}
+	var path string
+	var urlParams map[string]any
+	if _, ok := body["_url"]; ok {
+		urlParams = body["_url"].(map[string]any)
+		delete(body, "_url")
+	}
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		path, err = formatMap("{operationName}", urlParams)
+	} else {
+		path, err = formatMap("{operationName}", urlParams)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
+	}
+	if _, ok := body["_query"]; ok {
+		query, err := createURLQuery(body["_query"].(map[string]any))
+		if err != nil {
+			return nil, err
+		}
+		path += "?" + query
+		delete(body, "_query")
+	}
+	responseMap, err = sendRequest(ctx, m.apiClient, path, http.MethodGet, body, httpOptions)
+	if err != nil {
+		return nil, err
+	}
+	if fromConverter != nil {
+		responseMap, err = fromConverter(responseMap, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = mapToStruct(responseMap, response)
+	if err != nil {
+		return nil, err
+	}
+
+	if field, ok := reflect.TypeOf(response).Elem().FieldByName("SDKHTTPResponse"); ok {
+		{
+			if reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").IsValid() {
+				{
+					reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").Set(reflect.Zero(field.Type))
+				}
+			}
+		}
+	}
+
+	return response, nil
+}
+
 // GetVideosOperation retrieves the status and result of a long-running video generation operation.
 //
 // If the operation is still in progress, the returned GenerateVideosOperation
@@ -257,4 +476,38 @@ func (m Operations) GetVideosOperation(ctx context.Context, operation *GenerateV
 		}
 	}
 	return m.getVideosOperation(ctx, operationName, config)
+}
+
+// GetUploadToFileSearchStoreOperation retrieves the status and result of a long-running upload to file search store operation.
+//
+// If the operation is still in progress, the returned UploadToFileSearchStoreOperation
+// will have Done set to false. If the operation has completed successfully,
+// Done will be true, and the Result field will contain the result. If the
+// operation failed, Done will be true, and the Error field will be populated.
+func (m Operations) GetUploadToFileSearchStoreOperation(ctx context.Context, operation *UploadToFileSearchStoreOperation, config *GetOperationConfig) (*UploadToFileSearchStoreOperation, error) {
+	operationName := operation.Name
+	if operationName == "" {
+		return nil, fmt.Errorf("Operation name is empty")
+	}
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		return nil, fmt.Errorf("method GetUploadToFileSearchStoreOperation is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
+	}
+	return m.getUploadToFileSearchStoreOperation(ctx, operationName, config)
+}
+
+// GetImportFileOperation retrieves the status and result of a long-running import file to file search store operation.
+//
+// If the operation is still in progress, the returned ImportFileOperation
+// will have Done set to false. If the operation has completed successfully,
+// Done will be true, and the Result field will contain the result. If the
+// operation failed, Done will be true, and the Error field will be populated.
+func (m Operations) GetImportFileOperation(ctx context.Context, operation *ImportFileOperation, config *GetOperationConfig) (*ImportFileOperation, error) {
+	operationName := operation.Name
+	if operationName == "" {
+		return nil, fmt.Errorf("Operation name is empty")
+	}
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		return nil, fmt.Errorf("method GetUploadToFileSearchStoreOperation is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
+	}
+	return m.getImportFileOperation(ctx, operationName, config)
 }

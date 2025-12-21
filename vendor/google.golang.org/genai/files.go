@@ -350,9 +350,6 @@ func (m Files) Get(ctx context.Context, name string, config *GetFileConfig) (*Fi
 	if err != nil {
 		return nil, err
 	}
-	if err != nil {
-		return nil, err
-	}
 	err = mapToStruct(responseMap, response)
 	if err != nil {
 		return nil, err
@@ -454,7 +451,7 @@ func (m Files) List(ctx context.Context, config *ListFilesConfig) (Page[File], e
 // All retrieves all files resources.
 //
 // This method handles pagination internally, making multiple API calls as needed
-// to fetch all entries. It returns an iterator that yields each file
+// to fetch all entries. It returns an iterator that yields each "files"
 // entry one by one. You do not need to manage pagination
 // tokens or make multiple calls to retrieve all data.
 func (m Files) All(ctx context.Context) iter.Seq2[*File, error] {
@@ -592,6 +589,9 @@ func (m Files) UploadFromPath(ctx context.Context, path string, config *UploadFi
 		copiedCfg.HTTPOptions.Headers = http.Header{}
 	}
 	copiedCfg.HTTPOptions.Headers.Add("X-Goog-Upload-Header-Content-Length", strconv.FormatInt(fileInfo.Size(), 10))
+
+	fileName := filepath.Base(path)
+	copiedCfg.HTTPOptions.Headers.Add("X-Goog-Upload-File-Name", fileName)
 
 	return m.Upload(ctx, osf, &copiedCfg)
 }

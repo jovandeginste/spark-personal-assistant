@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 	"go.mau.fi/util/jsontime"
+	"go.mau.fi/util/ptr"
 
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
@@ -104,10 +106,21 @@ type RespContext struct {
 type RespSendEvent struct {
 	EventID id.EventID `json:"event_id"`
 
-	UnstableDelayID string `json:"delay_id,omitempty"`
+	UnstableDelayID id.DelayID `json:"delay_id,omitempty"`
 }
 
 type RespUpdateDelayedEvent struct{}
+
+type RespDelayedEvents struct {
+	Scheduled []*event.ScheduledDelayedEvent `json:"scheduled,omitempty"`
+	Finalised []*event.FinalisedDelayedEvent `json:"finalised,omitempty"`
+	NextBatch string                         `json:"next_batch,omitempty"`
+
+	// Deprecated: Synapse implementation still returns this
+	DelayedEvents []*event.ScheduledDelayedEvent `json:"delayed_events,omitempty"`
+	// Deprecated: Synapse implementation still returns this
+	FinalisedEvents []*event.FinalisedDelayedEvent `json:"finalised_events,omitempty"`
+}
 
 type RespRedactUserEvents struct {
 	IsMoreEvents   bool `json:"is_more_events"`
@@ -210,7 +223,36 @@ func (r *RespUserProfile) MarshalJSON() ([]byte, error) {
 	} else {
 		delete(marshalMap, "avatar_url")
 	}
-	return json.Marshal(r.Extra)
+	return json.Marshal(marshalMap)
+}
+
+type RespSearchUserDirectory struct {
+	Limited bool                  `json:"limited"`
+	Results []*UserDirectoryEntry `json:"results"`
+}
+
+type UserDirectoryEntry struct {
+	RespUserProfile
+	UserID id.UserID `json:"user_id"`
+}
+
+func (r *UserDirectoryEntry) UnmarshalJSON(data []byte) error {
+	err := r.RespUserProfile.UnmarshalJSON(data)
+	if err != nil {
+		return err
+	}
+	userIDStr, _ := r.Extra["user_id"].(string)
+	r.UserID = id.UserID(userIDStr)
+	delete(r.Extra, "user_id")
+	return nil
+}
+
+func (r *UserDirectoryEntry) MarshalJSON() ([]byte, error) {
+	if r.Extra == nil {
+		r.Extra = make(map[string]any)
+	}
+	r.Extra["user_id"] = r.UserID.String()
+	return r.RespUserProfile.MarshalJSON()
 }
 
 type RespMutualRooms struct {
@@ -221,10 +263,7 @@ type RespMutualRooms struct {
 type RespRoomSummary struct {
 	PublicRoomInfo
 
-	Membership     event.Membership `json:"membership,omitempty"`
-	RoomVersion    id.RoomVersion   `json:"room_version,omitempty"`
-	Encryption     id.Algorithm     `json:"encryption,omitempty"`
-	AllowedRoomIDs []id.RoomID      `json:"allowed_room_ids,omitempty"`
+	Membership event.Membership `json:"membership,omitempty"`
 
 	UnstableRoomVersion    id.RoomVersion `json:"im.nheko.summary.room_version,omitempty"`
 	UnstableRoomVersionOld id.RoomVersion `json:"im.nheko.summary.version,omitempty"`
@@ -300,6 +339,17 @@ type LazyLoadSummary struct {
 	Heroes             []id.UserID `json:"m.heroes,omitempty"`
 	JoinedMemberCount  *int        `json:"m.joined_member_count,omitempty"`
 	InvitedMemberCount *int        `json:"m.invited_member_count,omitempty"`
+}
+
+func (lls *LazyLoadSummary) Equal(other *LazyLoadSummary) bool {
+	if lls == other {
+		return true
+	} else if lls == nil || other == nil {
+		return false
+	}
+	return ptr.Val(lls.JoinedMemberCount) == ptr.Val(other.JoinedMemberCount) &&
+		ptr.Val(lls.InvitedMemberCount) == ptr.Val(other.InvitedMemberCount) &&
+		slices.Equal(lls.Heroes, other.Heroes)
 }
 
 type SyncEventsList struct {
@@ -632,6 +682,10 @@ type PublicRoomInfo struct {
 	RoomType         event.RoomType      `json:"room_type"`
 	Topic            string              `json:"topic,omitempty"`
 	WorldReadable    bool                `json:"world_readable"`
+
+	RoomVersion    id.RoomVersion `json:"room_version,omitempty"`
+	Encryption     id.Algorithm   `json:"encryption,omitempty"`
+	AllowedRoomIDs []id.RoomID    `json:"allowed_room_ids,omitempty"`
 }
 
 // RespHierarchy is the JSON response for https://spec.matrix.org/v1.4/client-server-api/#get_matrixclientv1roomsroomidhierarchy
@@ -714,4 +768,24 @@ type RespSuspended struct {
 // RespLocked is the response body for https://github.com/matrix-org/matrix-spec-proposals/pull/4323
 type RespLocked struct {
 	Locked bool `json:"locked"`
+}
+
+type ConnectionInfo struct {
+	IP        string             `json:"ip,omitempty"`
+	LastSeen  jsontime.UnixMilli `json:"last_seen,omitempty"`
+	UserAgent string             `json:"user_agent,omitempty"`
+}
+
+type SessionInfo struct {
+	Connections []ConnectionInfo `json:"connections,omitempty"`
+}
+
+type DeviceInfo struct {
+	Sessions []SessionInfo `json:"sessions,omitempty"`
+}
+
+// RespWhoIs is the response body for https://spec.matrix.org/v1.15/client-server-api/#get_matrixclientv3adminwhoisuserid
+type RespWhoIs struct {
+	UserID  id.UserID                  `json:"user_id,omitempty"`
+	Devices map[id.DeviceID]DeviceInfo `json:"devices,omitempty"`
 }

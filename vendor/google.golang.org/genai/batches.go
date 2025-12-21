@@ -20,8 +20,10 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"log"
 	"net/http"
 	"reflect"
+	"sync"
 )
 
 func batchJobDestinationFromMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
@@ -40,6 +42,11 @@ func batchJobDestinationFromMldev(fromObject map[string]any, parentObject map[st
 		}
 
 		setValueByPath(toObject, []string{"inlinedResponses"}, fromInlinedResponses)
+	}
+
+	fromInlinedEmbedContentResponses := getValueByPath(fromObject, []string{"inlinedEmbedContentResponses", "inlinedResponses"})
+	if fromInlinedEmbedContentResponses != nil {
+		setValueByPath(toObject, []string{"inlinedEmbedContentResponses"}, fromInlinedEmbedContentResponses)
 	}
 
 	return toObject, nil
@@ -90,6 +97,10 @@ func batchJobDestinationToVertex(fromObject map[string]any, parentObject map[str
 
 	if getValueByPath(fromObject, []string{"inlinedResponses"}) != nil {
 		return nil, fmt.Errorf("inlinedResponses parameter is not supported in Vertex AI")
+	}
+
+	if getValueByPath(fromObject, []string{"inlinedEmbedContentResponses"}) != nil {
+		return nil, fmt.Errorf("inlinedEmbedContentResponses parameter is not supported in Vertex AI")
 	}
 
 	return toObject, nil
@@ -232,6 +243,11 @@ func batchJobFromVertex(fromObject map[string]any, parentObject map[string]any) 
 		}
 
 		setValueByPath(toObject, []string{"dest"}, fromDest)
+	}
+
+	fromCompletionStats := getValueByPath(fromObject, []string{"completionStats"})
+	if fromCompletionStats != nil {
+		setValueByPath(toObject, []string{"completionStats"}, fromCompletionStats)
 	}
 
 	return toObject, nil
@@ -470,6 +486,51 @@ func createBatchJobParametersToVertex(ac *apiClient, fromObject map[string]any, 
 	return toObject, nil
 }
 
+func createEmbeddingsBatchJobConfigToMldev(fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromDisplayName := getValueByPath(fromObject, []string{"displayName"})
+	if fromDisplayName != nil {
+		setValueByPath(parentObject, []string{"batch", "displayName"}, fromDisplayName)
+	}
+
+	return toObject, nil
+}
+
+func createEmbeddingsBatchJobParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromModel := getValueByPath(fromObject, []string{"model"})
+	if fromModel != nil {
+		fromModel, err = tModel(ac, fromModel)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"_url", "model"}, fromModel)
+	}
+
+	fromSrc := getValueByPath(fromObject, []string{"src"})
+	if fromSrc != nil {
+		fromSrc, err = embeddingsBatchJobSourceToMldev(ac, fromSrc.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"batch", "inputConfig"}, fromSrc)
+	}
+
+	fromConfig := getValueByPath(fromObject, []string{"config"})
+	if fromConfig != nil {
+		_, err = createEmbeddingsBatchJobConfigToMldev(fromConfig.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return toObject, nil
+}
+
 func deleteBatchJobParametersToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
@@ -549,6 +610,54 @@ func deleteResourceJobFromVertex(fromObject map[string]any, parentObject map[str
 	fromError := getValueByPath(fromObject, []string{"error"})
 	if fromError != nil {
 		setValueByPath(toObject, []string{"error"}, fromError)
+	}
+
+	return toObject, nil
+}
+
+func embedContentBatchToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromContents := getValueByPath(fromObject, []string{"contents"})
+	if fromContents != nil {
+		fromContents, err = tContentsForEmbed(ac, fromContents)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"requests[]", "request", "content"}, fromContents)
+	}
+
+	fromConfig := getValueByPath(fromObject, []string{"config"})
+	if fromConfig != nil {
+		fromConfig, err = embedContentConfigToMldev(fromConfig.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"_self"}, fromConfig)
+		moveValueByPath(toObject, map[string]string{"requests[].*": "requests[].request.*"})
+	}
+
+	return toObject, nil
+}
+
+func embeddingsBatchJobSourceToMldev(ac *apiClient, fromObject map[string]any, parentObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromFileName := getValueByPath(fromObject, []string{"fileName"})
+	if fromFileName != nil {
+		setValueByPath(toObject, []string{"file_name"}, fromFileName)
+	}
+
+	fromInlinedRequests := getValueByPath(fromObject, []string{"inlinedRequests"})
+	if fromInlinedRequests != nil {
+		fromInlinedRequests, err = embedContentBatchToMldev(ac, fromInlinedRequests.(map[string]any), toObject)
+		if err != nil {
+			return nil, err
+		}
+
+		setValueByPath(toObject, []string{"requests"}, fromInlinedRequests)
 	}
 
 	return toObject, nil
@@ -862,6 +971,88 @@ func (m Batches) create(ctx context.Context, model *string, src *BatchJobSource,
 	return response, nil
 }
 
+func (m Batches) createEmbeddings(ctx context.Context, model *string, src *EmbeddingsBatchJobSource, config *CreateEmbeddingsBatchJobConfig) (*BatchJob, error) {
+	parameterMap := make(map[string]any)
+
+	kwargs := map[string]any{"model": model, "src": src, "config": config}
+	deepMarshal(kwargs, &parameterMap)
+
+	var httpOptions *HTTPOptions
+	if config == nil || config.HTTPOptions == nil {
+		httpOptions = &HTTPOptions{}
+	} else {
+		httpOptions = config.HTTPOptions
+	}
+	if httpOptions.Headers == nil {
+		httpOptions.Headers = http.Header{}
+	}
+	var response = new(BatchJob)
+	var responseMap map[string]any
+	var fromConverter func(map[string]any, map[string]any) (map[string]any, error)
+	var toConverter func(*apiClient, map[string]any, map[string]any) (map[string]any, error)
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+
+		return nil, fmt.Errorf("method CreateEmbeddings is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
+
+	} else {
+		toConverter = createEmbeddingsBatchJobParametersToMldev
+		fromConverter = batchJobFromMldev
+	}
+
+	body, err := toConverter(m.apiClient, parameterMap, nil)
+	if err != nil {
+		return nil, err
+	}
+	var path string
+	var urlParams map[string]any
+	if _, ok := body["_url"]; ok {
+		urlParams = body["_url"].(map[string]any)
+		delete(body, "_url")
+	}
+	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+		path, err = formatMap("None", urlParams)
+	} else {
+		path, err = formatMap("{model}:asyncBatchEmbedContent", urlParams)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
+	}
+	if _, ok := body["_query"]; ok {
+		query, err := createURLQuery(body["_query"].(map[string]any))
+		if err != nil {
+			return nil, err
+		}
+		path += "?" + query
+		delete(body, "_query")
+	}
+	responseMap, err = sendRequest(ctx, m.apiClient, path, http.MethodPost, body, httpOptions)
+	if err != nil {
+		return nil, err
+	}
+	if fromConverter != nil {
+		responseMap, err = fromConverter(responseMap, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+	err = mapToStruct(responseMap, response)
+	if err != nil {
+		return nil, err
+	}
+
+	if field, ok := reflect.TypeOf(response).Elem().FieldByName("SDKHTTPResponse"); ok {
+		{
+			if reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").IsValid() {
+				{
+					reflect.ValueOf(response).Elem().FieldByName("SDKHTTPResponse").Set(reflect.Zero(field.Type))
+				}
+			}
+		}
+	}
+
+	return response, nil
+}
+
 // Get gets a batch job resource.
 func (m Batches) Get(ctx context.Context, name string, config *GetBatchJobConfig) (*BatchJob, error) {
 	parameterMap := make(map[string]any)
@@ -995,14 +1186,11 @@ func (m Batches) Cancel(ctx context.Context, name string, config *CancelBatchJob
 		path += "?" + query
 		delete(body, "_query")
 	}
-
-	if _, ok := body["config"]; ok {
-		delete(body, "config")
-	}
 	_, err = sendRequest(ctx, m.apiClient, path, http.MethodPost, body, httpOptions)
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -1149,6 +1337,49 @@ func (m Batches) Delete(ctx context.Context, name string, config *DeleteBatchJob
 	return response, nil
 }
 
+// List retrieves a paginated list of batch_jobs resources.
+func (m Batches) List(ctx context.Context, config *ListBatchJobsConfig) (Page[BatchJob], error) {
+	listFunc := func(ctx context.Context, config map[string]any) ([]*BatchJob, string, *HTTPResponse, error) {
+		var c ListBatchJobsConfig
+		if err := mapToStruct(config, &c); err != nil {
+			return nil, "", nil, err
+		}
+		resp, err := m.list(ctx, &c)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		return resp.BatchJobs, resp.NextPageToken, resp.SDKHTTPResponse, nil
+	}
+	c := make(map[string]any)
+	deepMarshal(config, &c)
+	return newPage(ctx, "batchJobs", c, listFunc)
+}
+
+// All retrieves all batch_jobs resources.
+//
+// This method handles pagination internally, making multiple API calls as needed
+// to fetch all entries. It returns an iterator that yields each "batchJobs"
+// entry one by one. You do not need to manage pagination
+// tokens or make multiple calls to retrieve all data.
+func (m Batches) All(ctx context.Context) iter.Seq2[*BatchJob, error] {
+	listFunc := func(ctx context.Context, config map[string]any) ([]*BatchJob, string, *HTTPResponse, error) {
+		var c ListBatchJobsConfig
+		if err := mapToStruct(config, &c); err != nil {
+			return nil, "", nil, err
+		}
+		resp, err := m.list(ctx, &c)
+		if err != nil {
+			return nil, "", nil, err
+		}
+		return resp.BatchJobs, resp.NextPageToken, resp.SDKHTTPResponse, nil
+	}
+	p, err := newPage(ctx, "batchJobs", map[string]any{}, listFunc)
+	if err != nil {
+		return yieldErrorAndEndIterator[BatchJob](err)
+	}
+	return p.all(ctx)
+}
+
 // Create a batch job.
 func (b Batches) Create(ctx context.Context, model string, src *BatchJobSource, config *CreateBatchJobConfig) (*BatchJob, error) {
 	if b.apiClient.clientConfig.Backend == BackendVertexAI {
@@ -1175,45 +1406,15 @@ func (b Batches) Create(ctx context.Context, model string, src *BatchJobSource, 
 	return b.create(ctx, &model, src, config)
 }
 
-// List retrieves a paginated list of batch jobs.
-func (b Batches) List(ctx context.Context, config *ListBatchJobsConfig) (Page[BatchJob], error) {
-	listFunc := func(ctx context.Context, config map[string]any) ([]*BatchJob, string, *HTTPResponse, error) {
-		var c ListBatchJobsConfig
-		if err := mapToStruct(config, &c); err != nil {
-			return nil, "", nil, err
-		}
-		resp, err := b.list(ctx, &c)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		return resp.BatchJobs, resp.NextPageToken, resp.SDKHTTPResponse, nil
-	}
-	c := make(map[string]any)
-	deepMarshal(config, &c)
-	return newPage(ctx, "batchJobs", c, listFunc)
-}
+var experimentalWarningBatchesCreateEmbeddings sync.Once
 
-// All retrieves all batch job resources.
-//
-// This method handles pagination internally, making multiple API calls as needed
-// to fetch all entries. It returns an iterator that yields each cached
-// content entry one by one. You do not need to manage pagination
-// tokens or make multiple calls to retrieve all data.
-func (b Batches) All(ctx context.Context) iter.Seq2[*BatchJob, error] {
-	listFunc := func(ctx context.Context, config map[string]any) ([]*BatchJob, string, *HTTPResponse, error) {
-		var c ListBatchJobsConfig
-		if err := mapToStruct(config, &c); err != nil {
-			return nil, "", nil, err
-		}
-		resp, err := b.list(ctx, &c)
-		if err != nil {
-			return nil, "", nil, err
-		}
-		return resp.BatchJobs, resp.NextPageToken, resp.SDKHTTPResponse, nil
+// Create an embeddings batch job.
+func (b Batches) CreateEmbeddings(ctx context.Context, model *string, src *EmbeddingsBatchJobSource, config *CreateEmbeddingsBatchJobConfig) (*BatchJob, error) {
+	experimentalWarningBatchesCreateEmbeddings.Do(func() {
+		log.Println("The SDK's CreateEmbeddings implementation is experimental, and may change in future versions.")
+	})
+	if b.apiClient.clientConfig.Backend == BackendVertexAI {
+		return nil, fmt.Errorf("Vertex AI does not support batches.createEmbeddings.")
 	}
-	p, err := newPage(ctx, "BatchJobs", map[string]any{}, listFunc)
-	if err != nil {
-		return yieldErrorAndEndIterator[BatchJob](err)
-	}
-	return p.all(ctx)
+	return b.createEmbeddings(ctx, model, src, config)
 }
