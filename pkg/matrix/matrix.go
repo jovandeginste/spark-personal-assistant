@@ -174,14 +174,16 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 				return "", err
 			}
 
-			list := "All personas:\n"
+			var list strings.Builder
+
+			list.WriteString("All personas:\n")
 			for _, p := range pDir {
 				n := p.Name()
 				n = strings.TrimSuffix(n, ".md")
-				list += fmt.Sprintf("- %s\n", n)
+				list.WriteString(fmt.Sprintf("- %s\n", n))
 			}
 
-			return list, nil
+			return list.String(), nil
 		}
 
 		mc.App.SetPersona(cmd[1])
