@@ -26,8 +26,8 @@ func PromptFor(format string) (Prompt, error) {
 var promptPreamble = []string{
 	"Your entire response should be formatted in Markdown",
 	"Use the metric system and 24 hour clock notation.",
-	"The following entries consist a list of items.",
-	"Entries without a timestamp are for the whole day.",
+	"The following entries consist a list of events.",
+	"Events without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
 }
 
@@ -36,7 +36,7 @@ func (a AssistantConfig) PromptPreamble() []string {
 		"Your name is: " + a.Name,
 		"Use the following style: " + a.Style,
 		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
-		"Translate all entries to:" + a.Language,
+		"Translate all events to:" + a.Language,
 	}
 
 	return append(prompt, promptPreamble...)
@@ -112,7 +112,7 @@ func PromptWeek(assistant *AssistantConfig, data any) ([]string, error) {
 
 	c := append(assistant.PromptPreamble(),
 		[]string{
-			"Only include the following week's entries.",
+			"Only include the coming week's events.",
 			"Compile a schedule and a summarized overview of todo's, and reminders.",
 			"Information:",
 			string(j),
@@ -130,7 +130,7 @@ func PromptToday(assistant *AssistantConfig, data any) ([]string, error) {
 
 	c := append(assistant.PromptPreamble(),
 		[]string{
-			"Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's entries. Be verbose.",
+			"Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's events. Add pointers regarding the weather if relevant. Be verbose.",
 			"Information:",
 			string(j),
 		}...,
@@ -147,7 +147,7 @@ func PromptFull(assistant *AssistantConfig, data any) ([]string, error) {
 
 	c := append(assistant.PromptPreamble(),
 		[]string{
-			"Add a quick summary of the past week's important entries. Be verbose about today's entries. Add a quick summary of future important entries - one line per day. Add weather information for days with outside entries.",
+			"Add a quick summary of the past week's important events. Add a quick summary of future important events - one line per day. Add weather information for events with outside events.",
 			"Information:",
 			string(j),
 		}...,
