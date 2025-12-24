@@ -89,7 +89,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		return nil
 	}
 
-	result, err := mc.parseInput(input)
+	result, err := mc.parseInput(input, roomID)
 	if err != nil {
 		return err
 	}
@@ -141,13 +141,23 @@ func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
 	return nil
 }
 
-func (mc *MatrixConfig) parseInput(input string) (string, error) {
+func (mc *MatrixConfig) parseInput(input string, roomID id.RoomID) (string, error) {
 	cmd := strings.SplitN(input, " ", 3)
 
 	switch cmd[0] {
 	case "reset":
 		defer mc.AIData.ResetHistory()
 		return "Resetting chat history...", nil
+	case "update":
+		go func() {
+			if err := mc.App.UpdateSources(); err != nil {
+				mc.sendMessage(roomID, "Something went wrong while updating sources:\n\n> "+strings.ReplaceAll(err.Error(), "\n", "\n> "))
+			}
+
+			mc.sendNotice(roomID, "Sources were updated.")
+		}()
+
+		return "Updating all sources", nil
 	case "shutdown":
 		go func() {
 			time.Sleep(5 * time.Second)
