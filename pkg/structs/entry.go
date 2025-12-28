@@ -16,15 +16,16 @@ import (
 )
 
 type Entry struct {
-	ID       uint64              `gorm:"primaryKey"`
-	RemoteID string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Date     humantime.HumanTime `gorm:"index" json:",omitempty"`
-	DateEnd  humantime.HumanTime `json:",omitempty"`
-	SourceID uint64              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
-	Summary  string              `gorm:"not null"`
-	IsTodo   bool                `json:"Todo,omitempty"`
-	IsDone   bool                `json:"Done,omitempty"`
-	Metadata map[string]any      `gorm:"serializer:json" json:",omitempty"`
+	ID        uint64              `gorm:"primaryKey"`
+	RemoteID  string              `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	DateStart humantime.HumanTime `gorm:"index"`
+	Date      humantime.HumanTime
+	DateEnd   humantime.HumanTime
+	SourceID  uint64         `gorm:"not null;uniqueIndex:idx_source_id" json:"-"`
+	Summary   string         `gorm:"not null"`
+	IsTodo    bool           `json:"Todo,omitempty"`
+	IsDone    bool           `json:"Done,omitempty"`
+	Metadata  map[string]any `gorm:"serializer:json" json:",omitempty"`
 
 	DateString    string `gorm:"-" json:"-"`
 	DateEndString string `gorm:"-" json:"-"`
@@ -63,6 +64,10 @@ func (e *Entry) GenerateRemoteID() {
 func (e *Entry) BeforeSave(_ *gorm.DB) error {
 	e.GenerateRemoteID()
 
+	if e.DateStart.Time.IsZero() {
+		e.DateStart = e.Date
+	}
+
 	if e.DateEnd.Time.IsZero() {
 		e.DateEnd = e.Date
 	}
@@ -83,7 +88,27 @@ func (e *Entry) AfterFind(_ *gorm.DB) error {
 	e.DateEndString = e.FormattedDateEnd()
 	e.TodoString = e.FormattedTodo()
 
+	e.UpdateDate()
+
 	return nil
+}
+
+func (e *Entry) UpdateDate() {
+	if e.DateStart.IsZero() {
+		e.DateStart = e.Date
+	}
+
+	if e.DateEnd.SameDate(&e.Date) {
+		return
+	}
+
+	now := humantime.Today()
+
+	if e.Date.After(now) || e.DateEnd.Before(now) {
+		return
+	}
+
+	e.Date = *now
 }
 
 func (e *Entry) DateRange() string {
