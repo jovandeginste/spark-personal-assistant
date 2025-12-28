@@ -64,6 +64,9 @@ func (c *cli) md2speechCmd() *cobra.Command {
 			w := bytes.NewReader(resp.AudioContent)
 
 			out, err := getOutput(args[1])
+			if err != nil {
+				return err
+			}
 			defer out.Close()
 
 			_, err = io.Copy(out, w)
