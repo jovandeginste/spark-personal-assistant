@@ -46,17 +46,14 @@ func GetWeatherData(location string) (Entries, error) {
 
 	var entries Entries
 
-	for hour := range len(weatherData.Hourly.Time) {
-		e, err := newHourEventFromOpenMeteo(weatherData, location, hour)
+	today := humantime.Today()
+	for d := range 5 {
+		e, err := newHourEventFromOpenMeteo(weatherData, location, today.Add(time.Duration(d*24)*time.Hour))
 		if err != nil {
 			log.Printf("Error: %s", err)
-			continue
+		} else {
+			entries = append(entries, *e)
 		}
-		if e == nil {
-			continue
-		}
-
-		entries = append(entries, *e)
 	}
 
 	for day := range len(weatherData.Daily.Time) {
@@ -125,38 +122,50 @@ func getWeatherData(location string) (*WeatherData, error) {
 	return &d, nil
 }
 
-func newHourEventFromOpenMeteo(wd *WeatherData, location string, hour int) (*Entry, error) {
+func newHourEventFromOpenMeteo(wd *WeatherData, location string, date *humantime.HumanTime) (*Entry, error) {
 	allHours := wd.Hourly
-	eDate := allHours.Time[hour]
 
-	parsedDate, err := time.Parse("2006-01-02T15:04", eDate)
+	e := &Entry{
+		Date:    *date,
+		Summary: fmt.Sprintf("Hourly weather for %s in %s", date.Format("Monday"), location),
+	}
+
+	type hw map[string]string
+
+	hr := map[string]hw{}
+
+	for hour, t := range allHours.Time {
+		lt, err := time.ParseInLocation("2006-01-02T15:04", t, humantime.LocalTimezone)
+		if err != nil {
+			continue
+		}
+
+		d := &humantime.HumanTime{Time: lt}
+		if !d.SameDate(date) {
+			continue
+		}
+
+		if d.Hour() == 0 {
+			d = d.Add(60 * time.Second)
+		}
+
+		data := hw{
+			"temperature": fmt.Sprintf("%.1f %s", allHours.Temperature2M[hour], wd.HourlyUnits.Temperature2M),
+			"rain":        fmt.Sprintf("%.0f %s", allHours.Rain[hour], wd.HourlyUnits.Rain),
+			"showers":     fmt.Sprintf("%.0f %s", allHours.Showers[hour], wd.HourlyUnits.Showers),
+			"snowfall":    fmt.Sprintf("%.0f %s", allHours.Snowfall[hour], wd.HourlyUnits.Snowfall),
+			"windspeed":   fmt.Sprintf("%.1f %s", allHours.WindSpeed10M[hour], wd.HourlyUnits.WindSpeed10M),
+		}
+
+		hr[d.FormatDate()] = data
+	}
+
+	j, err := json.MarshalIndent(hr, "", "  ")
 	if err != nil {
 		return nil, err
 	}
 
-	parsedDate = parsedDate.In(humantime.LocalTimezone)
-
-	if parsedDate.Before(time.Now().Add(-6 * time.Hour)) {
-		return nil, nil
-	}
-
-	if parsedDate.After(time.Now().Add(30 * time.Hour)) {
-		return nil, nil
-	}
-
-	e := &Entry{
-		Date:    humantime.HumanTime{Time: parsedDate},
-		DateEnd: humantime.HumanTime{Time: parsedDate.Add(1 * time.Hour)},
-		Summary: fmt.Sprintf("Weather for %s at %s in %s", parsedDate.Format("Monday"), parsedDate.Format("15:04"), location),
-	}
-
-	e.SetMetadata("Temperature", fmt.Sprintf("%.1f %s", allHours.Temperature2M[hour], wd.HourlyUnits.Temperature2M))
-	e.SetMetadata("Rain", fmt.Sprintf("%.0f %s", allHours.Rain[hour], wd.HourlyUnits.Rain))
-	e.SetMetadata("Showers", fmt.Sprintf("%.0f %s", allHours.Showers[hour], wd.HourlyUnits.Showers))
-	e.SetMetadata("Snowfall", fmt.Sprintf("%.0f %s", allHours.Snowfall[hour], wd.HourlyUnits.Snowfall))
-	e.SetMetadata("Windspeed", fmt.Sprintf("%.1f %s", allHours.WindSpeed10M[hour], wd.HourlyUnits.WindSpeed10M))
-	e.SetMetadata("Latitude", wd.Latitude)
-	e.SetMetadata("Longitude", wd.Longitude)
+	e.SetMetadata("hourly", string(j))
 
 	return e, nil
 }
@@ -184,8 +193,6 @@ func newDayEventFromOpenMeteo(wd *WeatherData, location string, day int) (*Entry
 	e.SetMetadata("Showers sum", fmt.Sprintf("%.0f %s", allDays.ShowersSum[day], wd.DailyUnits.ShowersSum))
 	e.SetMetadata("Snowfall sum", fmt.Sprintf("%.0f %s", allDays.SnowfallSum[day], wd.DailyUnits.SnowfallSum))
 	e.SetMetadata("Windspeed max", fmt.Sprintf("%.1f %s", allDays.WindSpeed10MMax[day], wd.DailyUnits.WindSpeed10MMax))
-	e.SetMetadata("Latitude", wd.Latitude)
-	e.SetMetadata("Longitude", wd.Longitude)
 
 	return e, nil
 }
