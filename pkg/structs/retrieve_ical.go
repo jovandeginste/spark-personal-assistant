@@ -89,10 +89,7 @@ func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
 
 	if event.Start != nil && event.End != nil {
 		dur := event.End.Sub(*event.Start).Round(60 * time.Second)
-		d := dur.String()
-		d = strings.TrimSuffix(d, "0s")
-		d = strings.TrimSuffix(d, "0m")
-		e.SetMetadata("Duration", d)
+		e.SetMetadata("Duration", cleanDuration(dur))
 	}
 
 	e.SetMetadataIfNotEmpty("Location", event.Location)
@@ -160,4 +157,12 @@ func parseTimezone(tz string) *time.Location {
 	}
 
 	return time.UTC
+}
+
+func cleanDuration(d time.Duration) string {
+	r := d.String()
+	r = strings.TrimSuffix(r, "0s")
+	r = strings.TrimSuffix(r, "0m")
+
+	return r
 }
