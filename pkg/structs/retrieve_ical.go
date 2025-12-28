@@ -88,8 +88,11 @@ func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
 	}
 
 	if event.Start != nil && event.End != nil {
-		dur := event.End.Sub(*event.Start)
-		e.SetMetadata("Duration", dur.String())
+		dur := event.End.Sub(*event.Start).Round(60 * time.Second)
+		d := dur.String()
+		d = strings.TrimSuffix(d, "0s")
+		d = strings.TrimSuffix(d, "0m")
+		e.SetMetadata("Duration", d)
 	}
 
 	e.SetMetadataIfNotEmpty("Location", event.Location)
@@ -97,6 +100,10 @@ func newEventFromICal(event *gocal.Event, collection string) (*Entry, error) {
 	e.SetMetadataIfNotEmpty("Class", event.Class)
 	e.SetMetadataIfNotEmpty("Comment", event.Comment)
 	e.SetMetadataIfNotEmpty("Description", event.Description)
+
+	if event.IsRecurring {
+		e.SetMetadata("Recurring", event.IsRecurring)
+	}
 
 	if event.Organizer != nil {
 		e.SetMetadataIfNotEmpty("Organizer", event.Organizer.Cn)
