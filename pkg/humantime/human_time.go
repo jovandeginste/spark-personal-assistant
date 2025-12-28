@@ -14,16 +14,30 @@ type HumanTime struct {
 	time.Time
 }
 
+func Today() *HumanTime {
+	now := time.Now()
+	t := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, LocalTimezone)
+	return &HumanTime{Time: t}
+}
+
 func Now() *HumanTime {
 	return &HumanTime{Time: time.Now().In(LocalTimezone)}
+}
+
+func (ct *HumanTime) Add(d time.Duration) *HumanTime {
+	return &HumanTime{ct.Time.Add(d)}
 }
 
 func (ct *HumanTime) DateOnly() bool {
 	return ct.Hour() == 0 && ct.Minute() == 0
 }
 
+func (ct *HumanTime) SameDate(other *HumanTime) bool {
+	return ct.Format("2006-01-02") == other.Format("2006-01-02")
+}
+
 func (ct *HumanTime) IsToday() bool {
-	return ct.Format("2006-01-02") == time.Now().In(LocalTimezone).Format("2006-01-02")
+	return ct.SameDate(Now())
 }
 
 func (ct *HumanTime) MarshalJSON() ([]byte, error) {
