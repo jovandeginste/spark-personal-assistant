@@ -709,7 +709,7 @@ maunium.net/go/mautrix/format/mdext
 maunium.net/go/mautrix/id
 maunium.net/go/mautrix/pushrules
 maunium.net/go/mautrix/sqlstatestore
-# modernc.org/libc v1.67.1
+# modernc.org/libc v1.67.2
 ## explicit; go 1.24.0
 modernc.org/libc
 modernc.org/libc/errno
@@ -743,6 +743,6 @@ modernc.org/mathutil
 # modernc.org/memory v1.11.0
 ## explicit; go 1.23.0
 modernc.org/memory
-# modernc.org/sqlite v1.41.0
+# modernc.org/sqlite v1.42.2
 ## explicit; go 1.24.0
 modernc.org/sqlite/lib
