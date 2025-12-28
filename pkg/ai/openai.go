@@ -3,7 +3,6 @@ package ai
 import (
 	"context"
 	"fmt"
-	"io"
 	"log/slog"
 	"time"
 
@@ -86,23 +85,4 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	}
 
 	return "", nil
-}
-
-func (c openaiClient) GenerateSpeech(ctx context.Context, text string) ([]byte, error) {
-	client := openai.NewClient(
-		option.WithAPIKey(c.APIKey()),
-	)
-
-	result, err := client.Audio.Speech.New(ctx, openai.AudioSpeechNewParams{
-		Model:          c.ttsModel,
-		Voice:          openai.AudioSpeechNewParamsVoice(c.ttsVoice),
-		ResponseFormat: openai.AudioSpeechNewParamsResponseFormatPCM,
-		Instructions:   openai.String(c.assistant.Style),
-		Input:          text,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return io.ReadAll(result.Body)
 }

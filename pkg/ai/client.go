@@ -26,7 +26,6 @@ type Client interface {
 	APIKey() string
 	Model() string
 	GeneratePrompt(context.Context, Prompt, any) (string, error)
-	GenerateSpeech(context.Context, string) ([]byte, error)
 	Logger() *slog.Logger
 }
 

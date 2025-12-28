@@ -20,11 +20,19 @@ type Config struct {
 	ExtraContext []string       `mapstructure:"extra_context"`
 	Mailer       Mailer         `mapstructure:"mail"`
 	LLM          *ai.AIConfig   `mapstructure:"llm"`
+	TTS          *TTSConfig     `mapstructure:"tts"`
 
 	AssistantFileCLI string             `mapstructure:"-"`
 	Assistant        ai.AssistantConfig `mapstructure:"assistant"`
 	Matrix           MatrixConfig       `mapstructure:"matrix"`
 	Webserver        WebserverConfig    `mapstructure:"webserver"`
+}
+
+type TTSConfig struct {
+	Type   string `mapstructure:"type"`
+	Voice  string `mapstructure:"voice"`
+	Lang   string `mapstructure:"lang"`
+	APIKey string `mapstructure:"api_key"`
 }
 
 type MatrixConfig struct {
