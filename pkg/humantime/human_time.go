@@ -24,6 +24,14 @@ func Now() *HumanTime {
 	return &HumanTime{Time: time.Now().In(LocalTimezone)}
 }
 
+func (ct *HumanTime) Before(other *HumanTime) bool {
+	return ct.Time.Before(other.Time)
+}
+
+func (ct *HumanTime) After(other *HumanTime) bool {
+	return ct.Time.After(other.Time)
+}
+
 func (ct *HumanTime) Add(d time.Duration) *HumanTime {
 	return &HumanTime{ct.Time.Add(d)}
 }
