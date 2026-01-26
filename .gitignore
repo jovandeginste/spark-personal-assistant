@@ -2,3 +2,7 @@ data/*
 database.db
 spark.yaml
 .aider*
+.cache
+.direnv
+.gocache
+.gomodcache
