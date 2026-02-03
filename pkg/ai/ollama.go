@@ -57,12 +57,12 @@ func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		// Options can be added here if needed, potentially from config
 	}
 
-	var result string
+	var result strings.Builder
 
 	respFunc := func(resp api.GenerateResponse) error {
 		// Only print the response here; GenerateResponse has a number of other
 		// interesting fields you want to examine.
-		result = resp.Response
+		result.WriteString(resp.Response)
 		return nil
 	}
 
@@ -70,5 +70,10 @@ func (c ollamaClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		return "", err
 	}
 
-	return result, nil
+	return result.String(), nil
+}
+
+func (c ollamaClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor) (string, error) {
+	c.Logger().Warn("Ollama tool calling not implemented yet, falling back to GeneratePrompt")
+	return c.GeneratePrompt(ctx, p, data)
 }

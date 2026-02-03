@@ -23,7 +23,6 @@ func (mc *MatrixConfig) ServeHTTP() {
 	// Routes
 	e.GET("/prompt", mc.summarize)
 	e.GET("/persona", mc.switchPersona)
-	e.GET("/update", mc.updateSources)
 
 	go func() {
 		// Start server
@@ -45,14 +44,6 @@ func (mc *MatrixConfig) summarize(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, "Prompt sent")
-}
-
-func (mc *MatrixConfig) updateSources(c echo.Context) error {
-	if err := mc.App.UpdateSources(); err != nil {
-		return c.JSON(http.StatusBadRequest, err)
-	}
-
-	return c.String(http.StatusOK, "Sources updated")
 }
 
 func (mc *MatrixConfig) switchPersona(c echo.Context) error {

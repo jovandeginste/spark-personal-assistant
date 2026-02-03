@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 )
@@ -26,17 +27,30 @@ type Client interface {
 	APIKey() string
 	Model() string
 	GeneratePrompt(context.Context, Prompt, any) (string, error)
+	GenerateWithTools(context.Context, Prompt, any, []Tool, ToolExecutor) (string, error)
 	Logger() *slog.Logger
 }
 
+type Tool struct {
+	Name        string
+	Description string
+	InputSchema any
+}
+
+type ToolExecutor func(context.Context, string, map[string]any) (string, error)
+
 func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error) {
 	var c Client
+
+	if cc == nil {
+		return nil, errors.New("AI config is nil")
+	}
 
 	l = l.With("ai_backend", "gemini").With("name", ac.Name)
 
 	switch cc.Type {
 	case "gemini":
-		c = geminiClient{
+		c = &geminiClient{
 			apiKey:    cc.APIKey,
 			model:     cc.Model,
 			ttsModel:  cc.TTSModel,
@@ -45,7 +59,7 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 			logger:    l,
 		}
 	case "openai":
-		c = openaiClient{
+		c = &openaiClient{
 			apiKey:    cc.APIKey,
 			model:     cc.Model,
 			ttsModel:  cc.TTSModel,
@@ -55,7 +69,7 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 		}
 	case "ollama":
 		l.Warn("ollama does not work yet - input size is too large?")
-		c = ollamaClient{
+		c = &ollamaClient{
 			model:     cc.Model,
 			assistant: ac,
 			logger:    l,

@@ -6032,10 +6032,7 @@ func Xputchar(t *TLS, c int32) int32 {
 	if __ccgo_strace {
 		trc("t=%v c=%v, (%v:)", t, c, origin(2))
 	}
-	if _, err := fwrite(unistd.STDOUT_FILENO, []byte{byte(c)}); err != nil {
-		return -1
-	}
-	return int32(byte(c))
+	panic(todo(""))
 }
 
 // void _assert(

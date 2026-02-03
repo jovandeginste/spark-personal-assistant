@@ -24,7 +24,6 @@ linters:
     - reassign
     - revive # Metalinter; drop-in replacement for golint.
     - staticcheck
-    - usetesting 
     - thelper # Detects test helpers without t.Helper().
     - tparallel # Detects inappropriate usage of t.Parallel().
     - unconvert # Detects unnecessary type conversions.

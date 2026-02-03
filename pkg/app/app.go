@@ -4,19 +4,23 @@ import (
 	"log/slog"
 	"os"
 
-	"gorm.io/gorm"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type App struct {
 	ConfigFile string
 	Config     Config
 
-	db     *gorm.DB
 	logger *slog.Logger
+
+	mcpClients map[string]*mcp.ClientSession
+	mcpCleanup []func()
 }
 
 func NewApp() *App {
-	a := &App{}
+	a := &App{
+		mcpClients: make(map[string]*mcp.ClientSession),
+	}
 
 	return a
 }
@@ -34,7 +38,7 @@ func (a *App) Initialize() error {
 
 	a.Config.Mailer.app = a
 
-	if err := a.initializeDatabase(); err != nil {
+	if err := a.InitializeMCP(); err != nil {
 		return err
 	}
 
@@ -43,38 +47,4 @@ func (a *App) Initialize() error {
 
 func (a *App) initializeLogger() {
 	a.logger = slog.New(slog.NewJSONHandler(os.Stderr, nil))
-}
-
-func (a *App) UpdateSources() error {
-	sources, err := a.Sources()
-	if err != nil {
-		return err
-	}
-
-	for _, src := range sources {
-		a.Logger().Info("Updating entries", "source", src.Name)
-
-		entries, err := src.RetrieveEntries()
-		if err != nil {
-			a.Logger().Error("could not update source", "source", src.Name, "error", err)
-			continue
-		}
-
-		if len(entries) == 0 {
-			a.Logger().Info("No entries found", "source", src.Name)
-			continue
-		}
-
-		a.Logger().Info("Entries retrieved", "source", src.Name, "count", len(entries))
-
-		a.FetchExistingEntries(src.ID, entries)
-
-		if err := a.ReplaceSourceEntries(&src, entries); err != nil {
-			return err
-		}
-
-		a.Logger().Info("Entries updated", "source", src.Name, "count", len(entries))
-	}
-
-	return nil
 }

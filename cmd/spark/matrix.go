@@ -18,20 +18,14 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 		Example: "spark matrix",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			src, err := mc.App.FindSourceByName(mc.App.Config.Database.InternalSource)
-			if err != nil {
-				return err
-			}
-
-			mc.SourceID = src.ID
-
 			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
 			}
 
 			mc.AIClient = aiClient
-			aiData, err := c.app.BuildData(&mc.EF)
+
+			aiData, err := c.app.BuildData()
 			if err != nil {
 				return err
 			}
@@ -75,10 +69,7 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
-	cmd.Flags().StringVar(&c.app.Config.Matrix.Database, "database", "./matrix.db", "SQLite database path")
-	cmd.Flags().StringVar(&c.app.Config.Database.InternalSource, "source", "internal", "Name of the source to use")
-	cmd.Flags().UintVarP(&mc.EF.DaysBack, "days-back", "b", 30, "Number of days in the past to include")
-	cmd.Flags().UintVarP(&mc.EF.DaysAhead, "days-ahead", "a", 90, "Number of days in the future to include")
+	cmd.Flags().StringVar(&c.app.Config.Matrix.CryptoStore, "database", "./matrix.db", "SQLite database path")
 
 	return cmd
 }

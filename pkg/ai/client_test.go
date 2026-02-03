@@ -19,7 +19,7 @@ func TestNewClient(t *testing.T) {
 		aiConfig           *AIConfig
 		assistantConfig    AssistantConfig
 		expectError        bool
-		expectedClientType Client // Use reflect.Type to check the concrete type
+		expectedClientType any // Use reflect.Type to check the concrete type
 	}{
 		{
 			name: "Create Gemini client",
@@ -30,7 +30,7 @@ func TestNewClient(t *testing.T) {
 			},
 			assistantConfig:    assistantConfig,
 			expectError:        false,
-			expectedClientType: geminiClient{}, // Expected concrete type
+			expectedClientType: (*geminiClient)(nil), // Expected concrete type
 		},
 		{
 			name: "Create OpenAI client",
@@ -41,7 +41,7 @@ func TestNewClient(t *testing.T) {
 			},
 			assistantConfig:    assistantConfig,
 			expectError:        false,
-			expectedClientType: openaiClient{}, // Expected concrete type
+			expectedClientType: (*openaiClient)(nil), // Expected concrete type
 		},
 		{
 			name: "Create Ollama client",
@@ -51,7 +51,7 @@ func TestNewClient(t *testing.T) {
 			},
 			assistantConfig:    assistantConfig,
 			expectError:        false,
-			expectedClientType: ollamaClient{}, // Expected concrete type
+			expectedClientType: (*ollamaClient)(nil), // Expected concrete type
 		},
 		{
 			name: "Unknown AI type",
@@ -91,6 +91,7 @@ func TestNewClient(t *testing.T) {
 			if tt.expectError {
 				assert.Error(t, err, "Expected an error")
 				assert.Nil(t, client, "Expected nil client on error")
+
 				if tt.aiConfig != nil && tt.aiConfig.Type != "unknown" {
 					// Specific error check for unknown type
 					assert.Contains(t, err.Error(), "unknown type", "Error message did not indicate unknown type")

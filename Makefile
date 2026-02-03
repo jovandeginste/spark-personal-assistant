@@ -1,9 +1,17 @@
-all: test lint
+all: test lint build
 test:
-	go test -short -count 1 -tags goolm -mod vendor -covermode=atomic -gcflags=all=-l ./...
+	CGO_ENABLED=0 go test -short -count 1 -tags "goolm,sqlite_foreign_keys" -mod vendor -covermode=atomic -gcflags=all=-l ./...
 
 lint:
-	golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --color=always --build-tags=goolm
+	CGO_ENABLED=0 golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --build-tags="goolm,sqlite_foreign_keys"
+
+build: build-spark build-mcp
+
+build-spark:
+	go build -o spark ./cmd/spark
+
+build-mcp:
+	go build -o spark-mcp-assistant ./cmd/spark-mcp-assistant
 
 build-docker:
 	docker build -t spark-personal-assistant --pull .

@@ -1,7 +1,6 @@
 package matrix
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
@@ -10,25 +9,11 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/personas"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
-	"maunium.net/go/mautrix/id"
 )
 
 func (mc *MatrixConfig) performCommandReset() (string, error) {
 	mc.AIData.ResetHistory()
 	return "History is clear", nil
-}
-
-func (mc *MatrixConfig) performCommandUpdate(roomID id.RoomID) (string, error) {
-	go func() {
-		if err := mc.App.UpdateSources(); err != nil {
-			mc.sendMessage(roomID, "Something went wrong while updating sources:\n\n> "+strings.ReplaceAll(err.Error(), "\n", "\n> "))
-		}
-
-		mc.sendNotice(roomID, "Sources were updated.")
-	}()
-
-	return "Updating all sources", nil
 }
 
 func (mc *MatrixConfig) performCommandShutdown() (string, error) {
@@ -40,20 +25,6 @@ func (mc *MatrixConfig) performCommandShutdown() (string, error) {
 	return "Shutting down...", nil
 }
 
-func (mc *MatrixConfig) performCommandShowToday() (string, error) {
-	f := &app.EntryFilter{DaysBack: 1, DaysAhead: 1}
-
-	entries, err := mc.App.CurrentEntries(f)
-	if err != nil {
-		return "", err
-	}
-
-	b := bytes.Buffer{}
-	entries.PrintTo(&b, true)
-
-	return b.String(), nil
-}
-
 func (mc *MatrixConfig) performCommandListPersona() (string, error) {
 	pDir, err := personas.FS().ReadDir(".")
 	if err != nil {
@@ -63,6 +34,7 @@ func (mc *MatrixConfig) performCommandListPersona() (string, error) {
 	var list strings.Builder
 
 	list.WriteString("All personas:\n")
+
 	for _, p := range pDir {
 		n := p.Name()
 		n = strings.TrimSuffix(n, ".md")
@@ -82,38 +54,43 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 func (mc *MatrixConfig) performCommandSummarize(name string) (string, error) {
 	mc.AIData.ResetHistory()
 
-	if err := mc.AIData.UpdateEntries(mc.App); err != nil {
-		return "", err
-	}
+	var p ai.Prompt
 
 	switch name {
 	case "full":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptFull, mc.AIData)
+		p = ai.PromptFull
 	case "week":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptWeek, mc.AIData)
+		p = ai.PromptWeek
 	case "today":
-		return mc.AIClient.GeneratePrompt(context.Background(), ai.PromptToday, mc.AIData)
+		p = ai.PromptToday
 	default:
-		return "", nil
+		// Assume it is a custom prompt
+		mc.AIData.EmployerQuestion = []string{"Summarize the events based on the prompt: " + name}
+		p = ai.PromptCustom
 	}
+
+	tools, err := mc.App.GetMCPTools(context.Background())
+	if err != nil {
+		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
+	}
+
+	return mc.AIClient.GenerateWithTools(context.Background(), p, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		return mc.App.ExecuteMCPTool(ctx, name, args)
+	})
 }
 
 func (mc *MatrixConfig) performCommandPing() (string, error) {
 	return "*pong back*", nil
 }
 
-func (mc *MatrixConfig) parseInput(input string, roomID id.RoomID) (string, error) {
+func (mc *MatrixConfig) parseInput(input string) (string, error) {
 	cmd := strings.SplitN(input, " ", 3)
 
 	switch cmd[0] {
 	case "reset":
 		return mc.performCommandReset()
-	case "update":
-		return mc.performCommandUpdate(roomID)
 	case "shutdown":
 		return mc.performCommandShutdown()
-	case "today":
-		return mc.performCommandShowToday()
 	case "switch":
 		if len(cmd) < 2 {
 			return mc.performCommandListPersona()

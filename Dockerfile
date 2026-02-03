@@ -2,6 +2,7 @@ FROM golang:alpine AS backend
 RUN apk add gcc g++
 
 WORKDIR /app
+ENV CGO_ENABLED=0
 
 COPY go.mod go.sum ./
 COPY cmd ./cmd

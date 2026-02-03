@@ -1,8 +1,12 @@
-data/*
-database.db
+data/
 spark.yaml
+mcp-config.yaml
 .aider*
 .cache
 .direnv
 .gocache
 .gomodcache
+.venv/
+/matrix.*
+/spark
+/spark-mcp-assistant

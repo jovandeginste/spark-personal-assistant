@@ -1,6 +1,7 @@
 # ✨ Spark, your personal AI assistant
 
-I was inspired by [this post](https://www.geoffreylitt.com/2025/04/12/how-i-made-a-useful-ai-assistant-with-one-sqlite-table-and-a-handful-of-cron-jobs).
+I was inspired by
+[this post](https://www.geoffreylitt.com/2025/04/12/how-i-made-a-useful-ai-assistant-with-one-sqlite-table-and-a-handful-of-cron-jobs).
 How much work would it be to make this myself?
 
 The answer: it's only a few hours of _vibe coding_ to get to a working
@@ -20,8 +21,8 @@ The following summaries are currently pre-defined:
 You can also start a conversation with Spark, to ask it questions about your
 events.
 
-Spark currently supports Google Gemini and OpenAI ChatGPT.
-Ollama support is available, but I can't test this with my hardware...
+Spark currently supports Google Gemini and OpenAI ChatGPT. Ollama support is
+available, but I can't test this with my hardware...
 
 ## Installation
 
@@ -31,44 +32,10 @@ Install the binary:
 go install github.com/jovandeginste/spark-personal-assistant/cmd/spark@latest
 ```
 
-Create a configuration file. Take a look at [the example file](./spark.example.yaml).
+Create a configuration file. Take a look at
+[the example file](./spark.example.yaml).
 
 ## Getting started
-
-Create some entry sources:
-
-```bash
-spark sources add my-calendar --name "My personal calendar"
-spark sources add birthdays --name "Birthday reminders"
-spark sources add weather-brussels --name "Weather in Brussels"
-```
-
-Check your current sources:
-
-```bash
-spark sources list
-```
-
-Import some entries:
-
-```bash
-# Update your personal calendar from an ICS file
-spark ical2entry my-calendar https://example.com/feed/calendar.ics
-
-# Update your birthday reminders from a VCF file
-spark vcf2entry birthdays ./contacts.vcf
-
-# Update the weather in Brussels
-spark weather2entry weather-brussels Brussels
-```
-
-## The result
-
-Check your current entries:
-
-```bash
-spark entries list
-```
 
 Create a summary:
 
@@ -77,6 +44,38 @@ spark print -f today
 spark print -f week
 spark print -f full
 ```
+
+## MCP server
+
+Spark includes an MCP (Model Context Protocol) server that exposes your personal data (calendar, weather, planned meals) to LLMs.
+
+### Installation
+
+```bash
+go install github.com/jovandeginste/spark-personal-assistant/cmd/mcp@latest
+```
+
+### Configuration
+
+Create a `mcp-config.yaml` file (or use environment variables with `MCP_` prefix).
+
+```yaml
+port: :8081
+weather:
+  apiurl: https://api.open-meteo.com/v1/forecast
+kitchenowl:
+  apiurl: https://your-kitchenowl-instance/api
+  token: your-token
+  householdid: 1
+ical:
+  calendars:
+    - name: "Personal"
+      url: "https://example.com/calendar.ics"
+simplemarkdown:
+  path: /path/to/markdown/files
+```
+
+If `kitchenowl.token` is not provided, the meal planning tool will be disabled.
 
 ## Customization
 
@@ -147,7 +146,8 @@ is probably supervising the exam instead of taking it.
 
 You can customize the behavior of the assistant by creating a custom persona.
 
-A number of alternative persona can be found in the [personas](./personas) folder.
+A number of alternative persona can be found in the [personas](./personas)
+folder.
 
 ```yaml
 assistant:
@@ -155,7 +155,7 @@ assistant:
   language: German
 ```
 
-## The result
+## Usage
 
 Ask for a summary:
 
@@ -173,6 +173,6 @@ Enter your question. Type /quit to exit or press Ctrl+D.
 
 ## Wishlist
 
-- [ ] Add support for Matrix
+- [x] Add support for Matrix
 - [ ] Add text-to-speech support, to generate an mp3 file and expose as a
       (personal) podcast

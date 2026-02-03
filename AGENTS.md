@@ -10,13 +10,16 @@ This document describes what an automated agent (or new contributor) needs to kn
 - Supports LLM backends (Gemini, OpenAI, Ollama) via `pkg/ai`.
 - Optional Matrix chat integration in `pkg/matrix`.
 - Personas (assistant style files) are embedded from `personas/*.md` via `personas/embed.go:7-12`.
+- MCP server component (main at `cmd/mcp/main.go`) provides data sources like calendar, weather, and KitchenOwl to the AI.
 
 ## Repository layout (observed)
 
 - `cmd/spark/` — CLI entrypoint (main.go).
+- `cmd/mcp/` — MCP server entrypoint (main.go).
 - `pkg/app/` — application wiring, configuration, database initialization (`pkg/app/config.go:56-84`, `pkg/app/app.go`).
 - `pkg/ai/` — AI backend clients and prompt logic (`pkg/ai/client.go`).
 - `pkg/matrix/` — Matrix integration and handlers (`pkg/matrix/matrix.go`).
+- `pkg/mcp/` — MCP integration and data source providers (ical, weather, kitchenowl).
 - `pkg/markdown/`, `pkg/structs/`, `pkg/humantime/`, `pkg/helpers/` — utility packages and domain models.
 - `personas/` — markdown persona files used to configure assistant behavior.
 - `.github/workflows/` — CI workflows (docker image build + golangci-lint).
@@ -30,6 +33,7 @@ This document describes what an automated agent (or new contributor) needs to kn
 
 - Build & run locally (typical development):
   - `go build ./cmd/spark` or use `go install` above.
+  - `go build ./cmd/mcp` for the MCP server.
 
 - Makefile targets (exact):
   - `make test`
@@ -113,6 +117,7 @@ This document describes what an automated agent (or new contributor) needs to kn
 ## What I did
 
 - Created this file `AGENTS.md` documenting observed repo facts.
+- Fixed MCP server crash when KitchenOwl token is missing.
 
 
 

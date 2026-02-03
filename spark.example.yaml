@@ -1,4 +1,7 @@
-assistant: ./personas/wesley.md
+assistant:
+  file: ./personas/butler.md
+  language: English
+  name: Spark [test]
 database:
   file: ./database.db
 user_data:

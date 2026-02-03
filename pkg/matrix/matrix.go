@@ -2,13 +2,15 @@ package matrix
 
 import (
 	"context"
-	"encoding/json"
+	"database/sql"
+
+	// "encoding/json"
 	"fmt"
 	"slices"
 	"strings"
 	"time"
 
-	_ "github.com/glebarez/sqlite"
+	"github.com/glebarez/go-sqlite"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"maunium.net/go/mautrix"
@@ -18,9 +20,11 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+func init() {
+	sql.Register("sqlite3-fk-wal", &sqlite.Driver{})
+}
+
 type MatrixConfig struct {
-	SourceID     uint64
-	EF           app.EntryFilter
 	AIData       *app.AIData
 	AIClient     ai.Client
 	Client       *mautrix.Client
@@ -39,6 +43,7 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 	syncer := mc.Client.Syncer.(*mautrix.DefaultSyncer)
 	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
 		mc.AIData.CleanHistory()
+
 		body := evt.Content.AsMessage().Body
 
 		mc.App.Logger().Info(
@@ -86,7 +91,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		return nil
 	}
 
-	result, err := mc.parseInput(input, roomID)
+	result, err := mc.parseInput(input)
 	if err != nil {
 		return err
 	}
@@ -102,71 +107,26 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 	}
 
 	mc.sendMessage(roomID, result)
-	return nil
-}
-
-func (mc *MatrixConfig) performTasks(roomID id.RoomID) error {
-	src, err := mc.App.FindSourceByName(mc.App.Config.Database.InternalSource)
-	if err != nil {
-		return err
-	}
-
-	d, err := mc.AIClient.GeneratePrompt(context.Background(), ai.PromptTask, mc.AIData)
-	if err != nil {
-		return fmt.Errorf("could not generate tasks: %w", err)
-	}
-
-	d = strings.Replace(d, "```json", "", 1)
-	d = strings.Replace(d, "```", "", 1)
-
-	mc.App.Logger().Info("Executing tasks", "tasks", d)
-
-	var entries []entry
-
-	if err := json.Unmarshal([]byte(d), &entries); err != nil {
-		return err
-	}
-
-	for _, e := range entries {
-		e.Execute(mc, roomID, src)
-	}
-
-	if err := mc.AIData.UpdateEntries(mc.App); err != nil {
-		return err
-	}
 
 	return nil
-}
-
-func (mc *MatrixConfig) checkIfTask(input string) (bool, string) {
-	if strings.HasPrefix(input, "!") {
-		input = strings.TrimLeft(input, "!")
-		return true, input
-	}
-
-	return false, input
 }
 
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
-	if err := mc.AIData.UpdateEntries(mc.App); err != nil {
-		return "", err
-	}
-
-	isTask, _ := mc.checkIfTask(input)
-	if isTask {
-		mc.sendNotice(roomID, "Calculating tasks...")
-
-		if err := mc.performTasks(roomID); err != nil {
-			return "", fmt.Errorf("could not perform task: %w", err)
-		}
-	}
-
 	mc.sendNotice(roomID, "Calculating response...")
 
-	md, err := mc.AIClient.GeneratePrompt(context.Background(), ai.PromptCustom, mc.AIData)
+	tools, err := mc.App.GetMCPTools(context.Background())
+	if err != nil {
+		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
+	}
+
+	mc.App.Logger().Info("Using tools", "count", len(tools))
+
+	md, err := mc.AIClient.GenerateWithTools(context.Background(), ai.PromptCustom, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		return mc.App.ExecuteMCPTool(ctx, name, args)
+	})
 	if err != nil {
 		return "", fmt.Errorf("could not calculate response: %w", err)
 	}
@@ -189,6 +149,7 @@ func (mc *MatrixConfig) syncFunc(ctx context.Context, evt *event.Event) {
 			"inviter", evt.Sender.String(),
 			"error", err,
 		)
+
 		return
 	}
 
@@ -211,7 +172,7 @@ func (mc *MatrixConfig) InitClient() error {
 }
 
 func (mc *MatrixConfig) ConfigureCryptoHelper() error {
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), mc.App.Config.Matrix.Database)
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), mc.App.Config.Matrix.CryptoStore)
 	if err != nil {
 		return err
 	}

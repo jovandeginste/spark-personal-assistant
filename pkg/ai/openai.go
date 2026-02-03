@@ -2,12 +2,16 @@ package ai
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
+	"github.com/openai/openai-go/shared"
+	"github.com/openai/openai-go/shared/constant"
 )
 
 type openaiClient struct {
@@ -85,4 +89,72 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	}
 
 	return "", nil
+}
+
+func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor) (string, error) {
+	c.Logger().Info("Fetching result from AI with tools...")
+
+	promptMsg, err := c.convertPrompt(p, data)
+	if err != nil {
+		return "", err
+	}
+
+	client := openai.NewClient(
+		option.WithAPIKey(c.APIKey()),
+	)
+
+	openaiTools := make([]openai.ChatCompletionToolParam, 0, len(tools))
+	for _, t := range tools {
+		openaiTools = append(openaiTools, openai.ChatCompletionToolParam{
+			Type: constant.Function("function"),
+			Function: shared.FunctionDefinitionParam{
+				Name:        t.Name,
+				Description: openai.String(t.Description),
+				Parameters:  t.InputSchema.(shared.FunctionParameters),
+			},
+		})
+	}
+
+	messages := []openai.ChatCompletionMessageParamUnion{promptMsg}
+
+	for i := range 10 {
+		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+			Messages: messages,
+			Model:    c.Model(),
+			Tools:    openaiTools,
+		})
+		if err != nil {
+			c.Logger().Warn("Error generating content", "error", err, "attempt", i)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+
+		choice := result.Choices[0]
+		messages = append(messages, choice.Message.ToParam())
+
+		if len(choice.Message.ToolCalls) == 0 {
+			return choice.Message.Content, nil
+		}
+
+		for _, tc := range choice.Message.ToolCalls {
+			c.Logger().Info("Tool call received", "tool", tc.Function.Name)
+
+			var args map[string]any
+			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {
+				c.Logger().Error("Failed to unmarshal tool arguments", "error", err)
+
+				args = make(map[string]any)
+			}
+
+			resp, err := executor(ctx, tc.Function.Name, args)
+			if err != nil {
+				c.Logger().Error("Tool execution failed", "error", err)
+				resp = fmt.Errorf("tool execution failed: %w", err).Error()
+			}
+
+			messages = append(messages, openai.ToolMessage(resp, tc.ID))
+		}
+	}
+
+	return "", errors.New("reached maximum iterations with tool calls")
 }

@@ -26,8 +26,6 @@ func PromptFor(format string) (Prompt, error) {
 var promptPreamble = []string{
 	"Your entire response should be formatted in Markdown",
 	"Use the metric system and 24 hour clock notation.",
-	"The following entries consist a list of events.",
-	"Events without a timestamp are for the whole day.",
 	"The names in the user data are your employers' names",
 }
 
@@ -36,55 +34,11 @@ func (a AssistantConfig) PromptPreamble() []string {
 		"Your name is: " + a.Name,
 		"Use the following style: " + a.Style,
 		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
+		"The current time is: " + time.Now().Format("15:04"),
 		"Translate all events to:" + a.Language,
 	}
 
 	return append(prompt, promptPreamble...)
-}
-
-func PromptCheckTask(assistant AssistantConfig, data any) ([]string, error) {
-	j, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	c := []string{
-		"Assert whether the employer's question is about creating, updating or deleting one or more tasks.",
-		"If no actions are required, answer with a single zero and nothing else.",
-		"If actions are required, provide a human readable list of those actions.",
-		string(j),
-	}
-
-	return c, nil
-}
-
-func PromptTask(assistant *AssistantConfig, data any) ([]string, error) {
-	j, err := json.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-
-	c := []string{
-		"Execute the employer's question.",
-		"Respond with only a JSON array with the following fields for each task:",
-		"- action: one of add, update, delete",
-		"- id: the current ID of the exiting when updating",
-		"- todo: true or false depending on whether or not the task is a todo",
-		"- done: true or false depending on whether or not the task is done",
-		"- date:",
-		"    - the date of the task must be performed",
-		"    - either YYYY-MM-DD or YYYY-MM-DD HH:MM",
-		"    - omitted if the task is a todo without a date",
-		"- summary: the summary of the task to perform",
-		"- description: a more verbose description of the task (omit this field if not needed)",
-		"- name: the person or persons for which this task is created, as comma-separated list",
-		"Take the following information into account to answer the question:",
-		"The names in the user data are your employers' names",
-		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
-		string(j),
-	}
-
-	return c, nil
 }
 
 func PromptCustom(assistant *AssistantConfig, data any) ([]string, error) {
@@ -114,6 +68,7 @@ func PromptWeek(assistant *AssistantConfig, data any) ([]string, error) {
 		[]string{
 			"Only include the coming week's events.",
 			"Compile a schedule and a summarized overview of todo's, and reminders.",
+			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,
@@ -131,6 +86,7 @@ func PromptToday(assistant *AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's events. Add pointers regarding the weather if relevant. Be verbose.",
+			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,
@@ -148,6 +104,7 @@ func PromptFull(assistant *AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Add a quick summary of the past week's important events. Add a quick summary of future important events - one line per day. Add weather information for events with outside events.",
+			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,

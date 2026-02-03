@@ -30,15 +30,10 @@ func (c *cli) root() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(c.entriesCmd())
-	cmd.AddCommand(c.sourcesCmd())
 	cmd.AddCommand(c.mailerCmd())
 	cmd.AddCommand(c.printCmd())
 	cmd.AddCommand(c.chatCmd())
 	cmd.AddCommand(c.matrixChatCmd())
-	cmd.AddCommand(c.md2htmlCmd())
-	cmd.AddCommand(c.md2textCmd())
-	cmd.AddCommand(c.md2speechCmd())
 
 	sparkConfig, ok := os.LookupEnv("SPARK_CONFIG")
 	if !ok {

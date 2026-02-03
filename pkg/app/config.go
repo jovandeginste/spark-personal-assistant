@@ -15,17 +15,25 @@ import (
 var defaultPersona = "butler.md"
 
 type Config struct {
-	Database     DatabaseConfig `mapstructure:"database"`
-	UserData     UserData       `mapstructure:"user_data"`
-	ExtraContext []string       `mapstructure:"extra_context"`
-	Mailer       Mailer         `mapstructure:"mail"`
-	LLM          *ai.AIConfig   `mapstructure:"llm"`
-	TTS          *TTSConfig     `mapstructure:"tts"`
+	UserData     UserData     `mapstructure:"user_data"`
+	ExtraContext []string     `mapstructure:"extra_context"`
+	Mailer       Mailer       `mapstructure:"mail"`
+	LLM          *ai.AIConfig `mapstructure:"llm"`
+	TTS          *TTSConfig   `mapstructure:"tts"`
 
-	AssistantFileCLI string             `mapstructure:"-"`
-	Assistant        ai.AssistantConfig `mapstructure:"assistant"`
-	Matrix           MatrixConfig       `mapstructure:"matrix"`
-	Webserver        WebserverConfig    `mapstructure:"webserver"`
+	AssistantFileCLI string                     `mapstructure:"-"`
+	Assistant        ai.AssistantConfig         `mapstructure:"assistant"`
+	Matrix           MatrixConfig               `mapstructure:"matrix"`
+	Webserver        WebserverConfig            `mapstructure:"webserver"`
+	MCPServers       map[string]MCPServerConfig `mapstructure:"mcp_servers"`
+}
+
+type MCPServerConfig struct {
+	Command   string   `mapstructure:"command"`
+	Args      []string `mapstructure:"args"`
+	Env       []string `mapstructure:"env"`
+	URL       string   `mapstructure:"url"`
+	Transport string   `mapstructure:"transport"`
 }
 
 type TTSConfig struct {
@@ -36,12 +44,12 @@ type TTSConfig struct {
 }
 
 type MatrixConfig struct {
-	Homeserver string   `mapstructure:"homeserver"`
-	Username   string   `mapstructure:"username"`
-	Password   string   `mapstructure:"password"`
-	RoomID     string   `mapstructure:"room_id"`
-	Database   string   `mapstructure:"database"`
-	Users      []string `mapstructure:"users"`
+	Homeserver  string   `mapstructure:"homeserver"`
+	Username    string   `mapstructure:"username"`
+	Password    string   `mapstructure:"password"`
+	RoomID      string   `mapstructure:"room_id"`
+	CryptoStore string   `mapstructure:"database"`
+	Users       []string `mapstructure:"users"`
 }
 
 type WebserverConfig struct {
@@ -68,7 +76,7 @@ func (a *App) ReadConfig() error {
 
 	for _, f := range []func() error{
 		a.setAssistantStylePath,
-		a.setMatrixDatabasePath,
+		a.setMatrixCryptoStorePath,
 		a.configureAssistant,
 	} {
 		if err := f(); err != nil {
@@ -78,9 +86,7 @@ func (a *App) ReadConfig() error {
 
 	a.SetDefaults()
 
-	a.Config.Database.originalFile = a.Config.Database.File
-
-	return a.setDatabasePath()
+	return nil
 }
 
 func (a *App) configureAssistant() error {
@@ -116,8 +122,8 @@ func (a *App) configureAssistant() error {
 	return nil
 }
 
-func (a *App) setMatrixDatabasePath() error {
-	if a.Config.Matrix.Database == "" || strings.HasPrefix(a.Config.Matrix.Database, "/") {
+func (a *App) setMatrixCryptoStorePath() error {
+	if a.Config.Matrix.CryptoStore == "" || strings.HasPrefix(a.Config.Matrix.CryptoStore, "/") {
 		return nil
 	}
 
@@ -127,7 +133,7 @@ func (a *App) setMatrixDatabasePath() error {
 	}
 
 	dirname := filepath.Dir(absPath)
-	a.Config.Matrix.Database = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Matrix.Database))
+	a.Config.Matrix.CryptoStore = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Matrix.CryptoStore))
 
 	return nil
 }
@@ -148,22 +154,6 @@ func (a *App) setAssistantStylePath() error {
 
 	dirname := filepath.Dir(absPath)
 	a.Config.Assistant.File = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Assistant.File))
-
-	return nil
-}
-
-func (a *App) setDatabasePath() error {
-	if strings.HasPrefix(a.Config.Database.File, "/") {
-		return nil
-	}
-
-	absPath, err := filepath.Abs(a.ConfigFile)
-	if err != nil {
-		return err
-	}
-
-	dirname := filepath.Dir(absPath)
-	a.Config.Database.File = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Database.File))
 
 	return nil
 }
@@ -193,10 +183,6 @@ func readPersona(persona string) *ai.AssistantConfig {
 func (a *App) SetDefaults() {
 	if a.Config.Webserver.Bind == "" {
 		a.Config.Webserver.Bind = ":8080"
-	}
-
-	if a.Config.Database.File == "" {
-		a.Config.Database.File = "spark.db"
 	}
 
 	if a.Config.Assistant.Language == "" {
