@@ -186,7 +186,11 @@ END:VCALENDAR`
 	assert.Equal(t, "New Year's Day", events[0].Summary)
 
 	// Should NOT find New Year's Day if range starts in Feb
-	events, err = searchEvents(cal, "Day", "2026-02-01", "2026-12-31", cache)
+	// Note: "My Birthday" is in Feb and matches "Day" via substring in "BirthDAY"
+	// So we need to ensure the query doesn't match the Feb event if we want empty result,
+	// OR check that we DO find the birthday if we search for Day in Feb.
+	// The original intent was to check that "New Year's Day" is NOT found.
+	events, err = searchEvents(cal, "Year", "2026-02-01", "2026-12-31", cache)
 	require.NoError(t, err)
 	assert.Empty(t, events)
 
