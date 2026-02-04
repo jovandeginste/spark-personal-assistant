@@ -36,8 +36,6 @@ func (a *App) Initialize() error {
 		return err
 	}
 
-	a.Config.Mailer.app = a
-
 	if err := a.InitializeMCP(); err != nil {
 		return err
 	}

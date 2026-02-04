@@ -30,7 +30,6 @@ func (c *cli) root() *cobra.Command {
 		},
 	}
 
-	cmd.AddCommand(c.mailerCmd())
 	cmd.AddCommand(c.printCmd())
 	cmd.AddCommand(c.chatCmd())
 	cmd.AddCommand(c.matrixChatCmd())

@@ -17,7 +17,6 @@ var defaultPersona = "butler.md"
 type Config struct {
 	UserData     UserData     `mapstructure:"user_data"`
 	ExtraContext []string     `mapstructure:"extra_context"`
-	Mailer       Mailer       `mapstructure:"mail"`
 	LLM          *ai.AIConfig `mapstructure:"llm"`
 	TTS          *TTSConfig   `mapstructure:"tts"`
 
