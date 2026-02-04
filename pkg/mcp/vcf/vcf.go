@@ -15,6 +15,10 @@ type Config struct {
 	Path string `mapstructure:"path"`
 }
 
+type contactParams struct {
+	Name string `json:"name" jsonschema:"Name of the contact to find"`
+}
+
 type birthdayParams struct {
 	Date      string `json:"date,omitempty" jsonschema:"Specific date to check for birthdays (MM-DD)"`
 	StartDate string `json:"start_date,omitempty" jsonschema:"Start date for birthday range search (MM-DD)"`
@@ -42,9 +46,7 @@ func registerContactTool(server *mcp.Server, config Config, cache caching.Cache,
 		Description: "Find a contact by name (case-insensitive)",
 	}
 
-	handler := func(ctx context.Context, request *mcp.CallToolRequest, params struct {
-		Name string `json:"name" jsonschema:"Name of the contact to find"`
-	}) (*mcp.CallToolResult, any, error) {
+	handler := func(ctx context.Context, request *mcp.CallToolRequest, params contactParams) (*mcp.CallToolResult, any, error) {
 		contacts, err := loadContacts(config.Path, cache)
 		if err != nil {
 			logger.Error("Failed to load contacts", "error", err)
@@ -94,15 +96,16 @@ func registerBirthdayTool(server *mcp.Server, config Config, cache caching.Cache
 		}
 
 		var results []Contact
-		
+
 		// If specific date provided
-		if params.Date != "" {
+		switch {
+		case params.Date != "":
 			date, err := parseDate(params.Date)
 			if err != nil {
 				return nil, nil, fmt.Errorf("invalid date format: %w", err)
 			}
 			results = findBirthdays(contacts, date, date)
-		} else if params.StartDate != "" && params.EndDate != "" {
+		case params.StartDate != "" && params.EndDate != "":
 			start, err := parseDate(params.StartDate)
 			if err != nil {
 				return nil, nil, fmt.Errorf("invalid start_date format: %w", err)
@@ -112,7 +115,7 @@ func registerBirthdayTool(server *mcp.Server, config Config, cache caching.Cache
 				return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
 			}
 			results = findBirthdays(contacts, start, end)
-		} else {
+		default:
 			// Default to today if no params
 			now := time.Now()
 			date := Date{Month: int(now.Month()), Day: now.Day()}

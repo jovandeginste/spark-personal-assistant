@@ -50,19 +50,19 @@ END:VCARD`
 func TestFindBirthdays(t *testing.T) {
 	contacts := []Contact{
 		{
-			Name: "Jan First",
+			Name:      "Jan First",
 			BirthDate: &Date{Year: 1990, Month: 1, Day: 1},
 		},
 		{
-			Name: "Jan Second",
+			Name:      "Jan Second",
 			BirthDate: &Date{Year: 1990, Month: 1, Day: 2},
 		},
 		{
-			Name: "Feb First",
+			Name:      "Feb First",
 			BirthDate: &Date{Year: 1990, Month: 2, Day: 1},
 		},
 		{
-			Name: "Dec Last",
+			Name:      "Dec Last",
 			BirthDate: &Date{Year: 1990, Month: 12, Day: 31},
 		},
 	}
@@ -83,7 +83,7 @@ func TestFindBirthdays(t *testing.T) {
 	// Test year wrap-around (Dec 31 to Jan 2)
 	results = findBirthdays(contacts, Date{Month: 12, Day: 31}, Date{Month: 1, Day: 2})
 	assert.Len(t, results, 3) // Dec Last, Jan First, Jan Second
-	
+
 	// Check content of wrap around result
 	names := make([]string, len(results))
 	for i, r := range results {
@@ -96,18 +96,18 @@ func TestFindBirthdays(t *testing.T) {
 
 func TestAgeCalculation(t *testing.T) {
 	currentYear := time.Now().Year()
-	
+
 	contacts := []Contact{
 		{
-			Name: "Born 1990",
+			Name:      "Born 1990",
 			BirthDate: &Date{Year: 1990, Month: 1, Day: 1},
 		},
 		{
-			Name: "Born 2000",
+			Name:      "Born 2000",
 			BirthDate: &Date{Year: 2000, Month: 1, Day: 1},
 		},
 		{
-			Name: "No Year",
+			Name:      "No Year",
 			BirthDate: &Date{Year: 0, Month: 1, Day: 1},
 		},
 	}
@@ -116,11 +116,12 @@ func TestAgeCalculation(t *testing.T) {
 	assert.Len(t, results, 3)
 
 	for _, c := range results {
-		if c.Name == "Born 1990" {
-			assert.Equal(t, currentYear - 1990, c.Age)
-		} else if c.Name == "Born 2000" {
-			assert.Equal(t, currentYear - 2000, c.Age)
-		} else if c.Name == "No Year" {
+		switch c.Name {
+		case "Born 1990":
+			assert.Equal(t, currentYear-1990, c.Age)
+		case "Born 2000":
+			assert.Equal(t, currentYear-2000, c.Age)
+		case "No Year":
 			assert.Equal(t, 0, c.Age)
 		}
 	}
@@ -150,20 +151,20 @@ func TestParseBirthday(t *testing.T) {
 }
 
 func TestIntegration(t *testing.T) {
-    // This is just to ensure the package builds and public interface is correct
-    // Real integration would require file system access
-    
-    // Simulate current date for "today" test
-    now := time.Now()
-    today := Date{Month: int(now.Month()), Day: now.Day()}
-    
-    contacts := []Contact{
-        {Name: "Today Birthday", BirthDate: &today},
-    }
-    
-    results := findBirthdays(contacts, today, today)
-    assert.Len(t, results, 1)
-    assert.Equal(t, "Today Birthday", results[0].Name)
+	// This is just to ensure the package builds and public interface is correct
+	// Real integration would require file system access
+
+	// Simulate current date for "today" test
+	now := time.Now()
+	today := Date{Month: int(now.Month()), Day: now.Day()}
+
+	contacts := []Contact{
+		{Name: "Today Birthday", BirthDate: &today},
+	}
+
+	results := findBirthdays(contacts, today, today)
+	assert.Len(t, results, 1)
+	assert.Equal(t, "Today Birthday", results[0].Name)
 }
 
 func TestFindContactByName(t *testing.T) {
@@ -177,12 +178,12 @@ func TestFindContactByName(t *testing.T) {
 		query    string
 		expected int
 	}{
-		{"John", 2},   // Matches John Doe and Bob Johnson (contains "ohn")? No, "John" matches "John Doe" and "Bob Johnson" has "ohn" not "John". Wait.
-		               // "John" is in "John Doe". "Bob Johnson" contains "Johnson" -> "John" is inside "Johnson". Yes.
-		{"doe", 1},    // Matches John Doe
-		{"Smith", 1},  // Matches Jane Smith
-		{"alice", 0},  // No match
-		{"", 3},       // Matches all
+		{"John", 2}, // Matches John Doe and Bob Johnson (contains "ohn")? No, "John" matches "John Doe" and "Bob Johnson" has "ohn" not "John". Wait.
+		// "John" is in "John Doe". "Bob Johnson" contains "Johnson" -> "John" is inside "Johnson". Yes.
+		{"doe", 1},   // Matches John Doe
+		{"Smith", 1}, // Matches Jane Smith
+		{"alice", 0}, // No match
+		{"", 3},      // Matches all
 	}
 
 	for _, tt := range tests {

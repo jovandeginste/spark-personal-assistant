@@ -2,6 +2,7 @@ package diary
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -29,11 +30,11 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 
 	handler := func(ctx context.Context, request *mcp.CallToolRequest, params diaryParams) (*mcp.CallToolResult, any, error) {
 		if config.Path == "" {
-			return nil, nil, fmt.Errorf("diary path is not configured")
+			return nil, nil, errors.New("diary path is not configured")
 		}
 
 		if params.User == "" {
-			return nil, nil, fmt.Errorf("user is required")
+			return nil, nil, errors.New("user is required")
 		}
 
 		if params.Date == "" {
@@ -42,12 +43,11 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 
 		filename := filepath.Join(config.Path, params.User+".md")
 
-		// Create directory if it doesn't exist
-		if err := os.MkdirAll(config.Path, 0755); err != nil {
+		if err := os.MkdirAll(config.Path, 0o755); err != nil {
 			return nil, nil, fmt.Errorf("failed to create diary directory: %w", err)
 		}
 
-		f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+		f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to open diary file: %w", err)
 		}

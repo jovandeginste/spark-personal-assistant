@@ -2,7 +2,7 @@ package vcf
 
 import (
 	"bufio"
-	"fmt"
+	"errors"
 	"io"
 	"os"
 	"strconv"
@@ -25,7 +25,7 @@ type Date struct {
 	Day   int
 }
 
-func loadContacts(path string, cache caching.Cache) ([]Contact, error) {
+func loadContacts(path string, _ caching.Cache) ([]Contact, error) {
 	// We'll use the cache to store the parsed contacts if possible,
 	// or just read the file directly since VCFs are usually local files.
 	// For simplicity, let's just read the file directly for now,
@@ -47,15 +47,16 @@ func parseVCF(r io.Reader) ([]Contact, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		
-		if strings.HasPrefix(line, "BEGIN:VCARD") {
+
+		switch {
+		case strings.HasPrefix(line, "BEGIN:VCARD"):
 			current = &Contact{}
-		} else if strings.HasPrefix(line, "END:VCARD") {
+		case strings.HasPrefix(line, "END:VCARD"):
 			if current != nil && (current.Name != "" || current.Birthday != "") {
 				contacts = append(contacts, *current)
 			}
 			current = nil
-		} else if current != nil {
+		case current != nil:
 			if strings.HasPrefix(line, "FN:") {
 				current.Name = strings.TrimPrefix(line, "FN:")
 			} else if strings.HasPrefix(line, "BDAY") {
@@ -72,6 +73,10 @@ func parseVCF(r io.Reader) ([]Contact, error) {
 		}
 	}
 
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
 	return contacts, nil
 }
 
@@ -80,25 +85,43 @@ func parseBirthday(s string) (*Date, error) {
 	s = strings.TrimSpace(s)
 	if len(s) == 8 {
 		// YYYYMMDD
-		y, _ := strconv.Atoi(s[0:4])
-		m, _ := strconv.Atoi(s[4:6])
-		d, _ := strconv.Atoi(s[6:8])
+		y, err := strconv.Atoi(s[0:4])
+		if err != nil {
+			return nil, err
+		}
+		m, err := strconv.Atoi(s[4:6])
+		if err != nil {
+			return nil, err
+		}
+		d, err := strconv.Atoi(s[6:8])
+		if err != nil {
+			return nil, err
+		}
 		return &Date{Year: y, Month: m, Day: d}, nil
 	} else if len(s) == 10 && s[4] == '-' && s[7] == '-' {
-        // YYYY-MM-DD
-        y, _ := strconv.Atoi(s[0:4])
-        m, _ := strconv.Atoi(s[5:7])
-        d, _ := strconv.Atoi(s[8:10])
-        return &Date{Year: y, Month: m, Day: d}, nil
-    }
-	return nil, fmt.Errorf("unknown date format")
+		// YYYY-MM-DD
+		y, err := strconv.Atoi(s[0:4])
+		if err != nil {
+			return nil, err
+		}
+		m, err := strconv.Atoi(s[5:7])
+		if err != nil {
+			return nil, err
+		}
+		d, err := strconv.Atoi(s[8:10])
+		if err != nil {
+			return nil, err
+		}
+		return &Date{Year: y, Month: m, Day: d}, nil
+	}
+	return nil, errors.New("unknown date format")
 }
 
 func parseDate(s string) (Date, error) {
 	// Expect MM-DD
 	parts := strings.Split(s, "-")
 	if len(parts) != 2 {
-		return Date{}, fmt.Errorf("invalid format, expected MM-DD")
+		return Date{}, errors.New("invalid format, expected MM-DD")
 	}
 	m, err := strconv.Atoi(parts[0])
 	if err != nil {
@@ -111,6 +134,23 @@ func parseDate(s string) (Date, error) {
 	return Date{Month: m, Day: d}, nil
 }
 
+func checkDateRange(bd *Date, start, end Date) bool {
+	if start.Month > end.Month || (start.Month == end.Month && start.Day > end.Day) {
+		// Range crosses year boundary
+		if (bd.Month > start.Month || (bd.Month == start.Month && bd.Day >= start.Day)) ||
+			(bd.Month < end.Month || (bd.Month == end.Month && bd.Day <= end.Day)) {
+			return true
+		}
+	} else {
+		// Normal range
+		if (bd.Month > start.Month || (bd.Month == start.Month && bd.Day >= start.Day)) &&
+			(bd.Month < end.Month || (bd.Month == end.Month && bd.Day <= end.Day)) {
+			return true
+		}
+	}
+	return false
+}
+
 func findBirthdays(contacts []Contact, start, end Date) []Contact {
 	var results []Contact
 	now := time.Now()
@@ -121,46 +161,10 @@ func findBirthdays(contacts []Contact, start, end Date) []Contact {
 			continue
 		}
 
-		// Check if birthday falls within range (ignoring year)
-		bd := c.BirthDate
-		
-		match := false
-		// Handle wrap-around year (e.g. Dec 25 to Jan 5)
-		if start.Month > end.Month || (start.Month == end.Month && start.Day > end.Day) {
-			// Range crosses year boundary
-			if (bd.Month > start.Month || (bd.Month == start.Month && bd.Day >= start.Day)) ||
-			   (bd.Month < end.Month || (bd.Month == end.Month && bd.Day <= end.Day)) {
-				match = true
-			}
-		} else {
-			// Normal range
-			if (bd.Month > start.Month || (bd.Month == start.Month && bd.Day >= start.Day)) &&
-			   (bd.Month < end.Month || (bd.Month == end.Month && bd.Day <= end.Day)) {
-				match = true
-			}
-		}
-
-		if match {
+		if checkDateRange(c.BirthDate, start, end) {
 			// Calculate age if year is present
-			if bd.Year > 0 {
-				c.Age = currentYear - bd.Year
-				// If birthday hasn't happened yet this year, subtract 1
-				// Wait, if we are looking for upcoming birthdays, we probably want the age they *will* turn?
-				// The prompt says "add the age of the contact". Usually means current age.
-				// However, if I list "Upcoming birthdays", showing "turning 30" is more useful than "is 29".
-				// Let's stick to "age they are turning this year" effectively, which is just currentYear - bd.Year
-				// actually, technically if today is Jan 1 and birthday is Dec 31, they are not that age yet.
-				// But usually when listing birthdays people want to know "John is turning 30".
-				
-				// Let's check if the birthday has already passed THIS YEAR relative to "now".
-				// But the request might be for a different date range.
-				// Let's keep it simple: Age = currentYear - bd.Year (the age they reach in the current calendar year).
-				// Or be more precise: Age = currentYear - bd.Year. If (now < birthday_this_year) Age-- ?
-				
-				// If I assume the user wants to know how old they are *right now*, I should check today's date.
-				// If I assume the user wants to know how old they will be *on their birthday*, it is simply year - birthyear.
-				// Given this is a "birthday list" tool, "turning X" is the most common interpretation.
-				// So I will provide Age = CurrentYear - BirthYear.
+			if c.BirthDate.Year > 0 {
+				c.Age = currentYear - c.BirthDate.Year
 			}
 			results = append(results, c)
 		}
