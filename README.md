@@ -71,6 +71,8 @@ ical:
   calendars:
     - name: "Personal"
       url: "https://example.com/calendar.ics"
+vcf:
+  path: /path/to/contacts.vcf
 simplemarkdown:
   path: /path/to/markdown/files
 ```

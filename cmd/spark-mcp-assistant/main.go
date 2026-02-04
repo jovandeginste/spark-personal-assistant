@@ -11,6 +11,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/simplemarkdown"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,6 +22,7 @@ type Config struct {
 	KitchenOwl     kitchenowl.Config     `mapstructure:"kitchenowl"`
 	Weather        weather.Config        `mapstructure:"weather"`
 	ICal           ical.Config           `mapstructure:"ical"`
+	VCF            vcf.Config            `mapstructure:"vcf"`
 	SimpleMarkdown simplemarkdown.Config `mapstructure:"simplemarkdown"`
 	Port           string                `mapstructure:"port"`
 }
@@ -40,6 +42,7 @@ func main() {
 		"weather_enabled", config.Weather.APIURL != "",
 		"kitchenowl_enabled", config.KitchenOwl.Token != "",
 		"ical_calendars", len(config.ICal.Calendars),
+		"vcf_enabled", config.VCF.Path != "",
 		"simplemarkdown_enabled", config.SimpleMarkdown.Path != "",
 		"port", config.Port,
 	)
@@ -82,6 +85,11 @@ func main() {
 
 		if err := ical.Register(server, config.ICal, cacheService, logger); err != nil {
 			slog.Error("failed to register ical tool", "error", err)
+			return nil
+		}
+
+		if err := vcf.Register(server, config.VCF, cacheService, logger); err != nil {
+			slog.Error("failed to register vcf tool", "error", err)
 			return nil
 		}
 
