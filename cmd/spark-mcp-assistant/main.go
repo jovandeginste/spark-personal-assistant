@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/diary"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/simplemarkdown"
@@ -24,6 +25,7 @@ type Config struct {
 	ICal           ical.Config           `mapstructure:"ical"`
 	VCF            vcf.Config            `mapstructure:"vcf"`
 	SimpleMarkdown simplemarkdown.Config `mapstructure:"simplemarkdown"`
+	Diary          diary.Config          `mapstructure:"diary"`
 	Port           string                `mapstructure:"port"`
 }
 
@@ -44,6 +46,7 @@ func main() {
 		"ical_calendars", len(config.ICal.Calendars),
 		"vcf_enabled", config.VCF.Path != "",
 		"simplemarkdown_enabled", config.SimpleMarkdown.Path != "",
+		"diary_enabled", config.Diary.Path != "",
 		"port", config.Port,
 	)
 
@@ -95,6 +98,11 @@ func main() {
 
 		if err := simplemarkdown.Register(server, config.SimpleMarkdown, logger); err != nil {
 			slog.Error("failed to register simplemarkdown tool", "error", err)
+			return nil
+		}
+
+		if err := diary.Register(server, config.Diary, logger); err != nil {
+			slog.Error("failed to register diary tool", "error", err)
 			return nil
 		}
 
