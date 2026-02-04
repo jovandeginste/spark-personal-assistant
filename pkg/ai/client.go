@@ -8,11 +8,9 @@ import (
 )
 
 type AIConfig struct {
-	Type     string `mapstructure:"type"`
-	APIKey   string `mapstructure:"api_key"`
-	Model    string `mapstructure:"model"`
-	TTSModel string `mapstructure:"tts_model"`
-	TTSVoice string `mapstructure:"tts_voice"`
+	Type   string `mapstructure:"type"`
+	APIKey string `mapstructure:"api_key"`
+	Model  string `mapstructure:"model"`
 }
 
 type AssistantConfig struct {
@@ -53,8 +51,6 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 		c = &geminiClient{
 			apiKey:    cc.APIKey,
 			model:     cc.Model,
-			ttsModel:  cc.TTSModel,
-			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
 			logger:    l,
 		}
@@ -62,8 +58,6 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 		c = &openaiClient{
 			apiKey:    cc.APIKey,
 			model:     cc.Model,
-			ttsModel:  cc.TTSModel,
-			ttsVoice:  cc.TTSVoice,
 			assistant: ac,
 			logger:    l,
 		}

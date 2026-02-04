@@ -18,7 +18,6 @@ type Config struct {
 	UserData     UserData     `mapstructure:"user_data"`
 	ExtraContext []string     `mapstructure:"extra_context"`
 	LLM          *ai.AIConfig `mapstructure:"llm"`
-	TTS          *TTSConfig   `mapstructure:"tts"`
 
 	AssistantFileCLI string                     `mapstructure:"-"`
 	Assistant        ai.AssistantConfig         `mapstructure:"assistant"`
@@ -33,13 +32,6 @@ type MCPServerConfig struct {
 	Env       []string `mapstructure:"env"`
 	URL       string   `mapstructure:"url"`
 	Transport string   `mapstructure:"transport"`
-}
-
-type TTSConfig struct {
-	Type   string `mapstructure:"type"`
-	Voice  string `mapstructure:"voice"`
-	Lang   string `mapstructure:"lang"`
-	APIKey string `mapstructure:"api_key"`
 }
 
 type MatrixConfig struct {

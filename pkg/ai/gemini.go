@@ -14,8 +14,6 @@ import (
 type geminiClient struct {
 	apiKey    string
 	model     string
-	ttsModel  string
-	ttsVoice  string
 	assistant *AssistantConfig
 	logger    *slog.Logger
 }
