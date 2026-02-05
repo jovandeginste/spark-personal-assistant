@@ -6,12 +6,12 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/apognu/gocal"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -184,17 +184,7 @@ func registerUpdateTool(server *mcp.Server, config Config, cache caching.Cache, 
 
 		for _, cal := range config.Calendars {
 			_, err := cache.ForceUpdateFile(cal.URL, func() (io.ReadCloser, error) {
-				resp, err := http.Get(cal.URL)
-				if err != nil {
-					return nil, err
-				}
-
-				if resp.StatusCode != http.StatusOK {
-					resp.Body.Close()
-					return nil, fmt.Errorf("bad status: %s", resp.Status)
-				}
-
-				return resp.Body, nil
+				return generic.ReadResource(cal.URL)
 			})
 			if err != nil {
 				errorCount++
@@ -420,16 +410,6 @@ func fetchAndCacheICS(url string, cache caching.Cache) (string, error) {
 	}
 
 	return cache.SetFile(url, func() (io.ReadCloser, error) {
-		resp, err := http.Get(url) //nolint:gosec
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, fmt.Errorf("bad status: %s", resp.Status)
-		}
-
-		return resp.Body, nil
+		return generic.ReadResource(url)
 	})
 }

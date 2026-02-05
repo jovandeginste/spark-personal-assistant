@@ -13,5 +13,15 @@ build-spark:
 build-mcp:
 	go build -o spark-mcp-assistant ./cmd/spark-mcp-assistant
 
+run-all:
+	$(MAKE) run-mcp &
+	$(MAKE) run-spark
+
+run-spark:
+	go run ./cmd/spark/ matrix
+
+run-mcp:
+	go run ./cmd/spark-mcp-assistant/
+
 build-docker:
 	docker build -t spark-personal-assistant --pull .

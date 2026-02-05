@@ -12,6 +12,13 @@ import (
 // ReadResource reads a resource from a given URI, supporting file and http/https schemes.
 // It returns an io.ReadCloser and an error. The caller is responsible for closing the ReadCloser.
 func ReadResource(uri string) (io.ReadCloser, error) {
+	return ReadResourceWithHeaders(uri, nil)
+}
+
+// ReadResourceWithHeaders reads a resource from a given URI, supporting file and http/https schemes.
+// It allows passing custom HTTP headers.
+// It returns an io.ReadCloser and an error. The caller is responsible for closing the ReadCloser.
+func ReadResourceWithHeaders(uri string, headers map[string]string) (io.ReadCloser, error) {
 	if uri == "-" {
 		return os.Stdin, nil
 	}
@@ -27,7 +34,7 @@ func ReadResource(uri string) (io.ReadCloser, error) {
 		return readFile(u)
 	case "http", "https":
 		// Handle HTTP/HTTPS URLs
-		return readHTTP(u)
+		return readHTTP(u, headers)
 	default:
 		return nil, fmt.Errorf("unsupported URI scheme: %s", u.Scheme)
 	}
@@ -44,13 +51,16 @@ func readFile(u *url.URL) (io.ReadCloser, error) {
 	return os.Open(filePath)
 }
 
-func readHTTP(u *url.URL) (io.ReadCloser, error) {
+func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 
 	req.Header.Set("User-Agent", "Spark")
+	for k, v := range headers {
+		req.Header.Set(k, v)
+	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

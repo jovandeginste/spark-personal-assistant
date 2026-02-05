@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -97,25 +97,9 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 		u := fmt.Sprintf("%s/household/%d/planner", config.APIURL, config.HouseholdID)
 
 		_, err := cache.ForceUpdateFile(u, func() (io.ReadCloser, error) {
-			req, err := http.NewRequest(http.MethodGet, u, nil)
-			if err != nil {
-				return nil, err
-			}
-
-			req.Header.Set("User-Agent", "Spark")
-			req.Header.Set("Authorization", config.Token)
-
-			resp, err := http.DefaultClient.Do(req)
-			if err != nil {
-				return nil, err
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				resp.Body.Close()
-				return nil, fmt.Errorf("HTTP request failed with status: %s", resp.Status)
-			}
-
-			return resp.Body, nil
+			return generic.ReadResourceWithHeaders(u, map[string]string{
+				"Authorization": config.Token,
+			})
 		})
 		if err != nil {
 			logger.Error("Failed to update planned meals", "error", err)
@@ -145,25 +129,9 @@ func getPlannedMeals(config Config, cache caching.Cache) ([]byte, error) {
 
 	// Fetch from API and cache
 	cachedFile, err := cache.SetFile(u, func() (io.ReadCloser, error) {
-		req, err := http.NewRequest(http.MethodGet, u, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("User-Agent", "Spark")
-		req.Header.Set("Authorization", config.Token)
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return nil, err
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, fmt.Errorf("HTTP request failed with status: %s", resp.Status)
-		}
-
-		return resp.Body, nil
+		return generic.ReadResourceWithHeaders(u, map[string]string{
+			"Authorization": config.Token,
+		})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("fetching/caching meals: %w", err)
