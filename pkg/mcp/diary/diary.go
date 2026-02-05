@@ -21,6 +21,7 @@ type Config struct {
 type addEntryParams struct {
 	Entry string `json:"entry" jsonschema:"The text to add to the diary"`
 	Date  string `json:"date,omitempty" jsonschema:"The date for the entry (YYYY-MM-DD), defaults to today"`
+	Time  string `json:"time,omitempty" jsonschema:"The time for the entry (HH:MM), defaults to current time"`
 	User  string `json:"user" jsonschema:"The user to add the entry for"`
 }
 
@@ -100,6 +101,9 @@ func handleAddEntry(config Config) func(ctx context.Context, request *mcp.CallTo
 		if params.Date == "" {
 			params.Date = time.Now().Format("2006-01-02")
 		}
+		if params.Time == "" {
+			params.Time = time.Now().Format("15:04")
+		}
 
 		userDir := filepath.Join(config.Path, params.User)
 		if err := os.MkdirAll(userDir, 0o755); err != nil {
@@ -113,14 +117,14 @@ func handleAddEntry(config Config) func(ctx context.Context, request *mcp.CallTo
 		}
 		defer f.Close()
 
-		if _, err := fmt.Fprintf(f, "\n%s\n", params.Entry); err != nil {
+		if _, err := fmt.Fprintf(f, "\n%s: %s\n", params.Time, params.Entry); err != nil {
 			return nil, nil, fmt.Errorf("failed to write to diary file: %w", err)
 		}
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{
-					Text: fmt.Sprintf("Added entry to %s's diary for %s", params.User, params.Date),
+					Text: fmt.Sprintf("Added entry to %s's diary for %s at %s", params.User, params.Date, params.Time),
 				},
 			},
 		}, nil, nil
