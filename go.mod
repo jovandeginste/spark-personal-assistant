@@ -11,7 +11,6 @@ require (
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 	github.com/chzyer/readline v1.5.1
 	github.com/glebarez/go-sqlite v1.22.0
-	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/google/go-querystring v1.1.0
 	github.com/jovandeginste/workout-tracker/v2 v2.4.1
 	github.com/labstack/echo/v4 v4.14.0
