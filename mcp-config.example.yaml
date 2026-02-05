@@ -13,3 +13,8 @@ vcf:
   path: /path/to/contacts.vcf
 simplemarkdown:
   path: /path/to/markdown/files
+diary:
+  path: /path/to/diaries
+  users:
+    - Alice
+    - Bob
