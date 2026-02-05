@@ -69,83 +69,96 @@ func parseVCF(r io.Reader) ([]Contact, error) {
 			Extras: make(map[string]any),
 		}
 
-		// Parse standard fields
-		c.Name = card.PreferredValue(vcard.FieldFormattedName)
-		if c.Name == "" {
-			// Fallback to Name field components if FN is missing
-			name := card.Name()
-			if name != nil {
-				c.Name = strings.TrimSpace(name.GivenName + " " + name.FamilyName)
-			}
-		}
-
-		bday := card.PreferredValue(vcard.FieldBirthday)
-		if bday != "" {
-			c.Birthday = bday
-			if bd, err := parseBirthday(bday); err == nil {
-				c.BirthDate = bd
-			}
-		}
-
-		// Parse emails
-		for _, email := range card[vcard.FieldEmail] {
-			c.Emails = append(c.Emails, email.Value)
-		}
-
-		// Parse addresses
-		for _, adr := range card.Addresses() {
-			a := Address{
-				Street:     adr.StreetAddress,
-				Locality:   adr.Locality,
-				Region:     adr.Region,
-				PostalCode: adr.PostalCode,
-				Country:    adr.Country,
-			}
-			// Construct full address string for easier searching
-			var parts []string
-			if a.Street != "" {
-				parts = append(parts, a.Street)
-			}
-			if a.Locality != "" {
-				parts = append(parts, a.Locality)
-			}
-			if a.Region != "" {
-				parts = append(parts, a.Region)
-			}
-			if a.PostalCode != "" {
-				parts = append(parts, a.PostalCode)
-			}
-			if a.Country != "" {
-				parts = append(parts, a.Country)
-			}
-			a.FullAddress = strings.Join(parts, ", ")
-
-			if adr.ExtendedAddress != "" {
-				a.FullAddress += ", " + adr.ExtendedAddress
-			}
-			c.Addresses = append(c.Addresses, a)
-		}
-
-		// Store all fields in Extras
-		for k, fields := range card {
-			if k == vcard.FieldFormattedName || k == vcard.FieldBirthday || k == vcard.FieldEmail || k == vcard.FieldAddress {
-				continue
-			}
-			// Simplified representation for JSON
-			var values []string
-			for _, f := range fields {
-				values = append(values, f.Value)
-			}
-			if len(values) == 1 {
-				c.Extras[k] = values[0]
-			} else if len(values) > 1 {
-				c.Extras[k] = values
-			}
-		}
+		c.parseName(card)
+		c.parseBirthday(card)
+		c.parseEmails(card)
+		c.parseAddresses(card)
+		c.parseExtras(card)
 
 		contacts = append(contacts, c)
 	}
 	return contacts, nil
+}
+
+func (c *Contact) parseName(card vcard.Card) {
+	c.Name = card.PreferredValue(vcard.FieldFormattedName)
+	if c.Name == "" {
+		// Fallback to Name field components if FN is missing
+		name := card.Name()
+		if name != nil {
+			c.Name = strings.TrimSpace(name.GivenName + " " + name.FamilyName)
+		}
+	}
+}
+
+func (c *Contact) parseBirthday(card vcard.Card) {
+	bday := card.PreferredValue(vcard.FieldBirthday)
+	if bday != "" {
+		c.Birthday = bday
+		if bd, err := parseBirthday(bday); err == nil {
+			c.BirthDate = bd
+		}
+	}
+}
+
+func (c *Contact) parseEmails(card vcard.Card) {
+	for _, email := range card[vcard.FieldEmail] {
+		c.Emails = append(c.Emails, email.Value)
+	}
+}
+
+func (c *Contact) parseAddresses(card vcard.Card) {
+	for _, adr := range card.Addresses() {
+		a := Address{
+			Street:     adr.StreetAddress,
+			Locality:   adr.Locality,
+			Region:     adr.Region,
+			PostalCode: adr.PostalCode,
+			Country:    adr.Country,
+		}
+		// Construct full address string for easier searching
+		var parts []string
+		if a.Street != "" {
+			parts = append(parts, a.Street)
+		}
+		if a.Locality != "" {
+			parts = append(parts, a.Locality)
+		}
+		if a.Region != "" {
+			parts = append(parts, a.Region)
+		}
+		if a.PostalCode != "" {
+			parts = append(parts, a.PostalCode)
+		}
+		if a.Country != "" {
+			parts = append(parts, a.Country)
+		}
+		a.FullAddress = strings.Join(parts, ", ")
+
+		if adr.ExtendedAddress != "" {
+			a.FullAddress += ", " + adr.ExtendedAddress
+		}
+		c.Addresses = append(c.Addresses, a)
+	}
+}
+
+func (c *Contact) parseExtras(card vcard.Card) {
+	// Store all fields in Extras
+	for k, fields := range card {
+		if k == vcard.FieldFormattedName || k == vcard.FieldBirthday || k == vcard.FieldEmail || k == vcard.FieldAddress {
+			continue
+		}
+		// Simplified representation for JSON
+		values := make([]string, 0, len(fields))
+		for _, f := range fields {
+			values = append(values, f.Value)
+		}
+		if len(values) == 1 {
+			c.Extras[k] = values[0]
+		} else if len(values) > 1 {
+			c.Extras[k] = values
+		}
+	}
 }
 
 func parseBirthday(s string) (*Date, error) {
