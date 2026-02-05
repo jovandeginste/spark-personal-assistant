@@ -116,6 +116,35 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/sse", sseHandler)
+	mux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		slog.Info("Update requested, clearing caches")
+		if err := cacheService.Clear(); err != nil {
+			slog.Error("Failed to clear cache", "error", err)
+			http.Error(w, "Failed to clear cache", http.StatusInternalServerError)
+			return
+		}
+
+		// Re-initialize cache service logic if needed (e.g. recreating directory)
+		// Clear() removes the directory, so we should ensure it exists for next use
+		// Actually cacheService.Clear() -> removeAll, so next usage might fail if directory expected?
+		// NewService creates it. Let's rely on cacheService methods to handle recreation or just recreate the directory here.
+		// Looking at caching.go, NewService does MkdirAll.
+		// Let's just manually recreate the directory to be safe after RemoveAll
+		if err := os.MkdirAll("./tmp/cache", 0o755); err != nil {
+			slog.Error("Failed to recreate cache directory", "error", err)
+		}
+
+		// Trigger prefetch again
+		go ical.StartPrefetch(config.ICal, cacheService, slog.Default())
+
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("Cache cleared and updates triggered"))
+	})
 
 	server := &http.Server{
 		Addr:              config.Port,

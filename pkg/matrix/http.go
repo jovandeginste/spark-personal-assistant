@@ -2,8 +2,10 @@ package matrix
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -14,7 +16,19 @@ func (mc *MatrixConfig) ServeHTTP() {
 	e := echo.New()
 
 	// Middleware
-	e.Use(middleware.Logger())
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogStatus: true,
+		LogURI:    true,
+		LogMethod: true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			slog.Info("request",
+				"method", v.Method,
+				"uri", v.URI,
+				"status", v.Status,
+			)
+			return nil
+		},
+	}))
 	e.Use(middleware.Recover())
 
 	e.HideBanner = true
@@ -23,6 +37,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 	// Routes
 	e.GET("/prompt", mc.summarize)
 	e.GET("/persona", mc.switchPersona)
+	e.GET("/update", mc.update)
 
 	go func() {
 		// Start server
@@ -55,4 +70,30 @@ func (mc *MatrixConfig) switchPersona(c echo.Context) error {
 	}
 
 	return c.String(http.StatusOK, "Persona switched")
+}
+
+func (mc *MatrixConfig) update(c echo.Context) error {
+	mc.sendNotice(mc.DefaultRoomID(), "Updating MCP servers...")
+
+	results := mc.App.UpdateMCPServers(c.Request().Context())
+
+	var out strings.Builder
+	out.WriteString("Update results:\n")
+	for name, res := range results {
+		out.WriteString(fmt.Sprintf("- %s: %s\n", name, res))
+	}
+	mc.sendNotice(mc.DefaultRoomID(), out.String())
+
+	success := true
+	for _, msg := range results {
+		if msg != "Success" {
+			success = false
+			break
+		}
+	}
+
+	if !success {
+		return c.JSON(http.StatusInternalServerError, results)
+	}
+	return c.JSON(http.StatusOK, results)
 }

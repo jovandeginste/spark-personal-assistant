@@ -18,6 +18,7 @@ type Cache interface {
 	GetFile(key string) (string, bool)
 	SetFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error)
 	ForceUpdateFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error)
+	Clear() error
 }
 
 // Service implements the Cache interface using both in-memory and file-based strategies
@@ -106,6 +107,12 @@ func (s *Service) SetFile(key string, dataProvider func() (io.ReadCloser, error)
 func (s *Service) ForceUpdateFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error) {
 	// Directly call SetFile, which overwrites existing file
 	return s.SetFile(key, dataProvider)
+}
+
+// Clear clears both in-memory and file-based caches
+func (s *Service) Clear() error {
+	s.memoryCache.Clear()
+	return os.RemoveAll(s.storageDir)
 }
 
 // getFilePath generates the full path for a cache file based on the key

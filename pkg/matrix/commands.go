@@ -79,6 +79,20 @@ func (mc *MatrixConfig) performCommandSummarize(name string) (string, error) {
 	})
 }
 
+func (mc *MatrixConfig) performCommandUpdate() (string, error) {
+	mc.sendNotice(mc.DefaultRoomID(), "Updating MCP servers...")
+
+	results := mc.App.UpdateMCPServers(context.Background())
+
+	var out strings.Builder
+	out.WriteString("Update results:\n")
+	for name, res := range results {
+		out.WriteString(fmt.Sprintf("- %s: %s\n", name, res))
+	}
+
+	return out.String(), nil
+}
+
 func (mc *MatrixConfig) performCommandPing() (string, error) {
 	return "*pong back*", nil
 }
@@ -103,6 +117,8 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 		}
 
 		return mc.performCommandSummarize(cmd[1])
+	case "update":
+		return mc.performCommandUpdate()
 	case "ping":
 		return mc.performCommandPing()
 	default:

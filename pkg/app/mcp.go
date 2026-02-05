@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -215,4 +216,61 @@ func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]a
 	}
 
 	return string(jsonBytes), nil
+}
+
+func (a *App) UpdateMCPServers(ctx context.Context) map[string]string {
+	results := make(map[string]string)
+	type result struct {
+		name string
+		msg  string
+	}
+	resChan := make(chan result)
+	count := 0
+
+	for name, config := range a.Config.MCPServers {
+		if config.URL == "" {
+			continue
+		}
+		count++
+
+		go func(name, url string) {
+			// Assuming the URL is the base URL, append /update
+			updateURL := url
+			if updateURL[len(updateURL)-1] == '/' {
+				updateURL = updateURL[:len(updateURL)-1]
+			}
+			// If the URL ends with /sse, strip it
+			if len(updateURL) > 4 && updateURL[len(updateURL)-4:] == "/sse" {
+				updateURL = updateURL[:len(updateURL)-4]
+			}
+			updateURL += "/update"
+
+			req, err := http.NewRequestWithContext(ctx, http.MethodGet, updateURL, nil)
+			if err != nil {
+				resChan <- result{name, fmt.Sprintf("Failed to create request: %v", err)}
+				return
+			}
+
+			resp, err := http.DefaultClient.Do(req)
+			if err != nil {
+				resChan <- result{name, fmt.Sprintf("Failed: %v", err)}
+				return
+			}
+			defer resp.Body.Close()
+
+			if resp.StatusCode != http.StatusOK {
+				resChan <- result{name, fmt.Sprintf("Failed: Status %d", resp.StatusCode)}
+				return
+			}
+
+			resChan <- result{name, "Success"}
+		}(name, config.URL)
+	}
+
+	for i := 0; i < count; i++ {
+		res := <-resChan
+		results[res.name] = res.msg
+	}
+
+	return results
 }
