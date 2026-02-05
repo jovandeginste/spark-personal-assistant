@@ -13,11 +13,15 @@ func TestParseVCF(t *testing.T) {
 VERSION:3.0
 FN:John Doe
 BDAY:19900101
+EMAIL:john@example.com
+ADR;TYPE=HOME:;;123 Main St.;Anytown;CA;12345;USA
 END:VCARD
 BEGIN:VCARD
 VERSION:3.0
 FN:Jane Doe
 BDAY;VALUE=DATE:1995-05-15
+EMAIL:jane@example.com
+EMAIL:jane.doe@work.com
 END:VCARD
 BEGIN:VCARD
 VERSION:3.0
@@ -35,16 +39,29 @@ END:VCARD`
 	assert.Equal(t, 1990, contacts[0].BirthDate.Year)
 	assert.Equal(t, 1, contacts[0].BirthDate.Month)
 	assert.Equal(t, 1, contacts[0].BirthDate.Day)
+	assert.Len(t, contacts[0].Emails, 1)
+	assert.Equal(t, "john@example.com", contacts[0].Emails[0])
+	assert.Len(t, contacts[0].Addresses, 1)
+	assert.Equal(t, "123 Main St.", contacts[0].Addresses[0].Street)
+	assert.Equal(t, "Anytown", contacts[0].Addresses[0].Locality)
+	assert.Equal(t, "CA", contacts[0].Addresses[0].Region)
+	assert.Equal(t, "12345", contacts[0].Addresses[0].PostalCode)
+	assert.Equal(t, "USA", contacts[0].Addresses[0].Country)
+	assert.Equal(t, "123 Main St., Anytown, CA, 12345, USA", contacts[0].Addresses[0].FullAddress)
 
 	assert.Equal(t, "Jane Doe", contacts[1].Name)
 	assert.Equal(t, "1995-05-15", contacts[1].Birthday)
 	assert.Equal(t, 1995, contacts[1].BirthDate.Year)
 	assert.Equal(t, 5, contacts[1].BirthDate.Month)
 	assert.Equal(t, 15, contacts[1].BirthDate.Day)
+	assert.Len(t, contacts[1].Emails, 2)
+	assert.Contains(t, contacts[1].Emails, "jane@example.com")
+	assert.Contains(t, contacts[1].Emails, "jane.doe@work.com")
 
 	assert.Equal(t, "No Birthday", contacts[2].Name)
 	assert.Empty(t, contacts[2].Birthday)
 	assert.Nil(t, contacts[2].BirthDate)
+	assert.Empty(t, contacts[2].Emails)
 }
 
 func TestFindBirthdays(t *testing.T) {
@@ -169,8 +186,8 @@ func TestIntegration(t *testing.T) {
 
 func TestFindContactByName(t *testing.T) {
 	contacts := []Contact{
-		{Name: "John Doe"},
-		{Name: "Jane Smith"},
+		{Name: "John Doe", Emails: []string{"john@example.com"}, Addresses: []Address{{FullAddress: "123 Main St., Anytown, CA, 12345, USA"}}},
+		{Name: "Jane Smith", Emails: []string{"jane@example.com", "jsmith@work.com"}},
 		{Name: "Bob Johnson"},
 	}
 
@@ -178,12 +195,20 @@ func TestFindContactByName(t *testing.T) {
 		query    string
 		expected int
 	}{
-		{"John", 2}, // Matches John Doe and Bob Johnson (contains "ohn")? No, "John" matches "John Doe" and "Bob Johnson" has "ohn" not "John". Wait.
-		// "John" is in "John Doe". "Bob Johnson" contains "Johnson" -> "John" is inside "Johnson". Yes.
-		{"doe", 1},   // Matches John Doe
-		{"Smith", 1}, // Matches Jane Smith
-		{"alice", 0}, // No match
-		{"", 3},      // Matches all
+		{"John", 2},         // Matches John Doe (name) and Bob Johnson (name contains "ohn")
+		{"doe", 1},          // Matches John Doe (name)
+		{"Smith", 1},        // Matches Jane Smith (name)
+		{"example.com", 2},  // Matches John and Jane (email)
+		{"jsmith", 1},       // Matches Jane (email)
+		{"alice", 0},        // No match
+		{"Main St", 1},      // Matches John Doe (address)
+		{"Anytown", 1},      // Matches John Doe (address)
+		{"USA", 1},          // Matches John Doe (address)
+		{"anytown", 1},      // Matches John Doe (address) (case insensitive)
+		{"usa", 1},          // Matches John Doe (address) (case insensitive)
+		{"town", 1},         // Matches John Doe (partial city "Anytown")
+		{"US", 1},           // Matches John Doe (partial country "USA")
+		{"", 3},             // Matches all
 	}
 
 	for _, tt := range tests {

@@ -16,7 +16,7 @@ type Config struct {
 }
 
 type contactParams struct {
-	Name string `json:"name" jsonschema:"Name of the contact to find"`
+	Query string `json:"query" jsonschema:"Name, email, or address of the contact to find (case-insensitive)"`
 }
 
 type birthdayParams struct {
@@ -33,6 +33,10 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 		logger.Warn("No VCF path configured")
 		return nil
 	}
+	_, err := loadContacts(config.Path, cache)
+	if err != nil {
+		logger.Error("Failed to load contacts", "error", err)
+	}
 
 	registerBirthdayTool(server, config, cache, logger)
 	registerContactTool(server, config, cache, logger)
@@ -43,7 +47,7 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 func registerContactTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
 	tool := &mcp.Tool{
 		Name:        "get_contact",
-		Description: "Find a contact by name (case-insensitive)",
+		Description: "Find a contact by name, email, or address (case-insensitive)",
 	}
 
 	handler := func(ctx context.Context, request *mcp.CallToolRequest, params contactParams) (*mcp.CallToolResult, any, error) {
@@ -53,7 +57,7 @@ func registerContactTool(server *mcp.Server, config Config, cache caching.Cache,
 			return nil, nil, fmt.Errorf("failed to load contacts: %w", err)
 		}
 
-		results := findContactByName(contacts, params.Name)
+		results := findContactByName(contacts, params.Query)
 
 		if len(results) == 0 {
 			return &mcp.CallToolResult{

@@ -17,7 +17,18 @@ type Contact struct {
 	Birthday  string         `json:"birthday,omitempty"`
 	BirthDate *Date          `json:"birth_date,omitempty"`
 	Age       int            `json:"age,omitempty"`
+	Emails    []string       `json:"emails,omitempty"`
+	Addresses []Address      `json:"addresses,omitempty"`
 	Extras    map[string]any `json:"extras,omitempty"`
+}
+
+type Address struct {
+	Street      string `json:"street,omitempty"`
+	Locality    string `json:"locality,omitempty"` // City
+	Region      string `json:"region,omitempty"`   // State/Province
+	PostalCode  string `json:"postal_code,omitempty"`
+	Country     string `json:"country,omitempty"`
+	FullAddress string `json:"full_address,omitempty"`
 }
 
 type Date struct {
@@ -76,9 +87,48 @@ func parseVCF(r io.Reader) ([]Contact, error) {
 			}
 		}
 
+		// Parse emails
+		for _, email := range card[vcard.FieldEmail] {
+			c.Emails = append(c.Emails, email.Value)
+		}
+
+		// Parse addresses
+		for _, adr := range card.Addresses() {
+			a := Address{
+				Street:     adr.StreetAddress,
+				Locality:   adr.Locality,
+				Region:     adr.Region,
+				PostalCode: adr.PostalCode,
+				Country:    adr.Country,
+			}
+			// Construct full address string for easier searching
+			var parts []string
+			if a.Street != "" {
+				parts = append(parts, a.Street)
+			}
+			if a.Locality != "" {
+				parts = append(parts, a.Locality)
+			}
+			if a.Region != "" {
+				parts = append(parts, a.Region)
+			}
+			if a.PostalCode != "" {
+				parts = append(parts, a.PostalCode)
+			}
+			if a.Country != "" {
+				parts = append(parts, a.Country)
+			}
+			a.FullAddress = strings.Join(parts, ", ")
+
+			if adr.ExtendedAddress != "" {
+				a.FullAddress += ", " + adr.ExtendedAddress
+			}
+			c.Addresses = append(c.Addresses, a)
+		}
+
 		// Store all fields in Extras
 		for k, fields := range card {
-			if k == vcard.FieldFormattedName || k == vcard.FieldBirthday {
+			if k == vcard.FieldFormattedName || k == vcard.FieldBirthday || k == vcard.FieldEmail || k == vcard.FieldAddress {
 				continue
 			}
 			// Simplified representation for JSON
@@ -199,12 +249,33 @@ func findBirthdays(contacts []Contact, start, end Date) []Contact {
 	return results
 }
 
-func findContactByName(contacts []Contact, name string) []Contact {
+func findContactByName(contacts []Contact, query string) []Contact {
 	var results []Contact
-	name = strings.ToLower(name)
+	query = strings.ToLower(query)
 	for _, c := range contacts {
-		if strings.Contains(strings.ToLower(c.Name), name) {
+		// Search name
+		if strings.Contains(strings.ToLower(c.Name), query) {
 			results = append(results, c)
+			continue
+		}
+		// Search emails
+		matchFound := false
+		for _, email := range c.Emails {
+			if strings.Contains(strings.ToLower(email), query) {
+				results = append(results, c)
+				matchFound = true
+				break
+			}
+		}
+		if matchFound {
+			continue
+		}
+		// Search addresses
+		for _, addr := range c.Addresses {
+			if strings.Contains(strings.ToLower(addr.FullAddress), query) {
+				results = append(results, c)
+				break
+			}
 		}
 	}
 	return results
