@@ -17,6 +17,7 @@ import (
 type openaiClient struct {
 	apiKey    string
 	model     string
+	baseURL   string
 	assistant *AssistantConfig
 	logger    *slog.Logger
 }
@@ -58,9 +59,15 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 		return "", err
 	}
 
-	client := openai.NewClient(
+	opts := []option.RequestOption{
 		option.WithAPIKey(c.APIKey()),
-	)
+	}
+
+	if c.baseURL != "" {
+		opts = append(opts, option.WithBaseURL(c.baseURL))
+	}
+
+	client := openai.NewClient(opts...)
 
 	for i := range 10 {
 		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -97,9 +104,15 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 		return "", err
 	}
 
-	client := openai.NewClient(
+	opts := []option.RequestOption{
 		option.WithAPIKey(c.APIKey()),
-	)
+	}
+
+	if c.baseURL != "" {
+		opts = append(opts, option.WithBaseURL(c.baseURL))
+	}
+
+	client := openai.NewClient(opts...)
 
 	openaiTools := make([]openai.ChatCompletionToolParam, 0, len(tools))
 	for _, t := range tools {
@@ -108,7 +121,7 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 			Function: shared.FunctionDefinitionParam{
 				Name:        t.Name,
 				Description: openai.String(t.Description),
-				Parameters:  t.InputSchema.(shared.FunctionParameters),
+				Parameters:  shared.FunctionParameters(t.InputSchema.(map[string]any)),
 			},
 		})
 	}

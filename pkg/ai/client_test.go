@@ -51,7 +51,7 @@ func TestNewClient(t *testing.T) {
 			},
 			assistantConfig:    assistantConfig,
 			expectError:        false,
-			expectedClientType: (*ollamaClient)(nil), // Expected concrete type
+			expectedClientType: (*openaiClient)(nil), // Expected concrete type
 		},
 		{
 			name: "Unknown AI type",

@@ -21,8 +21,8 @@ The following summaries are currently pre-defined:
 You can also start a conversation with Spark, to ask it questions about your
 events.
 
-Spark currently supports Google Gemini and OpenAI ChatGPT. Ollama support is
-available, but I can't test this with my hardware...
+Spark supports Google Gemini, OpenAI ChatGPT, and Ollama. All backends use the
+OpenAI-compatible API format, making configuration simple.
 
 ## Installation
 
@@ -47,7 +47,8 @@ spark print -f full
 
 ## MCP server
 
-Spark includes an MCP (Model Context Protocol) server that exposes your personal data (calendar, weather, planned meals) to LLMs.
+Spark includes an MCP (Model Context Protocol) server that exposes your personal
+data (calendar, weather, planned meals) to LLMs.
 
 ### Installation
 
@@ -57,7 +58,8 @@ go install github.com/jovandeginste/spark-personal-assistant/cmd/mcp@latest
 
 ### Configuration
 
-Create a `mcp-config.yaml` file (or use environment variables with `MCP_` prefix).
+Create a `mcp-config.yaml` file (or use environment variables with `MCP_`
+prefix).
 
 ```yaml
 port: :8081
@@ -85,34 +87,52 @@ You can customize Spark's behavior by changing the configuration file.
 
 ### Pick your LLM
 
-#### ollama
-
-```yaml
-llm:
-  type: ollama
-  model: gemma3:1b
-```
+Spark supports any provider that offers an OpenAI-compatible API.
 
 #### Gemini
+
+Uses Google's OpenAI-compatible endpoint.
 
 ```yaml
 llm:
   type: gemini
-  model: models/gemini-2.5-flash-preview-04-17
-  tts_model: gemini-2.5-flash-preview-tts
-  tts_voice: Charon
-  api_key: your-key
+  model: gemini-2.0-flash-exp
+  api_key: your-gemini-api-key
+  base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+```
+
+#### Ollama (Local)
+
+Uses your local Ollama instance (default port 11434).
+
+```yaml
+llm:
+  type: ollama
+  model: llama3
+  base_url: http://localhost:11434/v1/
 ```
 
 #### OpenAI
 
+Standard OpenAI configuration.
+
 ```yaml
 llm:
   type: openai
-  model: gpt-4o-mini
-  tts_model: gpt-4o-mini-tts
-  tts_voice: ash
-  api_key: your-key
+  model: gpt-4o
+  api_key: your-openai-api-key
+```
+
+#### Custom OpenAI-compatible Provider
+
+You can specify a custom base URL for any OpenAI-compatible provider.
+
+```yaml
+llm:
+  type: openai
+  model: deepseek-chat
+  api_key: your-api-key
+  base_url: https://api.deepseek.com/v1/
 ```
 
 ### Your names

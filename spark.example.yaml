@@ -13,15 +13,6 @@ extra_context:
   - John likes to play video games
   - Jane is a teacher
   - Jane likes to read novels
-mail:
-  from:
-    name: Spark
-    address: spark@example.org
-  server:
-    address: smtp.example.org
-    port: 587
-    user_name: spark@example.org
-    password: my-password
 llm:
-  type: ollama
   model: gemma3:1b
+  base_url: http://localhost:11434/v1/

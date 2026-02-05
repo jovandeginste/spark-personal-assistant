@@ -42,7 +42,9 @@ type updateParams struct {
 	Entry string `json:"entry" jsonschema:"The new text for the diary entry"`
 }
 
-type listUsersParams struct{}
+type listUsersParams struct {
+	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the user list (optional)"`
+}
 
 func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	if config.Path == "" {

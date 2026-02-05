@@ -8,9 +8,10 @@ import (
 )
 
 type AIConfig struct {
-	Type   string `mapstructure:"type"`
-	APIKey string `mapstructure:"api_key"`
-	Model  string `mapstructure:"model"`
+	Type    string `mapstructure:"type"`
+	APIKey  string `mapstructure:"api_key"`
+	Model   string `mapstructure:"model"`
+	BaseURL string `mapstructure:"base_url"`
 }
 
 type AssistantConfig struct {
@@ -44,7 +45,7 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 		return nil, errors.New("AI config is nil")
 	}
 
-	l = l.With("ai_backend", "gemini").With("name", ac.Name)
+	l = l.With("ai_backend", cc.Type).With("model", cc.Model).With("name", ac.Name)
 
 	switch cc.Type {
 	case "gemini":
@@ -58,13 +59,19 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 		c = &openaiClient{
 			apiKey:    cc.APIKey,
 			model:     cc.Model,
+			baseURL:   cc.BaseURL,
 			assistant: ac,
 			logger:    l,
 		}
 	case "ollama":
-		l.Warn("ollama does not work yet - input size is too large?")
-		c = &ollamaClient{
+		baseURL := cc.BaseURL
+		if baseURL == "" {
+			baseURL = "http://localhost:11434/v1/"
+		}
+		c = &openaiClient{
+			apiKey:    cc.APIKey,
 			model:     cc.Model,
+			baseURL:   baseURL,
 			assistant: ac,
 			logger:    l,
 		}

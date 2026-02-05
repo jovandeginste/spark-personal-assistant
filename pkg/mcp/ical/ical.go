@@ -37,6 +37,10 @@ type searchParams struct {
 	EndDate   string `json:"end_date,omitempty" jsonschema:"Optional end date for search range (YYYY-MM-DD)"`
 }
 
+type updateParams struct {
+	Force bool `json:"force,omitempty" jsonschema:"Optional: Force update (default true)"`
+}
+
 func Register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
 	logger = logger.With("module", "ical")
 	logger.Info("Registering MCP package")
@@ -176,7 +180,7 @@ func registerUpdateTool(server *mcp.Server, config Config, cache caching.Cache, 
 		Description: "Force update of the calendar cache for all configured calendars",
 	}
 
-	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
+	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
 		successCount := 0
 		errorCount := 0
 

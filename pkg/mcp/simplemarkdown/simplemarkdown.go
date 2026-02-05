@@ -53,7 +53,10 @@ func registerFetchTool(server *mcp.Server, config Config, logger *slog.Logger) {
 		Description: "Fetch the current todo list",
 	}
 
-	fetchHandler := func(ctx context.Context, request *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
+	fetchHandler := func(ctx context.Context, request *mcp.CallToolRequest, params struct {
+		Force bool `json:"force,omitempty" jsonschema:"Force refresh (optional)"`
+	},
+	) (*mcp.CallToolResult, any, error) {
 		content, err := os.ReadFile(config.Path)
 		if err != nil {
 			if os.IsNotExist(err) {

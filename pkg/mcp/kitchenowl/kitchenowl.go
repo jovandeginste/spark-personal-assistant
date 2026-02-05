@@ -41,7 +41,9 @@ type Recipe struct {
 	Yields          int    `json:"yields"`
 }
 
-type kitchenOwlParams struct{}
+type kitchenOwlParams struct {
+	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the data (optional)"`
+}
 
 func Register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
 	logger = logger.With("module", "kitchenowl")
