@@ -1,7 +1,6 @@
 package vcf
 
 import (
-	"bufio"
 	"errors"
 	"io"
 	"os"
@@ -9,14 +8,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/emersion/go-vcard"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 )
 
 type Contact struct {
-	Name      string `json:"name"`
-	Birthday  string `json:"birthday,omitempty"` // stored as YYYYMMDD or --MMDD
-	BirthDate *Date  `json:"birth_date,omitempty"`
-	Age       int    `json:"age,omitempty"`
+	Name      string         `json:"name"`
+	Birthday  string         `json:"birthday,omitempty"`
+	BirthDate *Date          `json:"birth_date,omitempty"`
+	Age       int            `json:"age,omitempty"`
+	Extras    map[string]any `json:"extras,omitempty"`
 }
 
 type Date struct {
@@ -41,48 +42,66 @@ func loadContacts(path string, _ caching.Cache) ([]Contact, error) {
 }
 
 func parseVCF(r io.Reader) ([]Contact, error) {
-	scanner := bufio.NewScanner(r)
+	dec := vcard.NewDecoder(r)
+
 	var contacts []Contact
-	var current *Contact
+	for {
+		card, err := dec.Decode()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
 
-	for scanner.Scan() {
-		line := scanner.Text()
+		c := Contact{
+			Extras: make(map[string]any),
+		}
 
-		switch {
-		case strings.HasPrefix(line, "BEGIN:VCARD"):
-			current = &Contact{}
-		case strings.HasPrefix(line, "END:VCARD"):
-			if current != nil && (current.Name != "" || current.Birthday != "") {
-				contacts = append(contacts, *current)
-			}
-			current = nil
-		case current != nil:
-			if strings.HasPrefix(line, "FN:") {
-				current.Name = strings.TrimPrefix(line, "FN:")
-			} else if strings.HasPrefix(line, "BDAY") {
-				// Format can be BDAY:19900101 or BDAY;VALUE=DATE:19900101
-				parts := strings.Split(line, ":")
-				if len(parts) >= 2 {
-					bday := parts[len(parts)-1]
-					current.Birthday = bday
-					if d, err := parseBirthday(bday); err == nil {
-						current.BirthDate = d
-					}
-				}
+		// Parse standard fields
+		c.Name = card.PreferredValue(vcard.FieldFormattedName)
+		if c.Name == "" {
+			// Fallback to Name field components if FN is missing
+			name := card.Name()
+			if name != nil {
+				c.Name = strings.TrimSpace(name.GivenName + " " + name.FamilyName)
 			}
 		}
-	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
+		bday := card.PreferredValue(vcard.FieldBirthday)
+		if bday != "" {
+			c.Birthday = bday
+			if bd, err := parseBirthday(bday); err == nil {
+				c.BirthDate = bd
+			}
+		}
 
+		// Store all fields in Extras
+		for k, fields := range card {
+			if k == vcard.FieldFormattedName || k == vcard.FieldBirthday {
+				continue
+			}
+			// Simplified representation for JSON
+			var values []string
+			for _, f := range fields {
+				values = append(values, f.Value)
+			}
+			if len(values) == 1 {
+				c.Extras[k] = values[0]
+			} else if len(values) > 1 {
+				c.Extras[k] = values
+			}
+		}
+
+		contacts = append(contacts, c)
+	}
 	return contacts, nil
 }
 
 func parseBirthday(s string) (*Date, error) {
-	// Simple parsing for YYYYMMDD or --MMDD
+	// Simple parsing for YYYYMMDD or --MMDD or YYYY-MM-DD
 	s = strings.TrimSpace(s)
+	// Try standard parsing first if it matches specific lengths
 	if len(s) == 8 {
 		// YYYYMMDD
 		y, err := strconv.Atoi(s[0:4])
@@ -114,6 +133,14 @@ func parseBirthday(s string) (*Date, error) {
 		}
 		return &Date{Year: y, Month: m, Day: d}, nil
 	}
+	// Attempt to parse with time.Parse for other ISO8601 variants commonly found in vCards
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return &Date{Year: t.Year(), Month: int(t.Month()), Day: t.Day()}, nil
+	}
+	if t, err := time.Parse("20060102", s); err == nil {
+		return &Date{Year: t.Year(), Month: int(t.Month()), Day: t.Day()}, nil
+	}
+
 	return nil, errors.New("unknown date format")
 }
 

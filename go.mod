@@ -10,6 +10,7 @@ require (
 	github.com/apognu/gocal v0.9.1
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 	github.com/chzyer/readline v1.5.1
+	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/go-querystring v1.1.0
 	github.com/jovandeginste/workout-tracker/v2 v2.4.1

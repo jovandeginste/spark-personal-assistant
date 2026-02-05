@@ -30,7 +30,11 @@ type Config struct {
 }
 
 func main() {
-	geocoder.SetClient(slog.Default(), "Spark")
+	// Initialize structured logging with JSON handler
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	geocoder.SetClient(logger, "Spark")
 
 	// Load configuration
 	config, err := loadConfig()
@@ -67,11 +71,10 @@ func main() {
 			Name:    "mcp-personal-data",
 			Version: "1.0.0",
 		}, &mcp.ServerOptions{
-			Logger: slog.Default(),
+			Logger: logger,
 		})
 
 		// Register tools
-		logger := slog.Default()
 		if err := weather.Register(server, config.Weather, logger); err != nil {
 			slog.Error("failed to register weather tool", "error", err)
 			return nil
@@ -110,7 +113,7 @@ func main() {
 	}, nil)
 
 	// Prefetch calendars in background
-	ical.StartPrefetch(config.ICal, cacheService, slog.Default())
+	ical.StartPrefetch(config.ICal, cacheService, logger)
 
 	slog.Info("Starting SSE server on " + config.Port)
 
