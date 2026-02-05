@@ -54,10 +54,6 @@ func main() {
 		"port", config.Port,
 	)
 
-	for _, cal := range config.ICal.Calendars {
-		slog.Info("ICal Calendar configured", "name", cal.Name, "description", cal.Description)
-	}
-
 	// Initialize caching service
 	cacheService, err := caching.NewService("./tmp/cache", 12*time.Hour)
 	if err != nil {
