@@ -6,27 +6,48 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Config struct {
-	Path string `mapstructure:"path"`
+	Path  string   `mapstructure:"path"`
+	Users []string `mapstructure:"users"`
 }
 
 type addParams struct {
 	Item string `json:"item" jsonschema:"The todo item to add"`
+	User string `json:"user" jsonschema:"The user to add the item for"`
 }
 
 type updateParams struct {
 	Index   int    `json:"index" jsonschema:"The index of the item to update (0-based)"`
 	NewItem string `json:"new_item" jsonschema:"The new text for the item"`
+	User    string `json:"user" jsonschema:"The user to update the item for"`
 }
 
 type toggleParams struct {
-	Index int  `json:"index" jsonschema:"The index of the item to toggle (0-based)"`
-	Done  bool `json:"done" jsonschema:"Set to true to mark as done, false for todo"`
+	Index int    `json:"index" jsonschema:"The index of the item to toggle (0-based)"`
+	Done  bool   `json:"done" jsonschema:"Set to true to mark as done, false for todo"`
+	User  string `json:"user" jsonschema:"The user to toggle the item for"`
+}
+
+type listUsersParams struct {
+	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the user list (optional)"`
+}
+
+func isValidUser(user string, validUsers []string) bool {
+	if len(validUsers) == 0 {
+		return false // Require explicit user configuration
+	}
+	for _, u := range validUsers {
+		if strings.EqualFold(u, user) {
+			return true
+		}
+	}
+	return false
 }
 
 func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
@@ -42,6 +63,7 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	registerAddTool(server, config, logger)
 	registerUpdateTool(server, config, logger)
 	registerToggleTool(server, config, logger)
+	registerListUsersTool(server, config, logger)
 
 	return nil
 }
@@ -54,10 +76,19 @@ func registerFetchTool(server *mcp.Server, config Config, logger *slog.Logger) {
 	}
 
 	fetchHandler := func(ctx context.Context, request *mcp.CallToolRequest, params struct {
-		Force bool `json:"force,omitempty" jsonschema:"Force refresh (optional)"`
+		Force bool   `json:"force,omitempty" jsonschema:"Force refresh (optional)"`
+		User  string `json:"user" jsonschema:"The user to fetch the todo list for"`
 	},
 	) (*mcp.CallToolResult, any, error) {
-		content, err := os.ReadFile(config.Path)
+		if params.User == "" {
+			return nil, nil, errors.New("user is required")
+		}
+		if !isValidUser(params.User, config.Users) {
+			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
+		}
+
+		path := getTodoPath(config.Path, params.User)
+		content, err := os.ReadFile(path)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return &mcp.CallToolResult{
@@ -94,7 +125,15 @@ func registerAddTool(server *mcp.Server, config Config, logger *slog.Logger) {
 	}
 
 	addHandler := func(ctx context.Context, request *mcp.CallToolRequest, params addParams) (*mcp.CallToolResult, any, error) {
-		f, err := os.OpenFile(config.Path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+		if params.User == "" {
+			return nil, nil, errors.New("user is required")
+		}
+		if !isValidUser(params.User, config.Users) {
+			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
+		}
+
+		path := getTodoPath(config.Path, params.User)
+		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 		if err != nil {
 			logger.Error("Failed to open todo file", "error", err)
 			return nil, nil, fmt.Errorf("failed to open todo file: %w", err)
@@ -131,7 +170,15 @@ func registerUpdateTool(server *mcp.Server, config Config, logger *slog.Logger) 
 	}
 
 	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
-		lines, err := readLines(config.Path)
+		if params.User == "" {
+			return nil, nil, errors.New("user is required")
+		}
+		if !isValidUser(params.User, config.Users) {
+			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
+		}
+
+		path := getTodoPath(config.Path, params.User)
+		lines, err := readLines(path)
 		if err != nil {
 			logger.Error("Failed to read todo file", "error", err)
 			return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
@@ -149,7 +196,7 @@ func registerUpdateTool(server *mcp.Server, config Config, logger *slog.Logger) 
 		prefix := line[:6]
 		lines[params.Index] = prefix + params.NewItem
 
-		if err := writeLines(config.Path, lines); err != nil {
+		if err := writeLines(path, lines); err != nil {
 			logger.Error("Failed to write todo file", "error", err)
 			return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
 		}
@@ -174,7 +221,15 @@ func registerToggleTool(server *mcp.Server, config Config, logger *slog.Logger) 
 	}
 
 	toggleHandler := func(ctx context.Context, request *mcp.CallToolRequest, params toggleParams) (*mcp.CallToolResult, any, error) {
-		lines, err := readLines(config.Path)
+		if params.User == "" {
+			return nil, nil, errors.New("user is required")
+		}
+		if !isValidUser(params.User, config.Users) {
+			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
+		}
+
+		path := getTodoPath(config.Path, params.User)
+		lines, err := readLines(path)
 		if err != nil {
 			logger.Error("Failed to read todo file", "error", err)
 			return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
@@ -196,7 +251,7 @@ func registerToggleTool(server *mcp.Server, config Config, logger *slog.Logger) 
 			lines[params.Index] = "- [ ] " + content
 		}
 
-		if err := writeLines(config.Path, lines); err != nil {
+		if err := writeLines(path, lines); err != nil {
 			logger.Error("Failed to write todo file", "error", err)
 			return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
 		}
@@ -216,6 +271,32 @@ func registerToggleTool(server *mcp.Server, config Config, logger *slog.Logger) 
 	}
 
 	mcp.AddTool(server, toggleTool, toggleHandler)
+}
+
+func registerListUsersTool(server *mcp.Server, config Config, logger *slog.Logger) {
+	// Tool: List users
+	listUsersTool := &mcp.Tool{
+		Name:        "todo_list_users",
+		Description: "List all users who have access to the todo list",
+	}
+
+	listUsersHandler := func(ctx context.Context, request *mcp.CallToolRequest, params listUsersParams) (*mcp.CallToolResult, any, error) {
+		users := config.Users
+		if len(users) == 0 {
+			logger.Info("No users configured")
+			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "No users configured"}}}, nil, nil
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "Users: " + strings.Join(users, ", "),
+				},
+			},
+		}, nil, nil
+	}
+
+	mcp.AddTool(server, listUsersTool, listUsersHandler)
 }
 
 func readLines(path string) ([]string, error) {
@@ -242,4 +323,13 @@ func writeLines(path string, lines []string) error {
 	}
 
 	return os.WriteFile(path, []byte(output), 0o600)
+}
+
+func getTodoPath(basePath, user string) string {
+	if user == "" {
+		return basePath
+	}
+	ext := filepath.Ext(basePath)
+	name := strings.TrimSuffix(basePath, ext)
+	return fmt.Sprintf("%s.%s%s", name, user, ext)
 }

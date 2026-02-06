@@ -77,6 +77,9 @@ vcf:
   path: /path/to/contacts.vcf
 simplemarkdown:
   path: /path/to/markdown/files
+  users:
+    - alice
+    - bob
 ```
 
 If `kitchenowl.token` is not provided, the meal planning tool will be disabled.

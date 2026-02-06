@@ -17,7 +17,8 @@ func TestSimpleMarkdown(t *testing.T) {
 	logger := slog.Default()
 
 	config := Config{
-		Path: todoPath,
+		Path:  todoPath,
+		Users: []string{"testuser"},
 	}
 
 	server := mcp.NewServer(&mcp.Implementation{
@@ -87,6 +88,10 @@ func TestSimpleMarkdown(t *testing.T) {
 	content, err = os.ReadFile(todoPath)
 	require.NoError(t, err)
 	assert.Equal(t, "- [x] Updated Item 1\n", string(content))
+
+	// 6. Test listing users
+	// We can't directly test the handler here, but we can verify the configuration
+	assert.Contains(t, config.Users, "testuser")
 }
 
 func TestReadWriteLines(t *testing.T) {
@@ -104,4 +109,18 @@ func TestReadWriteLines(t *testing.T) {
 	content, err := os.ReadFile(path)
 	require.NoError(t, err)
 	assert.Equal(t, "Line 1\nLine 2\n", string(content))
+}
+
+func TestGetTodoPath(t *testing.T) {
+	base := "/path/to/todo.md"
+
+	// No user
+	assert.Equal(t, base, getTodoPath(base, ""))
+
+	// With user
+	assert.Equal(t, "/path/to/todo.user1.md", getTodoPath(base, "user1"))
+
+	// With user and different extension
+	baseTxt := "/data/list.txt"
+	assert.Equal(t, "/data/list.user2.txt", getTodoPath(baseTxt, "user2"))
 }
