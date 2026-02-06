@@ -128,7 +128,7 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 
 	messages := []openai.ChatCompletionMessageParamUnion{promptMsg}
 
-	for i := range 10 {
+	for i := range MaxToolCalls {
 		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 			Messages: messages,
 			Model:    c.Model(),

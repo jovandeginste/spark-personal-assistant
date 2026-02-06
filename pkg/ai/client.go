@@ -7,6 +7,8 @@ import (
 	"log/slog"
 )
 
+const MaxToolCalls = 30
+
 type AIConfig struct {
 	Type    string `mapstructure:"type"`
 	APIKey  string `mapstructure:"api_key"`

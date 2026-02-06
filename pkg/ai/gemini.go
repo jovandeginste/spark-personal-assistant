@@ -117,7 +117,7 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 
 	history := []*genai.Content{promptContent}
 
-	for i := range 10 {
+	for i := range MaxToolCalls {
 		result, err := client.Models.GenerateContent(ctx, c.model, history, config)
 		if err != nil {
 			c.Logger().Warn("Error generating content", "error", err, "attempt", i)
