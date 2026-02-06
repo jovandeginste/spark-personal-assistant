@@ -80,6 +80,9 @@ simplemarkdown:
   users:
     - alice
     - bob
+googlecontacts:
+  client_secret: '{"installed":{"client_id":"...","client_secret":"..."}}'
+  token_file: /path/to/token.json
 ```
 
 If `kitchenowl.token` is not provided, the meal planning tool will be disabled.

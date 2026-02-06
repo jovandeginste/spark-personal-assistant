@@ -9,6 +9,7 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/diary"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/googlecontacts"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/simplemarkdown"
@@ -26,6 +27,7 @@ type Config struct {
 	VCF            vcf.Config            `mapstructure:"vcf"`
 	SimpleMarkdown simplemarkdown.Config `mapstructure:"simplemarkdown"`
 	Diary          diary.Config          `mapstructure:"diary"`
+	GoogleContacts googlecontacts.Config `mapstructure:"googlecontacts"`
 	Port           string                `mapstructure:"port"`
 }
 
@@ -51,6 +53,7 @@ func main() {
 		"vcf_enabled", config.VCF.Path != "",
 		"simplemarkdown_enabled", config.SimpleMarkdown.Path != "",
 		"diary_enabled", config.Diary.Path != "",
+		"googlecontacts_enabled", config.GoogleContacts.TokenFile != "",
 		"port", config.Port,
 	)
 
@@ -102,6 +105,11 @@ func main() {
 
 		if err := diary.Register(server, config.Diary, logger); err != nil {
 			slog.Error("failed to register diary tool", "error", err)
+			return nil
+		}
+
+		if err := googlecontacts.Register(server, config.GoogleContacts, logger); err != nil {
+			slog.Error("failed to register googlecontacts tool", "error", err)
 			return nil
 		}
 

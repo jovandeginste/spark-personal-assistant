@@ -69,6 +69,11 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 
 		transport = &mcp.SSEClientTransport{
 			Endpoint: config.URL,
+			HTTPClient: &http.Client{
+				Transport: &headerTransport{
+					transport: http.DefaultTransport,
+				},
+			},
 		}
 	case "stdio":
 		if config.Command == "" {
@@ -273,4 +278,19 @@ func (a *App) UpdateMCPServers(ctx context.Context) map[string]string {
 	}
 
 	return results
+}
+
+type headerTransport struct {
+	transport http.RoundTripper
+}
+
+func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	r := req.Clone(req.Context())
+	r.Header.Set("Accept", "text/event-stream")
+
+	tr := t.transport
+	if tr == nil {
+		tr = http.DefaultTransport
+	}
+	return tr.RoundTrip(r)
 }
