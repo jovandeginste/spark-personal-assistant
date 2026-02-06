@@ -10,12 +10,17 @@ import (
 	"strings"
 	"time"
 
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Config struct {
 	Path  string   `mapstructure:"path"`
 	Users []string `mapstructure:"users"`
+}
+
+type Module struct {
+	sparkmcp.BaseModule
 }
 
 type addEntryParams struct {
@@ -46,7 +51,7 @@ type listUsersParams struct {
 	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the user list (optional)"`
 }
 
-func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
+func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	if config.Path == "" {
 		return errors.New("diary path is not configured")
 	}
@@ -77,6 +82,11 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	}, handleReadDiary(config, logger))
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Logger())
 }
 
 func isValidUser(user string, validUsers []string) bool {

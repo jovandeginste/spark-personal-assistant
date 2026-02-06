@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/go-querystring/query"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -49,7 +50,11 @@ type weatherParams struct {
 	EndDate   string `json:"end_date" jsonschema:"The last date in the range to get weather report for"`
 }
 
-func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
+type Module struct {
+	sparkmcp.BaseModule
+}
+
+func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	logger = logger.With("module", "weather")
 	logger.Info("Registering MCP package")
 
@@ -81,6 +86,11 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	mcp.AddTool(server, tool, handler)
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Logger())
 }
 
 func getWeatherInfo(apiURL, location, startDate, endDate string) ([]byte, error) {

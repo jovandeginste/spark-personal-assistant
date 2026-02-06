@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/diary"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/googlecontacts"
@@ -16,7 +17,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/viper"
 )
 
@@ -65,59 +66,75 @@ func main() {
 	}
 
 	// Create SSE handler
-	sseHandler := mcp.NewSSEHandler(func(r *http.Request) *mcp.Server {
-		server := mcp.NewServer(&mcp.Implementation{
+	sseHandler := sdk.NewSSEHandler(func(r *http.Request) *sdk.Server {
+		server := sdk.NewServer(&sdk.Implementation{
 			Name:    "mcp-personal-data",
 			Version: "1.0.0",
-		}, &mcp.ServerOptions{
+		}, &sdk.ServerOptions{
 			Logger: logger,
 		})
 
-		// Register tools
-		if err := weather.Register(server, config.Weather, logger); err != nil {
-			slog.Error("failed to register weather tool", "error", err)
-			return nil
-		}
+		modules := []mcp.Module{}
 
+		// Weather
+		weatherModule := &weather.Module{}
+		weatherModule.SetConfig(config.Weather)
+		modules = append(modules, weatherModule)
+
+		// KitchenOwl
 		if config.KitchenOwl.Token != "" {
-			if err := kitchenowl.Register(server, config.KitchenOwl, cacheService, logger); err != nil {
-				slog.Error("failed to register kitchenowl tool", "error", err)
-				return nil
-			}
+			kitchenOwlModule := &kitchenowl.Module{Cache: cacheService}
+			kitchenOwlModule.SetConfig(config.KitchenOwl)
+			modules = append(modules, kitchenOwlModule)
 		} else {
 			slog.Info("KitchenOwl tool disabled (no token provided)")
 		}
 
-		if err := ical.Register(server, config.ICal, cacheService, logger); err != nil {
-			slog.Error("failed to register ical tool", "error", err)
-			return nil
-		}
+		// ICal
+		icalModule := &ical.Module{Cache: cacheService}
+		icalModule.SetConfig(config.ICal)
+		modules = append(modules, icalModule)
 
-		if err := vcf.Register(server, config.VCF, cacheService, logger); err != nil {
-			slog.Error("failed to register vcf tool", "error", err)
-			return nil
-		}
+		// VCF
+		vcfModule := &vcf.Module{Cache: cacheService}
+		vcfModule.SetConfig(config.VCF)
+		modules = append(modules, vcfModule)
 
-		if err := simplemarkdown.Register(server, config.SimpleMarkdown, logger); err != nil {
-			slog.Error("failed to register simplemarkdown tool", "error", err)
-			return nil
-		}
+		// SimpleMarkdown
+		simpleMarkdownModule := &simplemarkdown.Module{}
+		simpleMarkdownModule.SetConfig(config.SimpleMarkdown)
+		modules = append(modules, simpleMarkdownModule)
 
-		if err := diary.Register(server, config.Diary, logger); err != nil {
-			slog.Error("failed to register diary tool", "error", err)
-			return nil
-		}
+		// Diary
+		diaryModule := &diary.Module{}
+		diaryModule.SetConfig(config.Diary)
+		modules = append(modules, diaryModule)
 
-		if err := googlecontacts.Register(server, config.GoogleContacts, logger); err != nil {
-			slog.Error("failed to register googlecontacts tool", "error", err)
-			return nil
+		// Google Contacts
+		googleContactsModule := &googlecontacts.Module{}
+		googleContactsModule.SetConfig(config.GoogleContacts)
+		modules = append(modules, googleContactsModule)
+
+		for _, module := range modules {
+			module.SetLogger(logger)
+			if err := module.Initialize(); err != nil {
+				slog.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
+				continue
+			}
+			if err := module.Register(server); err != nil {
+				slog.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
+			}
 		}
 
 		return server
 	}, nil)
 
 	// Prefetch calendars in background
-	ical.StartPrefetch(config.ICal, cacheService, logger)
+	// ical.StartPrefetch(config.ICal, cacheService, logger)
+	icalModule := &ical.Module{Cache: cacheService}
+	icalModule.SetConfig(config.ICal)
+	icalModule.SetLogger(logger)
+	icalModule.StartPrefetch()
 
 	slog.Info("Starting SSE server on " + config.Port)
 
@@ -147,7 +164,8 @@ func main() {
 		}
 
 		// Trigger prefetch again
-		go ical.StartPrefetch(config.ICal, cacheService, slog.Default())
+		// go ical.StartPrefetch(config.ICal, cacheService, slog.Default())
+		icalModule.StartPrefetch()
 
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("Cache cleared and updates triggered"))

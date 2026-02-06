@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -18,6 +19,11 @@ type Config struct {
 	APIURL      string
 	Token       string
 	HouseholdID int
+}
+
+type Module struct {
+	sparkmcp.BaseModule
+	Cache caching.Cache
 }
 
 type PlannedMeal struct {
@@ -45,7 +51,7 @@ type kitchenOwlParams struct {
 	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the data (optional)"`
 }
 
-func Register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
+func register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
 	logger = logger.With("module", "kitchenowl")
 	logger.Info("Registering MCP package")
 
@@ -119,6 +125,11 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 	mcp.AddTool(server, updateTool, updateHandler)
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Cache, m.Logger())
 }
 
 func getPlannedMeals(config Config, cache caching.Cache) ([]byte, error) {

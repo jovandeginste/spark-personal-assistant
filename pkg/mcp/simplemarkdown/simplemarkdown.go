@@ -9,12 +9,17 @@ import (
 	"path/filepath"
 	"strings"
 
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Config struct {
 	Path  string   `mapstructure:"path"`
 	Users []string `mapstructure:"users"`
+}
+
+type Module struct {
+	sparkmcp.BaseModule
 }
 
 type addParams struct {
@@ -50,7 +55,7 @@ func isValidUser(user string, validUsers []string) bool {
 	return false
 }
 
-func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
+func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	logger = logger.With("module", "simplemarkdown")
 	logger.Info("Registering MCP package")
 
@@ -66,6 +71,11 @@ func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	registerListUsersTool(server, config, logger)
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Logger())
 }
 
 func registerFetchTool(server *mcp.Server, config Config, logger *slog.Logger) {

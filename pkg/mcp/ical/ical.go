@@ -12,6 +12,7 @@ import (
 
 	"github.com/apognu/gocal"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -24,6 +25,11 @@ type Calendar struct {
 
 type Config struct {
 	Calendars []Calendar `mapstructure:"calendars"`
+}
+
+type Module struct {
+	sparkmcp.BaseModule
+	Cache caching.Cache
 }
 
 type icalParams struct {
@@ -41,7 +47,7 @@ type updateParams struct {
 	Force bool `json:"force,omitempty" jsonschema:"Optional: Force update (default true)"`
 }
 
-func Register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
+func register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
 	logger = logger.With("module", "ical")
 	logger.Info("Registering MCP package")
 
@@ -55,6 +61,11 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 	registerUpdateTool(server, config, cache, logger)
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Cache, m.Logger())
 }
 
 func registerListTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
@@ -219,7 +230,11 @@ func registerUpdateTool(server *mcp.Server, config Config, cache caching.Cache, 
 	mcp.AddTool(server, updateTool, updateHandler)
 }
 
-func StartPrefetch(config Config, cache caching.Cache, logger *slog.Logger) {
+func (m *Module) StartPrefetch() {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	cache := m.Cache
+
 	go func() {
 		logger.Info("Prefetching calendars", "count", len(config.Calendars))
 

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log/slog"
 	"strings"
 
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"google.golang.org/api/option"
 	"google.golang.org/api/people/v1"
@@ -15,6 +15,10 @@ import (
 type Config struct {
 	Init      string `mapstructure:"init"`
 	TokenFile string `mapstructure:"token_file"`
+}
+
+type Module struct {
+	sparkmcp.BaseModule
 }
 
 type contactsParams struct {
@@ -29,8 +33,9 @@ var readMask = []string{
 	"relations", "sipAddresses", "skills", "urls", "userDefined",
 }
 
-func Register(server *mcp.Server, config Config, logger *slog.Logger) error {
-	logger = logger.With("module", "googlecontacts")
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	logger := m.Logger().With("module", "googlecontacts")
 	logger.Info("Registering MCP package")
 
 	tool := &mcp.Tool{

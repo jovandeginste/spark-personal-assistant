@@ -20,7 +20,10 @@ func TestRegister(t *testing.T) {
 		APIURL: "http://example.com",
 	}
 
-	err := Register(server, config, logger)
+	module := &Module{}
+	module.SetConfig(config)
+	module.SetLogger(logger)
+	err := module.Register(server)
 	assert.NoError(t, err)
 }
 

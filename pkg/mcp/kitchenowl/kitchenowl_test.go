@@ -26,7 +26,10 @@ func TestRegister(t *testing.T) {
 	}
 
 	cache, _ := caching.NewService(os.TempDir(), time.Hour)
-	err := Register(server, config, cache, logger)
+	module := &Module{Cache: cache}
+	module.SetConfig(config)
+	module.SetLogger(logger)
+	err := module.Register(server)
 	assert.NoError(t, err)
 }
 
@@ -147,6 +150,9 @@ func TestHandlerLogic(t *testing.T) {
 	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "1.0"}, &mcp.ServerOptions{})
 
 	cache, _ := caching.NewService(os.TempDir(), time.Hour)
-	err := Register(server, config, cache, logger)
+	module := &Module{Cache: cache}
+	module.SetConfig(config)
+	module.SetLogger(logger)
+	err := module.Register(server)
 	assert.NoError(t, err)
 }

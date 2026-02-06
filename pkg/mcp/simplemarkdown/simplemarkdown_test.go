@@ -28,7 +28,10 @@ func TestSimpleMarkdown(t *testing.T) {
 		Logger: logger,
 	})
 
-	err := Register(server, config, logger)
+	module := &Module{}
+	module.SetConfig(config)
+	module.SetLogger(logger)
+	err := module.Register(server)
 	require.NoError(t, err)
 
 	// Helper to find tool by name (simulated)

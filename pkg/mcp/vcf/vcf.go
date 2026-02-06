@@ -7,12 +7,18 @@ import (
 	"log/slog"
 	"time"
 
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 type Config struct {
 	Path string `mapstructure:"path"`
+}
+
+type Module struct {
+	sparkmcp.BaseModule
+	Cache caching.Cache
 }
 
 type contactParams struct {
@@ -25,7 +31,7 @@ type birthdayParams struct {
 	EndDate   string `json:"end_date,omitempty" jsonschema:"End date for birthday range search (MM-DD)"`
 }
 
-func Register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
+func register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
 	logger = logger.With("module", "vcf")
 	logger.Info("Registering VCF package")
 
@@ -42,6 +48,11 @@ func Register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 	registerContactTool(server, config, cache, logger)
 
 	return nil
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	return register(server, config, m.Cache, m.Logger())
 }
 
 func registerContactTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
