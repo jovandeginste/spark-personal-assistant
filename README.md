@@ -153,7 +153,7 @@ You may give the AI more context about yourself, which will be used to find
 links between events and your family.
 
 ```yaml
-extra_context:
+context: |
   - John works at BigCo
   - John likes to play video games
   - Jane is a teacher

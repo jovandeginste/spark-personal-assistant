@@ -11,7 +11,7 @@ type ChatHistory struct {
 }
 
 type AIData struct {
-	ExtraContext     []string
+	Context     string
 	ChatHistory      []ChatHistory `json:",omitempty"`
 	EmployerQuestion []string      `json:",omitempty"`
 	UserData         UserData
@@ -50,8 +50,8 @@ func (aiData *AIData) AddChatHistory(role string, input string) {
 
 func (a *App) BuildData() (*AIData, error) {
 	aiData := &AIData{
-		ExtraContext: a.Config.ExtraContext,
-		UserData:     a.Config.UserData,
+		Context:  a.Config.Context,
+		UserData: a.Config.UserData,
 	}
 
 	return aiData, nil

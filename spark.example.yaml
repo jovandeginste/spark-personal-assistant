@@ -8,11 +8,11 @@ user_data:
   names:
     - John Doe
     - Jane Doe
-extra_context:
-  - John works at BigCo
-  - John likes to play video games
-  - Jane is a teacher
-  - Jane likes to read novels
+context: |
+  John works at BigCo
+  John likes to play video games
+  Jane is a teacher
+  Jane likes to read novels
 llm:
   model: gemma3:1b
   base_url: http://localhost:11434/v1/

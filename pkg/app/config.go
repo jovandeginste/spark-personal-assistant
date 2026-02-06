@@ -16,7 +16,7 @@ var defaultPersona = "butler.md"
 
 type Config struct {
 	UserData     UserData     `mapstructure:"user_data"`
-	ExtraContext []string     `mapstructure:"extra_context"`
+	Context      string       `mapstructure:"context"`
 	LLM          *ai.AIConfig `mapstructure:"llm"`
 
 	AssistantFileCLI string                     `mapstructure:"-"`
