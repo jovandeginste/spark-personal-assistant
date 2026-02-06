@@ -242,6 +242,7 @@ type Event struct {
 	Summary      string    `json:"summary"`
 	Start        time.Time `json:"start"`
 	End          time.Time `json:"end"`
+	Duration     string    `json:"duration"`
 	Description  string    `json:"description,omitempty"`
 	Location     string    `json:"location,omitempty"`
 }
@@ -283,16 +284,21 @@ func getEvents(cal Calendar, start, end time.Time, cache caching.Cache) ([]Event
 		}
 
 		// Check overlap: (StartA <= EndB) and (EndA >= StartB)
-		if eventStart.Before(rangeEnd) && eventEnd.After(rangeStart) {
-			results = append(results, Event{
-				CalendarName: cal.Name,
-				Summary:      e.Summary,
-				Start:        *e.Start,
-				End:          *e.End,
-				Description:  e.Description,
-				Location:     e.Location,
-			})
+		if eventStart.After(rangeEnd) || eventEnd.Before(rangeStart) {
+			continue
 		}
+
+		newEvent := Event{
+			CalendarName: cal.Name,
+			Summary:      e.Summary,
+			Description:  e.Description,
+			Location:     e.Location,
+		}
+		if err := newEvent.SetTimes(e); err != nil {
+			continue
+		}
+
+		results = append(results, newEvent)
 	}
 
 	return results, nil
@@ -346,14 +352,16 @@ func searchEvents(cal Calendar, query string, startDateStr, endDateStr string, c
 			continue
 		}
 
-		results = append(results, Event{
+		newEvent := Event{
 			CalendarName: cal.Name,
 			Summary:      e.Summary,
-			Start:        *e.Start,
-			End:          *e.End,
 			Description:  e.Description,
 			Location:     e.Location,
-		})
+		}
+
+		newEvent.SetTimes(e)
+
+		results = append(results, newEvent)
 	}
 
 	return results, nil
@@ -416,4 +424,55 @@ func fetchAndCacheICS(url string, cache caching.Cache) (string, error) {
 	return cache.SetFile(url, func() (io.ReadCloser, error) {
 		return generic.ReadResource(url)
 	})
+}
+
+func (e *Event) SetTimes(event gocal.Event) error {
+	if err := e.SetStart(event); err != nil {
+		return err
+	}
+
+	if err := e.SetEnd(event); err != nil {
+		return err
+	}
+
+	e.SetDuration(event)
+
+	return nil
+}
+
+func (e *Event) SetStart(event gocal.Event) error {
+	s := event.Start
+	if s == nil {
+		return nil
+	}
+
+	t, err := parseICalRawDate(&event.RawStart, event.Start)
+	if err != nil {
+		return err
+	}
+
+	e.Start = t
+	return nil
+}
+
+func (e *Event) SetEnd(event gocal.Event) error {
+	if event.End == nil {
+		return nil
+	}
+	t, err := parseICalRawDate(&event.RawEnd, event.End)
+	if err != nil {
+		return err
+	}
+
+	e.End = t
+	return nil
+}
+
+func (e *Event) SetDuration(event gocal.Event) {
+	if event.Start == nil || event.End == nil {
+		return
+	}
+
+	dur := event.End.Sub(*event.Start)
+	e.Duration = cleanDuration(dur)
 }
