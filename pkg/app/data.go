@@ -11,7 +11,7 @@ type ChatHistory struct {
 }
 
 type AIData struct {
-	Context     string
+	Context          string
 	ChatHistory      []ChatHistory `json:",omitempty"`
 	EmployerQuestion []string      `json:",omitempty"`
 	UserData         UserData

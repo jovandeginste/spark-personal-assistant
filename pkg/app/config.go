@@ -15,9 +15,9 @@ import (
 var defaultPersona = "butler.md"
 
 type Config struct {
-	UserData     UserData     `mapstructure:"user_data"`
-	Context      string       `mapstructure:"context"`
-	LLM          *ai.AIConfig `mapstructure:"llm"`
+	UserData UserData     `mapstructure:"user_data"`
+	Context  string       `mapstructure:"context"`
+	LLM      *ai.AIConfig `mapstructure:"llm"`
 
 	AssistantFileCLI string                     `mapstructure:"-"`
 	Assistant        ai.AssistantConfig         `mapstructure:"assistant"`
