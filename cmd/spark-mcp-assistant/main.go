@@ -55,7 +55,7 @@ func main() {
 	)
 
 	// Initialize caching service
-	cacheService, err := caching.NewService("./tmp/cache", 12*time.Hour)
+	cacheService, err := caching.NewService("./tmp/cache", 6*time.Hour)
 	if err != nil {
 		slog.Error("failed to initialize caching service", "error", err)
 		os.Exit(1)
