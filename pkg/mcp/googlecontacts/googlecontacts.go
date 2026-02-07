@@ -3,6 +3,7 @@ package googlecontacts
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -61,6 +62,14 @@ func (m *Module) Register(server *mcp.Server) error {
 
 	mcp.AddTool(server, tool, handler)
 
+	return nil
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.TokenFile == "" {
+		return errors.New("googlecontacts token file is not configured")
+	}
 	return nil
 }
 

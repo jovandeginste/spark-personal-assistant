@@ -59,11 +59,6 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	logger = logger.With("module", "simplemarkdown")
 	logger.Info("Registering MCP package")
 
-	if config.Path == "" {
-		logger.Warn("No path configured for simplemarkdown")
-		return nil
-	}
-
 	registerFetchTool(server, config, logger)
 	registerAddTool(server, config, logger)
 	registerUpdateTool(server, config, logger)
@@ -76,6 +71,14 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.Path == "" {
+		return errors.New("simplemarkdown path is not configured")
+	}
+	return nil
 }
 
 func registerFetchTool(server *mcp.Server, config Config, logger *slog.Logger) {

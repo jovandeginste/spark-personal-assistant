@@ -3,6 +3,7 @@ package ical
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -51,11 +52,6 @@ func register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 	logger = logger.With("module", "ical")
 	logger.Info("Registering MCP package")
 
-	if len(config.Calendars) == 0 {
-		logger.Warn("No calendars configured")
-		return nil
-	}
-
 	registerListTool(server, config, cache, logger)
 	registerSearchTool(server, config, cache, logger)
 	registerUpdateTool(server, config, cache, logger)
@@ -66,6 +62,14 @@ func register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Cache, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if len(config.Calendars) == 0 {
+		return errors.New("no ical calendars configured")
+	}
+	return nil
 }
 
 func registerListTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {

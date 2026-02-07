@@ -52,10 +52,6 @@ type listUsersParams struct {
 }
 
 func register(server *mcp.Server, config Config, logger *slog.Logger) error {
-	if config.Path == "" {
-		return errors.New("diary path is not configured")
-	}
-
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_diary_entry",
 		Description: "Adds a new entry to the user's diary. Use this to remember things or log daily events.",
@@ -87,6 +83,14 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.Path == "" {
+		return errors.New("diary path is not configured")
+	}
+	return nil
 }
 
 func isValidUser(user string, validUsers []string) bool {

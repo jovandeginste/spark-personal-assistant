@@ -3,6 +3,7 @@ package vcf
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -35,10 +36,6 @@ func register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 	logger = logger.With("module", "vcf")
 	logger.Info("Registering VCF package")
 
-	if config.Path == "" {
-		logger.Warn("No VCF path configured")
-		return nil
-	}
 	_, err := loadContacts(config.Path, cache)
 	if err != nil {
 		logger.Error("Failed to load contacts", "error", err)
@@ -53,6 +50,14 @@ func register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Cache, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.Path == "" {
+		return errors.New("vcf path is not configured")
+	}
+	return nil
 }
 
 func registerContactTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {

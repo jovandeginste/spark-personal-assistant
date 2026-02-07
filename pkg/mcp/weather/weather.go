@@ -2,6 +2,7 @@ package weather
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -91,6 +92,14 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.APIURL == "" {
+		return errors.New("weather API URL is not configured")
+	}
+	return nil
 }
 
 func getWeatherInfo(apiURL, location, startDate, endDate string) ([]byte, error) {

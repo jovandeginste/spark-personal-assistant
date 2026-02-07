@@ -74,7 +74,7 @@ func main() {
 			Logger: logger,
 		})
 
-		modules := []mcp.Module{}
+		modules := make([]mcp.Module, 0, 7)
 
 		// Weather
 		weatherModule := &weather.Module{}
@@ -82,13 +82,9 @@ func main() {
 		modules = append(modules, weatherModule)
 
 		// KitchenOwl
-		if config.KitchenOwl.Token != "" {
-			kitchenOwlModule := &kitchenowl.Module{Cache: cacheService}
-			kitchenOwlModule.SetConfig(config.KitchenOwl)
-			modules = append(modules, kitchenOwlModule)
-		} else {
-			slog.Info("KitchenOwl tool disabled (no token provided)")
-		}
+		kitchenOwlModule := &kitchenowl.Module{Cache: cacheService}
+		kitchenOwlModule.SetConfig(config.KitchenOwl)
+		modules = append(modules, kitchenOwlModule)
 
 		// ICal
 		icalModule := &ical.Module{Cache: cacheService}
@@ -117,6 +113,14 @@ func main() {
 
 		for _, module := range modules {
 			module.SetLogger(logger)
+
+			if err := module.Enabled(); err != nil {
+				// Don't log "no users configured" for simplemarkdown, or other specific errors if desired.
+				// For now, log everything as info so user sees what is disabled.
+				slog.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
+				continue
+			}
+
 			if err := module.Initialize(); err != nil {
 				slog.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
 				continue

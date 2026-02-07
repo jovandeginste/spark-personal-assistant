@@ -3,6 +3,7 @@ package kitchenowl
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -130,6 +131,14 @@ func register(server *mcp.Server, config Config, cache caching.Cache, logger *sl
 func (m *Module) Register(server *mcp.Server) error {
 	config := m.Config().(Config)
 	return register(server, config, m.Cache, m.Logger())
+}
+
+func (m *Module) Enabled() error {
+	config := m.Config().(Config)
+	if config.Token == "" {
+		return errors.New("kitchenowl token is not configured")
+	}
+	return nil
 }
 
 func getPlannedMeals(config Config, cache caching.Cache) ([]byte, error) {

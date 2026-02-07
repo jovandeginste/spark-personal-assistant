@@ -13,6 +13,7 @@ type Module interface {
 	Config() any
 	Initialize() error
 	Register(server *mcp.Server) error
+	Enabled() error
 }
 
 type BaseModule struct {
@@ -41,5 +42,9 @@ func (b *BaseModule) Initialize() error {
 }
 
 func (b *BaseModule) Register(server *mcp.Server) error {
+	return nil
+}
+
+func (b *BaseModule) Enabled() error {
 	return nil
 }
