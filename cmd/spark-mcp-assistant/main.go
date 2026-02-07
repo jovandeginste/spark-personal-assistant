@@ -113,8 +113,10 @@ func main() {
 				slog.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
 				continue
 			}
+
 			if err := module.Register(server); err != nil {
 				slog.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
+				continue
 			}
 
 			slog.Info("Module registered", "module", fmt.Sprintf("%T", module))

@@ -32,6 +32,10 @@ type dateParams struct {
 	EndDate   string `json:"end_date,omitempty" jsonschema:"The end date to search for (MM-DD)"`
 }
 
+type locationParams struct {
+	Query string `json:"query" jsonschema:"The city, country, or other location keyword to search for"`
+}
+
 var readMask = []string{
 	"addresses", "ageRanges", "biographies", "birthdays", "calendarUrls", "clientData",
 	"coverPhotos", "emailAddresses", "events", "externalIds", "genders", "imClients",
@@ -90,6 +94,29 @@ func (m *Module) Register(server *mcp.Server) error {
 	}
 
 	mcp.AddTool(server, dateTool, dateHandler)
+
+	locationTool := &mcp.Tool{
+		Name:        "google_contacts_by_location",
+		Description: "Search for Google Contacts by location (address, city, country, etc)",
+	}
+
+	locationHandler := func(ctx context.Context, request *mcp.CallToolRequest, params locationParams) (*mcp.CallToolResult, any, error) {
+		result, err := searchContactsByLocation(ctx, config, params)
+		if err != nil {
+			logger.Error("Failed to search contacts by location", "params", params, "error", err)
+			return nil, nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: result,
+				},
+			},
+		}, nil, nil
+	}
+
+	mcp.AddTool(server, locationTool, locationHandler)
 
 	return nil
 }
@@ -251,5 +278,67 @@ func checkDate(date *people.Date, params dateParams) bool {
 		}
 	}
 
+	return false
+}
+
+func searchContactsByLocation(ctx context.Context, config Config, params locationParams) (string, error) {
+	client := getClient(&config)
+
+	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve people client: %w", err)
+	}
+
+	connections, err := fetchAllConnections(srv)
+	if err != nil {
+		return "", fmt.Errorf("unable to list connections: %w", err)
+	}
+
+	var results []*people.Person
+	for _, person := range connections {
+		if matchesLocation(person, params.Query) {
+			results = append(results, person)
+		}
+	}
+
+	if len(results) == 0 {
+		return "No contacts found.", nil
+	}
+
+	j, err := json.Marshal(results)
+	if err != nil {
+		return "", err
+	}
+
+	return string(j), nil
+}
+
+func matchesLocation(person *people.Person, query string) bool {
+	q := strings.ToLower(query)
+	for _, address := range person.Addresses {
+		// Check formatted address
+		if strings.Contains(strings.ToLower(address.FormattedValue), q) {
+			return true
+		}
+		// Check components if available
+		if strings.Contains(strings.ToLower(address.City), q) {
+			return true
+		}
+		if strings.Contains(strings.ToLower(address.Country), q) {
+			return true
+		}
+		if strings.Contains(strings.ToLower(address.Region), q) {
+			return true
+		}
+		if strings.Contains(strings.ToLower(address.StreetAddress), q) {
+			return true
+		}
+	}
+	// Also check locations field if present (though often redundant with addresses)
+	for _, loc := range person.Locations {
+		if strings.Contains(strings.ToLower(loc.Value), q) {
+			return true
+		}
+	}
 	return false
 }
