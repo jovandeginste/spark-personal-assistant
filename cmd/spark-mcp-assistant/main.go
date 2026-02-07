@@ -46,18 +46,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Log loaded configuration (excluding URLs/Tokens)
-	slog.Info("Configuration loaded",
-		"weather_enabled", config.Weather.APIURL != "",
-		"kitchenowl_enabled", config.KitchenOwl.Token != "",
-		"ical_calendars", len(config.ICal.Calendars),
-		"vcf_enabled", config.VCF.Path != "",
-		"simplemarkdown_enabled", config.SimpleMarkdown.Path != "",
-		"diary_enabled", config.Diary.Path != "",
-		"googlecontacts_enabled", config.GoogleContacts.TokenFile != "",
-		"port", config.Port,
-	)
-
 	// Initialize caching service
 	cacheService, err := caching.NewService("./tmp/cache", 6*time.Hour)
 	if err != nil {
@@ -128,6 +116,8 @@ func main() {
 			if err := module.Register(server); err != nil {
 				slog.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
 			}
+
+			slog.Info("Module registered", "module", fmt.Sprintf("%T", module))
 		}
 
 		return server
