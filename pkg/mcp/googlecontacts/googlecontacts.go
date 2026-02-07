@@ -26,6 +26,12 @@ type contactsParams struct {
 	Query string `json:"query" jsonschema:"The query to search contacts for (name, email, phone)"`
 }
 
+type dateParams struct {
+	Date      string `json:"date,omitempty" jsonschema:"The date to search for (MM-DD)"`
+	StartDate string `json:"start_date,omitempty" jsonschema:"The start date to search for (MM-DD)"`
+	EndDate   string `json:"end_date,omitempty" jsonschema:"The end date to search for (MM-DD)"`
+}
+
 var readMask = []string{
 	"addresses", "ageRanges", "biographies", "birthdays", "calendarUrls", "clientData",
 	"coverPhotos", "emailAddresses", "events", "externalIds", "genders", "imClients",
@@ -61,6 +67,29 @@ func (m *Module) Register(server *mcp.Server) error {
 	}
 
 	mcp.AddTool(server, tool, handler)
+
+	dateTool := &mcp.Tool{
+		Name:        "google_contacts_by_date",
+		Description: "Search for Google Contacts by date (birthday, anniversary, etc)",
+	}
+
+	dateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
+		result, err := searchContactsByDate(ctx, config, params)
+		if err != nil {
+			logger.Error("Failed to search contacts by date", "params", params, "error", err)
+			return nil, nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: result,
+				},
+			},
+		}, nil, nil
+	}
+
+	mcp.AddTool(server, dateTool, dateHandler)
 
 	return nil
 }
@@ -106,21 +135,121 @@ func searchContacts(ctx context.Context, config Config, query string) (string, e
 }
 
 func listConnections(srv *people.Service) (string, error) {
-	call := srv.People.Connections.List("people/me").PersonFields(strings.Join(readMask, ",")).PageSize(100)
-
-	r, err := call.Do()
+	connections, err := fetchAllConnections(srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
 
-	if len(r.Connections) == 0 {
+	if len(connections) == 0 {
 		return "No contacts found.", nil
 	}
 
-	j, err := json.Marshal(r.Connections)
+	j, err := json.Marshal(connections)
 	if err != nil {
 		return "", err
 	}
 
 	return string(j), nil
+}
+
+func fetchAllConnections(srv *people.Service) ([]*people.Person, error) {
+	var allConnections []*people.Person
+	pageToken := ""
+
+	for {
+		call := srv.People.Connections.List("people/me").
+			PersonFields(strings.Join(readMask, ",")).
+			PageSize(100)
+
+		if pageToken != "" {
+			call.PageToken(pageToken)
+		}
+
+		r, err := call.Do()
+		if err != nil {
+			return nil, err
+		}
+
+		allConnections = append(allConnections, r.Connections...)
+
+		pageToken = r.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+	return allConnections, nil
+}
+
+func searchContactsByDate(ctx context.Context, config Config, params dateParams) (string, error) {
+	client := getClient(&config)
+
+	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
+	if err != nil {
+		return "", fmt.Errorf("unable to retrieve people client: %w", err)
+	}
+
+	connections, err := fetchAllConnections(srv)
+	if err != nil {
+		return "", fmt.Errorf("unable to list connections: %w", err)
+	}
+
+	var results []*people.Person
+	for _, person := range connections {
+		if matchesDate(person, params) {
+			results = append(results, person)
+		}
+	}
+
+	if len(results) == 0 {
+		return "No contacts found.", nil
+	}
+
+	j, err := json.Marshal(results)
+	if err != nil {
+		return "", err
+	}
+
+	return string(j), nil
+}
+
+func matchesDate(person *people.Person, params dateParams) bool {
+	for _, birthday := range person.Birthdays {
+		if checkDate(birthday.Date, params) {
+			return true
+		}
+	}
+	for _, event := range person.Events {
+		if checkDate(event.Date, params) {
+			return true
+		}
+	}
+	return false
+}
+
+func checkDate(date *people.Date, params dateParams) bool {
+	if date == nil {
+		return false
+	}
+	// Format as MM-DD
+	d := fmt.Sprintf("%02d-%02d", date.Month, date.Day)
+
+	if params.Date != "" && d == params.Date {
+		return true
+	}
+
+	if params.StartDate != "" && params.EndDate != "" {
+		if params.StartDate <= params.EndDate {
+			// Normal range (e.g. 01-01 to 01-31)
+			if d >= params.StartDate && d <= params.EndDate {
+				return true
+			}
+		} else {
+			// Wrap around range (e.g. 12-01 to 01-31)
+			if d >= params.StartDate || d <= params.EndDate {
+				return true
+			}
+		}
+	}
+
+	return false
 }
