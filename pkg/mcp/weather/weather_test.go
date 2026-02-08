@@ -52,7 +52,8 @@ func TestGetWeatherInfo(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	result, err := getWeatherInfo(ts.URL, "Breda", "2024-01-01", "2024-01-02")
+	module := &Module{}
+	result, err := module.getWeatherInfo(ts.URL, "Breda", "2024-01-01", "2024-01-02")
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(`{"test": "response"}`), result)
 }

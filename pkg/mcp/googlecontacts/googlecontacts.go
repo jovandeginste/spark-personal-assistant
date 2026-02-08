@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -20,6 +21,14 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
+}
+
+func New(config Config, logger *slog.Logger) *Module {
+	module := &Module{
+		BaseModule: sparkmcp.NewBaseModule(config, logger),
+	}
+	module.SetLogger(logger.With("module", "googlecontacts"))
+	return module
 }
 
 type contactsParams struct {
@@ -45,8 +54,7 @@ var readMask = []string{
 }
 
 func (m *Module) Register(server *mcp.Server) error {
-	config := m.Config().(Config)
-	logger := m.Logger().With("module", "googlecontacts")
+	logger := m.Logger()
 	logger.Info("Registering MCP package")
 
 	tool := &mcp.Tool{
@@ -54,71 +62,83 @@ func (m *Module) Register(server *mcp.Server) error {
 		Description: "Search for Google Contacts",
 	}
 
-	handler := func(ctx context.Context, request *mcp.CallToolRequest, params contactsParams) (*mcp.CallToolResult, any, error) {
-		result, err := searchContacts(ctx, config, params.Query)
-		if err != nil {
-			logger.Error("Failed to search contacts", "query", params.Query, "error", err)
-			return nil, nil, err
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: result,
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, tool, handler)
+	mcp.AddTool(server, tool, m.handleContacts)
 
 	dateTool := &mcp.Tool{
 		Name:        "google_contacts_by_date",
 		Description: "Search for Google Contacts by date (birthday, anniversary, etc)",
 	}
 
-	dateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
-		result, err := searchContactsByDate(ctx, config, params)
-		if err != nil {
-			logger.Error("Failed to search contacts by date", "params", params, "error", err)
-			return nil, nil, err
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: result,
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, dateTool, dateHandler)
+	mcp.AddTool(server, dateTool, m.handleContactsByDate)
 
 	locationTool := &mcp.Tool{
 		Name:        "google_contacts_by_location",
 		Description: "Search for Google Contacts by location (address, city, country, etc)",
 	}
 
-	locationHandler := func(ctx context.Context, request *mcp.CallToolRequest, params locationParams) (*mcp.CallToolResult, any, error) {
-		result, err := searchContactsByLocation(ctx, config, params)
-		if err != nil {
-			logger.Error("Failed to search contacts by location", "params", params, "error", err)
-			return nil, nil, err
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: result,
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, locationTool, locationHandler)
+	mcp.AddTool(server, locationTool, m.handleContactsByLocation)
 
 	return nil
+}
+
+func (m *Module) handleContacts(ctx context.Context, request *mcp.CallToolRequest, params contactsParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("Search google contacts", "query", params.Query)
+	result, err := m.searchContacts(ctx, config, params.Query)
+	if err != nil {
+		logger.Error("Failed to search contacts", "query", params.Query, "error", err)
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: result,
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleContactsByDate(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("Search google contacts by date", "date", params.Date, "start_date", params.StartDate, "end_date", params.EndDate)
+	result, err := m.searchContactsByDate(ctx, config, params)
+	if err != nil {
+		logger.Error("Failed to search contacts by date", "params", params, "error", err)
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: result,
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleContactsByLocation(ctx context.Context, request *mcp.CallToolRequest, params locationParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("Search google contacts by location", "query", params.Query)
+	result, err := m.searchContactsByLocation(ctx, config, params)
+	if err != nil {
+		logger.Error("Failed to search contacts by location", "params", params, "error", err)
+		return nil, nil, err
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: result,
+			},
+		},
+	}, nil, nil
 }
 
 func (m *Module) Enabled() error {
@@ -129,7 +149,7 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func searchContacts(ctx context.Context, config Config, query string) (string, error) {
+func (m *Module) searchContacts(ctx context.Context, config Config, query string) (string, error) {
 	client := getClient(&config)
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
@@ -207,7 +227,7 @@ func fetchAllConnections(srv *people.Service) ([]*people.Person, error) {
 	return allConnections, nil
 }
 
-func searchContactsByDate(ctx context.Context, config Config, params dateParams) (string, error) {
+func (m *Module) searchContactsByDate(ctx context.Context, config Config, params dateParams) (string, error) {
 	client := getClient(&config)
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
@@ -281,7 +301,7 @@ func checkDate(date *people.Date, params dateParams) bool {
 	return false
 }
 
-func searchContactsByLocation(ctx context.Context, config Config, params locationParams) (string, error) {
+func (m *Module) searchContactsByLocation(ctx context.Context, config Config, params locationParams) (string, error) {
 	client := getClient(&config)
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))

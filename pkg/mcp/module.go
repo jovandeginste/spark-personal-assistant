@@ -21,6 +21,13 @@ type BaseModule struct {
 	config any
 }
 
+func NewBaseModule(config any, logger *slog.Logger) BaseModule {
+	return BaseModule{
+		config: config,
+		logger: logger,
+	}
+}
+
 func (b *BaseModule) SetLogger(logger *slog.Logger) {
 	b.logger = logger
 }

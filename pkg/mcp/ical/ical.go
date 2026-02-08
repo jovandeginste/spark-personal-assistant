@@ -33,6 +33,13 @@ type Module struct {
 	Cache caching.Cache
 }
 
+func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
+	m := &Module{Cache: cache}
+	m.SetConfig(config)
+	m.SetLogger(logger.With("module", "ical"))
+	return m
+}
+
 type icalParams struct {
 	StartDate string `json:"start_date" jsonschema:"The start date to retrieve events for (YYYY-MM-DD)"`
 	EndDate   string `json:"end_date,omitempty" jsonschema:"Optional end date (YYYY-MM-DD)"`
@@ -48,20 +55,32 @@ type updateParams struct {
 	Force bool `json:"force,omitempty" jsonschema:"Optional: Force update (default true)"`
 }
 
-func register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
-	logger = logger.With("module", "ical")
+func (m *Module) Register(server *mcp.Server) error {
+	logger := m.Logger()
 	logger.Info("Registering MCP package")
 
-	registerListTool(server, config, cache, logger)
-	registerSearchTool(server, config, cache, logger)
-	registerUpdateTool(server, config, cache, logger)
+	// Tool 1: List events for a specific date range
+	listTool := &mcp.Tool{
+		Name:        "calendar_events",
+		Description: "List calendar events for a given date range from the configured ICS calendars",
+	}
+	mcp.AddTool(server, listTool, m.handleListEvents)
+
+	// Tool 2: Search events
+	searchTool := &mcp.Tool{
+		Name:        "calendar_search",
+		Description: "Search for calendar events matching a query string, with optional date range filters",
+	}
+	mcp.AddTool(server, searchTool, m.handleSearchEvents)
+
+	// Tool 3: Update calendar cache
+	updateTool := &mcp.Tool{
+		Name:        "calendar_update",
+		Description: "Force update of the calendar cache for all configured calendars",
+	}
+	mcp.AddTool(server, updateTool, m.handleUpdateCalendar)
 
 	return nil
-}
-
-func (m *Module) Register(server *mcp.Server) error {
-	config := m.Config().(Config)
-	return register(server, config, m.Cache, m.Logger())
 }
 
 func (m *Module) Enabled() error {
@@ -72,172 +91,158 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func registerListTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
-	// Tool 1: List events for a specific date range
-	listTool := &mcp.Tool{
-		Name:        "calendar_events",
-		Description: "List calendar events for a given date range from the configured ICS calendars",
+func (m *Module) handleListEvents(ctx context.Context, request *mcp.CallToolRequest, params icalParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("List events", "start_date", params.StartDate, "end_date", params.EndDate)
+	start, err := time.Parse("2006-01-02", params.StartDate)
+	if err != nil {
+		logger.Error("Invalid start_date format", "error", err, "start_date", params.StartDate)
+		return nil, nil, fmt.Errorf("invalid start_date format: %w", err)
 	}
 
-	listHandler := func(ctx context.Context, request *mcp.CallToolRequest, params icalParams) (*mcp.CallToolResult, any, error) {
-		start, err := time.Parse("2006-01-02", params.StartDate)
+	var end time.Time
+	if params.EndDate != "" {
+		end, err = time.Parse("2006-01-02", params.EndDate)
 		if err != nil {
-			logger.Error("Invalid start_date format", "error", err, "start_date", params.StartDate)
-			return nil, nil, fmt.Errorf("invalid start_date format: %w", err)
+			logger.Error("Invalid end_date format", "error", err, "end_date", params.EndDate)
+			return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
+		}
+	} else {
+		// Default to same day if no end date provided
+		end = start
+	}
+
+	var allEvents []Event
+	for _, cal := range config.Calendars {
+		events, err := m.getEvents(cal, start, end)
+		if err != nil {
+			logger.Error("Failed to get events", "calendar", cal.Name, "error", err)
+			return nil, nil, fmt.Errorf("failed to get events from %s: %w", cal.Name, err)
 		}
 
-		var end time.Time
-		if params.EndDate != "" {
-			end, err = time.Parse("2006-01-02", params.EndDate)
-			if err != nil {
-				logger.Error("Invalid end_date format", "error", err, "end_date", params.EndDate)
-				return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
-			}
+		allEvents = append(allEvents, events...)
+	}
+
+	if len(allEvents) == 0 {
+		logger.Info("No events found", "start_date", params.StartDate, "end_date", params.EndDate)
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "No events found for this time range.",
+				},
+			},
+		}, nil, nil
+	}
+
+	jsonEvents, err := json.Marshal(allEvents)
+	if err != nil {
+		logger.Error("Failed to marshal events", "error", err)
+		return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonEvents),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRequest, params searchParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("Search events", "query", params.Query, "start_date", params.StartDate, "end_date", params.EndDate)
+	var allEvents []Event
+	for _, cal := range config.Calendars {
+		events, err := m.searchEvents(cal, params.Query, params.StartDate, params.EndDate)
+		if err != nil {
+			logger.Error("Search failed", "calendar", cal.Name, "error", err)
+			return nil, nil, fmt.Errorf("search failed on %s: %w", cal.Name, err)
+		}
+
+		allEvents = append(allEvents, events...)
+	}
+
+	if len(allEvents) == 0 {
+		logger.Info("No matching events found", "query", params.Query)
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "No matching events found.",
+				},
+			},
+		}, nil, nil
+	}
+
+	jsonEvents, err := json.Marshal(allEvents)
+	if err != nil {
+		logger.Error("Failed to marshal search results", "error", err)
+		return nil, nil, fmt.Errorf("failed to marshal search results: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(jsonEvents),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleUpdateCalendar(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
+	logger.Debug("Update calendar", "force", params.Force)
+	successCount := 0
+	errorCount := 0
+
+	var errorMessages []string
+
+	for _, cal := range config.Calendars {
+		_, err := m.Cache.ForceUpdateFile(cal.URL, func() (io.ReadCloser, error) {
+			return generic.ReadResource(cal.URL)
+		})
+		if err != nil {
+			errorCount++
+
+			errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", cal.Name, err))
+			logger.Error("Failed to update calendar", "calendar", cal.Name, "error", err)
 		} else {
-			// Default to same day if no end date provided
-			end = start
+			successCount++
+
+			logger.Info("Updated calendar", "calendar", cal.Name)
 		}
-
-		var allEvents []Event
-		for _, cal := range config.Calendars {
-			events, err := getEvents(cal, start, end, cache)
-			if err != nil {
-				logger.Error("Failed to get events", "calendar", cal.Name, "error", err)
-				return nil, nil, fmt.Errorf("failed to get events from %s: %w", cal.Name, err)
-			}
-
-			allEvents = append(allEvents, events...)
-		}
-
-		if len(allEvents) == 0 {
-			logger.Info("No events found", "start_date", params.StartDate, "end_date", params.EndDate)
-
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{
-						Text: "No events found for this time range.",
-					},
-				},
-			}, nil, nil
-		}
-
-		jsonEvents, err := json.Marshal(allEvents)
-		if err != nil {
-			logger.Error("Failed to marshal events", "error", err)
-			return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: string(jsonEvents),
-				},
-			},
-		}, nil, nil
 	}
 
-	mcp.AddTool(server, listTool, listHandler)
+	resultText := fmt.Sprintf("Updated %d calendars. Errors: %d", successCount, errorCount)
+	if errorCount > 0 {
+		resultText += "\nFailures:\n" + strings.Join(errorMessages, "\n")
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: resultText,
+			},
+		},
+	}, nil, nil
 }
 
-func registerSearchTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
-	// Tool 2: Search events
-	searchTool := &mcp.Tool{
-		Name:        "calendar_search",
-		Description: "Search for calendar events matching a query string, with optional date range filters",
-	}
-
-	searchHandler := func(ctx context.Context, request *mcp.CallToolRequest, params searchParams) (*mcp.CallToolResult, any, error) {
-		var allEvents []Event
-		for _, cal := range config.Calendars {
-			events, err := searchEvents(cal, params.Query, params.StartDate, params.EndDate, cache)
-			if err != nil {
-				logger.Error("Search failed", "calendar", cal.Name, "error", err)
-				return nil, nil, fmt.Errorf("search failed on %s: %w", cal.Name, err)
-			}
-
-			allEvents = append(allEvents, events...)
-		}
-
-		if len(allEvents) == 0 {
-			logger.Info("No matching events found", "query", params.Query)
-
-			return &mcp.CallToolResult{
-				Content: []mcp.Content{
-					&mcp.TextContent{
-						Text: "No matching events found.",
-					},
-				},
-			}, nil, nil
-		}
-
-		jsonEvents, err := json.Marshal(allEvents)
-		if err != nil {
-			logger.Error("Failed to marshal search results", "error", err)
-			return nil, nil, fmt.Errorf("failed to marshal search results: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: string(jsonEvents),
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, searchTool, searchHandler)
-}
-
-func registerUpdateTool(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) {
-	// Tool 3: Update calendar cache
-	updateTool := &mcp.Tool{
-		Name:        "calendar_update",
-		Description: "Force update of the calendar cache for all configured calendars",
-	}
-
-	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
-		successCount := 0
-		errorCount := 0
-
-		var errorMessages []string
-
-		for _, cal := range config.Calendars {
-			_, err := cache.ForceUpdateFile(cal.URL, func() (io.ReadCloser, error) {
-				return generic.ReadResource(cal.URL)
-			})
-			if err != nil {
-				errorCount++
-
-				errorMessages = append(errorMessages, fmt.Sprintf("%s: %v", cal.Name, err))
-				logger.Error("Failed to update calendar", "calendar", cal.Name, "error", err)
-			} else {
-				successCount++
-
-				logger.Info("Updated calendar", "calendar", cal.Name)
-			}
-		}
-
-		resultText := fmt.Sprintf("Updated %d calendars. Errors: %d", successCount, errorCount)
-		if errorCount > 0 {
-			resultText += "\nFailures:\n" + strings.Join(errorMessages, "\n")
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: resultText,
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, updateTool, updateHandler)
+func (m *Module) Initialize() error {
+	m.StartPrefetch()
+	return nil
 }
 
 func (m *Module) StartPrefetch() {
 	config := m.Config().(Config)
 	logger := m.Logger()
-	cache := m.Cache
 
 	go func() {
 		logger.Info("Prefetching calendars", "count", len(config.Calendars))
@@ -245,7 +250,7 @@ func (m *Module) StartPrefetch() {
 		for _, cal := range config.Calendars {
 			logger.Info("Prefetching calendar", "name", cal.Name)
 			// Trigger cache update by calling fetch logic
-			if _, err := fetchAndCacheICS(cal.URL, cache); err != nil {
+			if _, err := m.fetchAndCacheICS(cal.URL); err != nil {
 				logger.Error("Failed to prefetch calendar", "name", cal.Name, "error", err)
 			} else {
 				// We can read file size or something to log
@@ -266,8 +271,8 @@ type Event struct {
 	Location     string    `json:"location,omitempty"`
 }
 
-func getEvents(cal Calendar, start, end time.Time, cache caching.Cache) ([]Event, error) {
-	icsPath, err := fetchAndCacheICS(cal.URL, cache)
+func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) {
+	icsPath, err := m.fetchAndCacheICS(cal.URL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS: %w", err)
 	}
@@ -323,8 +328,8 @@ func getEvents(cal Calendar, start, end time.Time, cache caching.Cache) ([]Event
 	return results, nil
 }
 
-func searchEvents(cal Calendar, query string, startDateStr, endDateStr string, cache caching.Cache) ([]Event, error) {
-	icsPath, err := fetchAndCacheICS(cal.URL, cache)
+func (m *Module) searchEvents(cal Calendar, query string, startDateStr, endDateStr string) ([]Event, error) {
+	icsPath, err := m.fetchAndCacheICS(cal.URL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS: %w", err)
 	}
@@ -435,12 +440,12 @@ func isMatch(e gocal.Event, calendarMatch bool, queryLower string) bool {
 	return false
 }
 
-func fetchAndCacheICS(url string, cache caching.Cache) (string, error) {
-	if file, ok := cache.GetFile(url); ok {
+func (m *Module) fetchAndCacheICS(url string) (string, error) {
+	if file, ok := m.Cache.GetFile(url); ok {
 		return file, nil
 	}
 
-	return cache.SetFile(url, func() (io.ReadCloser, error) {
+	return m.Cache.SetFile(url, func() (io.ReadCloser, error) {
 		return generic.ReadResource(url)
 	})
 }

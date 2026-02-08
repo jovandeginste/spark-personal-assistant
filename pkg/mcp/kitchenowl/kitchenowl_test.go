@@ -59,7 +59,8 @@ func TestGetPlannedMeals(t *testing.T) {
 	}
 
 	cache, _ := caching.NewService(os.TempDir(), time.Hour)
-	result, err := getPlannedMeals(config, cache)
+	module := New(config, cache, slog.Default())
+	result, err := module.getPlannedMeals()
 	assert.NoError(t, err)
 
 	var meals []PlannedMeal
@@ -91,14 +92,15 @@ func TestCacheExpiry(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	cache, _ := caching.NewService(tmpDir, 12*time.Hour)
+	module := New(config, cache, slog.Default())
 
 	// 1. Initial Fetch
-	_, err := getPlannedMeals(config, cache)
+	_, err := module.getPlannedMeals()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, requestCount)
 
 	// 2. Fetch again immediately (should be cached)
-	_, err = getPlannedMeals(config, cache)
+	_, err = module.getPlannedMeals()
 	assert.NoError(t, err)
 	assert.Equal(t, 1, requestCount)
 
@@ -120,7 +122,7 @@ func TestCacheExpiry(t *testing.T) {
 	assert.NoError(t, err)
 
 	// 4. Fetch again (should trigger new request because file is old)
-	_, err = getPlannedMeals(config, cache)
+	_, err = module.getPlannedMeals()
 	assert.NoError(t, err)
 	assert.Equal(t, 2, requestCount)
 }

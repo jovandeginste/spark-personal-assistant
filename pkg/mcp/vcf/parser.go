@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/emersion/go-vcard"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 )
 
 type Contact struct {
@@ -37,7 +36,7 @@ type Date struct {
 	Day   int
 }
 
-func loadContacts(path string, _ caching.Cache) ([]Contact, error) {
+func (m *Module) loadContacts(path string) ([]Contact, error) {
 	// We'll use the cache to store the parsed contacts if possible,
 	// or just read the file directly since VCFs are usually local files.
 	// For simplicity, let's just read the file directly for now,

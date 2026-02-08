@@ -22,6 +22,13 @@ type Module struct {
 	sparkmcp.BaseModule
 }
 
+func New(config Config, logger *slog.Logger) *Module {
+	module := &Module{
+		BaseModule: sparkmcp.NewBaseModule(config, logger.With("module", "simplemarkdown")),
+	}
+	return module
+}
+
 type addParams struct {
 	Item string `json:"item" jsonschema:"The todo item to add"`
 	User string `json:"user" jsonschema:"The user to add the item for"`
@@ -55,22 +62,35 @@ func isValidUser(user string, validUsers []string) bool {
 	return false
 }
 
-func register(server *mcp.Server, config Config, logger *slog.Logger) error {
-	logger = logger.With("module", "simplemarkdown")
-	logger.Info("Registering MCP package")
+func (m *Module) Register(server *mcp.Server) error {
+	m.Logger().Info("Registering MCP package")
 
-	registerFetchTool(server, config, logger)
-	registerAddTool(server, config, logger)
-	registerUpdateTool(server, config, logger)
-	registerToggleTool(server, config, logger)
-	registerListUsersTool(server, config, logger)
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "todo_fetch",
+		Description: "Fetch the current todo list",
+	}, m.handleFetchTool)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "todo_add",
+		Description: "Add a new item to the todo list",
+	}, m.handleAddTool)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "todo_update",
+		Description: "Update an existing todo item",
+	}, m.handleUpdateTool)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "todo_toggle",
+		Description: "Mark an item as done or todo",
+	}, m.handleToggleTool)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "todo_list_users",
+		Description: "List all users who have access to the todo list",
+	}, m.handleListUsersTool)
 
 	return nil
-}
-
-func (m *Module) Register(server *mcp.Server) error {
-	config := m.Config().(Config)
-	return register(server, config, m.Logger())
 }
 
 func (m *Module) Enabled() error {
@@ -81,235 +101,200 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func registerFetchTool(server *mcp.Server, config Config, logger *slog.Logger) {
-	// Tool: Fetch todo list
-	fetchTool := &mcp.Tool{
-		Name:        "todo_fetch",
-		Description: "Fetch the current todo list",
+func (m *Module) handleFetchTool(ctx context.Context, request *mcp.CallToolRequest, params struct {
+	Force bool   `json:"force,omitempty" jsonschema:"Force refresh (optional)"`
+	User  string `json:"user" jsonschema:"The user to fetch the todo list for"`
+},
+) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	logger.Debug("Fetch todo list", "user", params.User, "force", params.Force)
+	if params.User == "" {
+		return nil, nil, errors.New("user is required")
+	}
+	if !isValidUser(params.User, config.Users) {
+		return nil, nil, fmt.Errorf("invalid user: %s", params.User)
 	}
 
-	fetchHandler := func(ctx context.Context, request *mcp.CallToolRequest, params struct {
-		Force bool   `json:"force,omitempty" jsonschema:"Force refresh (optional)"`
-		User  string `json:"user" jsonschema:"The user to fetch the todo list for"`
-	},
-	) (*mcp.CallToolResult, any, error) {
-		if params.User == "" {
-			return nil, nil, errors.New("user is required")
-		}
-		if !isValidUser(params.User, config.Users) {
-			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
-		}
-
-		path := getTodoPath(config.Path, params.User)
-		content, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				return &mcp.CallToolResult{
-					Content: []mcp.Content{
-						&mcp.TextContent{
-							Text: "Todo list is empty.",
-						},
+	path := getTodoPath(config.Path, params.User)
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return &mcp.CallToolResult{
+				Content: []mcp.Content{
+					&mcp.TextContent{
+						Text: "Todo list is empty.",
 					},
-				}, nil, nil
-			}
-
-			logger.Error("Failed to read todo file", "error", err)
-
-			return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
+				},
+			}, nil, nil
 		}
 
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: string(content),
-				},
-			},
-		}, nil, nil
+		logger.Error("Failed to read todo file", "error", err)
+
+		return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
 	}
 
-	mcp.AddTool(server, fetchTool, fetchHandler)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(content),
+			},
+		},
+	}, nil, nil
 }
 
-func registerAddTool(server *mcp.Server, config Config, logger *slog.Logger) {
-	// Tool: Add item
-	addTool := &mcp.Tool{
-		Name:        "todo_add",
-		Description: "Add a new item to the todo list",
+func (m *Module) handleAddTool(ctx context.Context, request *mcp.CallToolRequest, params addParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	logger.Debug("Add todo item", "user", params.User, "item", params.Item)
+	if params.User == "" {
+		return nil, nil, errors.New("user is required")
+	}
+	if !isValidUser(params.User, config.Users) {
+		return nil, nil, fmt.Errorf("invalid user: %s", params.User)
 	}
 
-	addHandler := func(ctx context.Context, request *mcp.CallToolRequest, params addParams) (*mcp.CallToolResult, any, error) {
-		if params.User == "" {
-			return nil, nil, errors.New("user is required")
-		}
-		if !isValidUser(params.User, config.Users) {
-			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
-		}
+	path := getTodoPath(config.Path, params.User)
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
+	if err != nil {
+		logger.Error("Failed to open todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to open todo file: %w", err)
+	}
+	defer f.Close()
 
-		path := getTodoPath(config.Path, params.User)
-		f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
-		if err != nil {
-			logger.Error("Failed to open todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to open todo file: %w", err)
-		}
-		defer f.Close()
+	item := strings.TrimSpace(params.Item)
+	if item == "" {
+		return nil, nil, errors.New("item cannot be empty")
+	}
 
-		item := strings.TrimSpace(params.Item)
-		if item == "" {
-			return nil, nil, errors.New("item cannot be empty")
-		}
+	if _, err := fmt.Fprintf(f, "- [ ] %s\n", item); err != nil {
+		logger.Error("Failed to write to todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to write to todo file: %w", err)
+	}
 
-		if _, err := fmt.Fprintf(f, "- [ ] %s\n", item); err != nil {
-			logger.Error("Failed to write to todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to write to todo file: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: "Added item: " + item,
-				},
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: "Added item: " + item,
 			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, addTool, addHandler)
+		},
+	}, nil, nil
 }
 
-func registerUpdateTool(server *mcp.Server, config Config, logger *slog.Logger) {
-	// Tool: Update item
-	updateTool := &mcp.Tool{
-		Name:        "todo_update",
-		Description: "Update an existing todo item",
+func (m *Module) handleUpdateTool(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	logger.Debug("Update todo item", "user", params.User, "index", params.Index, "new_item", params.NewItem)
+	if params.User == "" {
+		return nil, nil, errors.New("user is required")
+	}
+	if !isValidUser(params.User, config.Users) {
+		return nil, nil, fmt.Errorf("invalid user: %s", params.User)
 	}
 
-	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
-		if params.User == "" {
-			return nil, nil, errors.New("user is required")
-		}
-		if !isValidUser(params.User, config.Users) {
-			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
-		}
+	path := getTodoPath(config.Path, params.User)
+	lines, err := readLines(path)
+	if err != nil {
+		logger.Error("Failed to read todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
+	}
 
-		path := getTodoPath(config.Path, params.User)
-		lines, err := readLines(path)
-		if err != nil {
-			logger.Error("Failed to read todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
-		}
+	if params.Index < 0 || params.Index >= len(lines) {
+		return nil, nil, errors.New("index out of range")
+	}
 
-		if params.Index < 0 || params.Index >= len(lines) {
-			return nil, nil, errors.New("index out of range")
-		}
+	line := lines[params.Index]
+	if !strings.HasPrefix(line, "- [ ] ") && !strings.HasPrefix(line, "- [x] ") {
+		return nil, nil, fmt.Errorf("line at index %d is not a todo item", params.Index)
+	}
 
-		line := lines[params.Index]
-		if !strings.HasPrefix(line, "- [ ] ") && !strings.HasPrefix(line, "- [x] ") {
-			return nil, nil, fmt.Errorf("line at index %d is not a todo item", params.Index)
-		}
+	prefix := line[:6]
+	lines[params.Index] = prefix + params.NewItem
 
-		prefix := line[:6]
-		lines[params.Index] = prefix + params.NewItem
+	if err := writeLines(path, lines); err != nil {
+		logger.Error("Failed to write todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
+	}
 
-		if err := writeLines(path, lines); err != nil {
-			logger.Error("Failed to write todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: fmt.Sprintf("Updated item at index %d", params.Index),
-				},
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("Updated item at index %d", params.Index),
 			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, updateTool, updateHandler)
+		},
+	}, nil, nil
 }
 
-func registerToggleTool(server *mcp.Server, config Config, logger *slog.Logger) {
-	// Tool: Toggle item
-	toggleTool := &mcp.Tool{
-		Name:        "todo_toggle",
-		Description: "Mark an item as done or todo",
+func (m *Module) handleToggleTool(ctx context.Context, request *mcp.CallToolRequest, params toggleParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	logger.Debug("Toggle todo item", "user", params.User, "index", params.Index, "done", params.Done)
+	if params.User == "" {
+		return nil, nil, errors.New("user is required")
+	}
+	if !isValidUser(params.User, config.Users) {
+		return nil, nil, fmt.Errorf("invalid user: %s", params.User)
 	}
 
-	toggleHandler := func(ctx context.Context, request *mcp.CallToolRequest, params toggleParams) (*mcp.CallToolResult, any, error) {
-		if params.User == "" {
-			return nil, nil, errors.New("user is required")
-		}
-		if !isValidUser(params.User, config.Users) {
-			return nil, nil, fmt.Errorf("invalid user: %s", params.User)
-		}
+	path := getTodoPath(config.Path, params.User)
+	lines, err := readLines(path)
+	if err != nil {
+		logger.Error("Failed to read todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
+	}
 
-		path := getTodoPath(config.Path, params.User)
-		lines, err := readLines(path)
-		if err != nil {
-			logger.Error("Failed to read todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to read todo file: %w", err)
-		}
+	if params.Index < 0 || params.Index >= len(lines) {
+		return nil, nil, errors.New("index out of range")
+	}
 
-		if params.Index < 0 || params.Index >= len(lines) {
-			return nil, nil, errors.New("index out of range")
-		}
+	line := lines[params.Index]
+	if !strings.HasPrefix(line, "- [ ] ") && !strings.HasPrefix(line, "- [x] ") {
+		return nil, nil, fmt.Errorf("line at index %d is not a todo item", params.Index)
+	}
 
-		line := lines[params.Index]
-		if !strings.HasPrefix(line, "- [ ] ") && !strings.HasPrefix(line, "- [x] ") {
-			return nil, nil, fmt.Errorf("line at index %d is not a todo item", params.Index)
-		}
+	content := line[6:]
+	if params.Done {
+		lines[params.Index] = "- [x] " + content
+	} else {
+		lines[params.Index] = "- [ ] " + content
+	}
 
-		content := line[6:]
-		if params.Done {
-			lines[params.Index] = "- [x] " + content
-		} else {
-			lines[params.Index] = "- [ ] " + content
-		}
+	if err := writeLines(path, lines); err != nil {
+		logger.Error("Failed to write todo file", "error", err)
+		return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
+	}
 
-		if err := writeLines(path, lines); err != nil {
-			logger.Error("Failed to write todo file", "error", err)
-			return nil, nil, fmt.Errorf("failed to write todo file: %w", err)
-		}
+	state := "todo"
+	if params.Done {
+		state = "done"
+	}
 
-		state := "todo"
-		if params.Done {
-			state = "done"
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: fmt.Sprintf("Marked item at index %d as %s", params.Index, state),
-				},
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("Marked item at index %d as %s", params.Index, state),
 			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, toggleTool, toggleHandler)
+		},
+	}, nil, nil
 }
 
-func registerListUsersTool(server *mcp.Server, config Config, logger *slog.Logger) {
-	// Tool: List users
-	listUsersTool := &mcp.Tool{
-		Name:        "todo_list_users",
-		Description: "List all users who have access to the todo list",
+func (m *Module) handleListUsersTool(ctx context.Context, request *mcp.CallToolRequest, params listUsersParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger()
+	logger.Debug("List todo users", "force", params.Force)
+	users := config.Users
+	if len(users) == 0 {
+		logger.Info("No users configured")
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "No users configured"}}}, nil, nil
 	}
 
-	listUsersHandler := func(ctx context.Context, request *mcp.CallToolRequest, params listUsersParams) (*mcp.CallToolResult, any, error) {
-		users := config.Users
-		if len(users) == 0 {
-			logger.Info("No users configured")
-			return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: "No users configured"}}}, nil, nil
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: "Users: " + strings.Join(users, ", "),
-				},
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: "Users: " + strings.Join(users, ", "),
 			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, listUsersTool, listUsersHandler)
+		},
+	}, nil, nil
 }
 
 func readLines(path string) ([]string, error) {

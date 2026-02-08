@@ -33,24 +33,38 @@ type Config struct {
 }
 
 func main() {
+	lvl := new(slog.LevelVar)
+	lvl.Set(slog.LevelInfo)
+	if os.Getenv("DEBUG") != "" {
+		lvl.Set(slog.LevelDebug)
+	}
+
 	// Initialize structured logging with JSON handler
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	slog.SetDefault(logger)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})).With("app", "spark-mcp-assistant")
 
 	geocoder.SetClient(logger, "Spark")
 
 	// Load configuration
 	config, err := loadConfig()
 	if err != nil {
-		slog.Error("failed to load configuration", "error", err)
+		logger.Error("failed to load configuration", "error", err)
 		os.Exit(1)
 	}
 
 	// Initialize caching service
 	cacheService, err := caching.NewService("./tmp/cache", 6*time.Hour)
 	if err != nil {
-		slog.Error("failed to initialize caching service", "error", err)
+		logger.Error("failed to initialize caching service", "error", err)
 		os.Exit(1)
+	}
+
+	modules := allModules(config, logger, cacheService)
+
+	for _, module := range modules {
+		if err := module.Initialize(); err != nil {
+			logger.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
+			continue
+		}
 	}
 
 	// Create SSE handler
@@ -62,77 +76,26 @@ func main() {
 			Logger: logger,
 		})
 
-		modules := make([]mcp.Module, 0, 7)
-
-		// Weather
-		weatherModule := &weather.Module{}
-		weatherModule.SetConfig(config.Weather)
-		modules = append(modules, weatherModule)
-
-		// KitchenOwl
-		kitchenOwlModule := &kitchenowl.Module{Cache: cacheService}
-		kitchenOwlModule.SetConfig(config.KitchenOwl)
-		modules = append(modules, kitchenOwlModule)
-
-		// ICal
-		icalModule := &ical.Module{Cache: cacheService}
-		icalModule.SetConfig(config.ICal)
-		modules = append(modules, icalModule)
-
-		// VCF
-		vcfModule := &vcf.Module{Cache: cacheService}
-		vcfModule.SetConfig(config.VCF)
-		modules = append(modules, vcfModule)
-
-		// SimpleMarkdown
-		simpleMarkdownModule := &simplemarkdown.Module{}
-		simpleMarkdownModule.SetConfig(config.SimpleMarkdown)
-		modules = append(modules, simpleMarkdownModule)
-
-		// Diary
-		diaryModule := &diary.Module{}
-		diaryModule.SetConfig(config.Diary)
-		modules = append(modules, diaryModule)
-
-		// Google Contacts
-		googleContactsModule := &googlecontacts.Module{}
-		googleContactsModule.SetConfig(config.GoogleContacts)
-		modules = append(modules, googleContactsModule)
-
 		for _, module := range modules {
-			module.SetLogger(logger)
-
 			if err := module.Enabled(); err != nil {
 				// Don't log "no users configured" for simplemarkdown, or other specific errors if desired.
 				// For now, log everything as info so user sees what is disabled.
-				slog.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
-				continue
-			}
-
-			if err := module.Initialize(); err != nil {
-				slog.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
+				logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
 				continue
 			}
 
 			if err := module.Register(server); err != nil {
-				slog.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
+				logger.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
 				continue
 			}
 
-			slog.Info("Module registered", "module", fmt.Sprintf("%T", module))
+			logger.Info("Module registered", "module", fmt.Sprintf("%T", module))
 		}
 
 		return server
 	}, nil)
 
-	// Prefetch calendars in background
-	// ical.StartPrefetch(config.ICal, cacheService, logger)
-	icalModule := &ical.Module{Cache: cacheService}
-	icalModule.SetConfig(config.ICal)
-	icalModule.SetLogger(logger)
-	icalModule.StartPrefetch()
-
-	slog.Info("Starting SSE server on " + config.Port)
+	logger.Info("Starting SSE server on " + config.Port)
 
 	mux := http.NewServeMux()
 	mux.Handle("/sse", sseHandler)
@@ -142,9 +105,9 @@ func main() {
 			return
 		}
 
-		slog.Info("Update requested, clearing caches")
+		logger.Info("Update requested, clearing caches")
 		if err := cacheService.Clear(); err != nil {
-			slog.Error("Failed to clear cache", "error", err)
+			logger.Error("Failed to clear cache", "error", err)
 			http.Error(w, "Failed to clear cache", http.StatusInternalServerError)
 			return
 		}
@@ -156,11 +119,13 @@ func main() {
 		// Looking at caching.go, NewService does MkdirAll.
 		// Let's just manually recreate the directory to be safe after RemoveAll
 		if err := os.MkdirAll("./tmp/cache", 0o755); err != nil {
-			slog.Error("Failed to recreate cache directory", "error", err)
+			logger.Error("Failed to recreate cache directory", "error", err)
 		}
 
 		// Trigger prefetch again
-		// go ical.StartPrefetch(config.ICal, cacheService, slog.Default())
+		icalModule := &ical.Module{Cache: cacheService}
+		icalModule.SetConfig(config.ICal)
+		icalModule.SetLogger(logger)
 		icalModule.StartPrefetch()
 
 		w.WriteHeader(http.StatusOK)
@@ -174,7 +139,7 @@ func main() {
 	}
 
 	if err := server.ListenAndServe(); err != nil {
-		slog.Error("Server failed", "error", err)
+		logger.Error("Server failed", "error", err)
 		os.Exit(1)
 	}
 }
@@ -210,4 +175,18 @@ func loadConfig() (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func allModules(config *Config, logger *slog.Logger, cacheService *caching.Service) []mcp.Module {
+	modules := []mcp.Module{
+		weather.New(config.Weather, logger),
+		kitchenowl.New(config.KitchenOwl, cacheService, logger),
+		ical.New(config.ICal, cacheService, logger),
+		vcf.New(config.VCF, cacheService, logger),
+		simplemarkdown.New(config.SimpleMarkdown, logger),
+		diary.New(config.Diary, logger),
+		googlecontacts.New(config.GoogleContacts, logger),
+	}
+
+	return modules
 }

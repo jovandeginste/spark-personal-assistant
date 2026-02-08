@@ -55,8 +55,17 @@ type Module struct {
 	sparkmcp.BaseModule
 }
 
-func register(server *mcp.Server, config Config, logger *slog.Logger) error {
-	logger = logger.With("module", "weather")
+func New(config Config, logger *slog.Logger) *Module {
+	m := &Module{}
+	m.SetConfig(config)
+	m.SetLogger(logger.With("module", "weather"))
+	return m
+}
+
+func (m *Module) Register(server *mcp.Server) error {
+	config := m.Config().(Config)
+	logger := m.Logger()
+
 	logger.Info("Registering MCP package")
 
 	if config.APIURL == "" {
@@ -69,7 +78,8 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	}
 
 	handler := func(ctx context.Context, request *mcp.CallToolRequest, params weatherParams) (*mcp.CallToolResult, any, error) {
-		result, err := getWeatherInfo(config.APIURL, params.Location, params.StartDate, params.EndDate)
+		logger.Debug("Fetching weather info", "location", params.Location, "start_date", params.StartDate, "end_date", params.EndDate)
+		result, err := m.getWeatherInfo(config.APIURL, params.Location, params.StartDate, params.EndDate)
 		if err != nil {
 			logger.Error("Failed to get weather info", "location", params.Location, "error", err)
 			return nil, nil, err
@@ -89,11 +99,6 @@ func register(server *mcp.Server, config Config, logger *slog.Logger) error {
 	return nil
 }
 
-func (m *Module) Register(server *mcp.Server) error {
-	config := m.Config().(Config)
-	return register(server, config, m.Logger())
-}
-
 func (m *Module) Enabled() error {
 	config := m.Config().(Config)
 	if config.APIURL == "" {
@@ -102,7 +107,7 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func getWeatherInfo(apiURL, location, startDate, endDate string) ([]byte, error) {
+func (m *Module) getWeatherInfo(apiURL, location, startDate, endDate string) ([]byte, error) {
 	q, err := queryFor(location)
 	if err != nil {
 		return nil, err

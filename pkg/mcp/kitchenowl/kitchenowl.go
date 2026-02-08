@@ -27,6 +27,13 @@ type Module struct {
 	Cache caching.Cache
 }
 
+func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
+	m := &Module{Cache: cache}
+	m.SetConfig(config)
+	m.SetLogger(logger.With("module", "kitchenowl"))
+	return m
+}
+
 type PlannedMeal struct {
 	CookingDateUnixMili int64   `json:"cooking_date,omitempty"`
 	CookingDate         string  `json:"cooking_date_string,omitempty"`
@@ -52,85 +59,80 @@ type kitchenOwlParams struct {
 	Force bool `json:"force,omitempty" jsonschema:"Force refresh of the data (optional)"`
 }
 
-func register(server *mcp.Server, config Config, cache caching.Cache, logger *slog.Logger) error {
-	logger = logger.With("module", "kitchenowl")
-	logger.Info("Registering MCP package")
+func (m *Module) Register(server *mcp.Server) error {
+	m.Logger().Info("Registering MCP package")
 
-	tool := &mcp.Tool{
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mealplan",
 		Description: "Get planned meals",
-	}
+	}, m.handleMealPlan)
 
-	handler := func(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
-		result, err := getPlannedMeals(config, cache)
-		if err != nil {
-			logger.Error("Failed to get planned meals", "error", err)
-			return nil, nil, err
-		}
-
-		var meals []PlannedMeal
-		if err := json.Unmarshal(result, &meals); err != nil {
-			logger.Error("Failed to unmarshal mcp result", "error", err)
-			return nil, nil, fmt.Errorf("failed to unmarshal mcp result: %w", err)
-		}
-
-		for i := range meals {
-			meals[i].SetDate()
-		}
-
-		mealsJSON, err := json.Marshal(meals)
-		if err != nil {
-			logger.Error("Failed to marshal mcp result", "error", err)
-			return nil, nil, fmt.Errorf("failed to marshal mcp result: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: fmt.Sprintf("Planned meals: %s", mealsJSON),
-				},
-			},
-		}, nil, nil
-	}
-
-	mcp.AddTool(server, tool, handler)
-
-	// Tool 2: Force update meals
-	updateTool := &mcp.Tool{
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "mealplan_update",
 		Description: "Force update planned meals from KitchenOwl API",
-	}
-
-	updateHandler := func(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
-		// Use ForceUpdateFile logic here
-		u := fmt.Sprintf("%s/household/%d/planner", config.APIURL, config.HouseholdID)
-
-		_, err := cache.ForceUpdateFile(u, func() (io.ReadCloser, error) {
-			return generic.ReadResourceWithHeaders(u, map[string]string{
-				"Authorization": config.Token,
-			})
-		})
-		if err != nil {
-			logger.Error("Failed to update planned meals", "error", err)
-			return nil, nil, fmt.Errorf("failed to update planned meals: %w", err)
-		}
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: "Successfully updated planned meals cache.",
-				},
-			},
-		}, nil, nil
-	}
-	mcp.AddTool(server, updateTool, updateHandler)
+	}, m.handleMealPlanUpdate)
 
 	return nil
 }
 
-func (m *Module) Register(server *mcp.Server) error {
+func (m *Module) handleMealPlan(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
+	logger := m.Logger()
+	logger.Debug("Fetching planned meals", "params", params)
+	result, err := m.getPlannedMeals()
+	if err != nil {
+		logger.Error("Failed to get planned meals", "error", err)
+		return nil, nil, err
+	}
+
+	var meals []PlannedMeal
+	if err := json.Unmarshal(result, &meals); err != nil {
+		logger.Error("Failed to unmarshal mcp result", "error", err)
+		return nil, nil, fmt.Errorf("failed to unmarshal mcp result: %w", err)
+	}
+
+	for i := range meals {
+		meals[i].SetDate()
+	}
+
+	mealsJSON, err := json.Marshal(meals)
+	if err != nil {
+		logger.Error("Failed to marshal mcp result", "error", err)
+		return nil, nil, fmt.Errorf("failed to marshal mcp result: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("Planned meals: %s", mealsJSON),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleMealPlanUpdate(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	return register(server, config, m.Cache, m.Logger())
+	logger := m.Logger()
+	logger.Debug("Forcing update of planned meals")
+	// Use ForceUpdateFile logic here
+	u := fmt.Sprintf("%s/household/%d/planner", config.APIURL, config.HouseholdID)
+
+	_, err := m.Cache.ForceUpdateFile(u, func() (io.ReadCloser, error) {
+		return generic.ReadResourceWithHeaders(u, map[string]string{
+			"Authorization": config.Token,
+		})
+	})
+	if err != nil {
+		logger.Error("Failed to update planned meals", "error", err)
+		return nil, nil, fmt.Errorf("failed to update planned meals: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: "Successfully updated planned meals cache.",
+			},
+		},
+	}, nil, nil
 }
 
 func (m *Module) Enabled() error {
@@ -141,16 +143,17 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func getPlannedMeals(config Config, cache caching.Cache) ([]byte, error) {
+func (m *Module) getPlannedMeals() ([]byte, error) {
+	config := m.Config().(Config)
 	u := fmt.Sprintf("%s/household/%d/planner", config.APIURL, config.HouseholdID)
 
 	// Check cache first
-	if file, ok := cache.GetFile(u); ok {
+	if file, ok := m.Cache.GetFile(u); ok {
 		return os.ReadFile(file)
 	}
 
 	// Fetch from API and cache
-	cachedFile, err := cache.SetFile(u, func() (io.ReadCloser, error) {
+	cachedFile, err := m.Cache.SetFile(u, func() (io.ReadCloser, error) {
 		return generic.ReadResourceWithHeaders(u, map[string]string{
 			"Authorization": config.Token,
 		})

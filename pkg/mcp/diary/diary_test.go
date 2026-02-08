@@ -44,11 +44,12 @@ func TestAddDiaryEntry(t *testing.T) {
 		Users: []string{"TestUser"},
 	}
 
-	handler := handleAddEntry(config)
+	logger := slog.Default()
+	m := New(config, logger)
 	ctx := context.Background()
 
 	// 1. Success case
-	_, _, err := handler(ctx, nil, addEntryParams{
+	_, _, err := m.handleAddEntry(ctx, nil, addEntryParams{
 		User:  "TestUser",
 		Entry: "Hello Diary",
 		Date:  "2023-10-27",
@@ -61,7 +62,7 @@ func TestAddDiaryEntry(t *testing.T) {
 	assert.Contains(t, string(content), "Hello Diary")
 
 	// 2. Invalid User
-	_, _, err = handler(ctx, nil, addEntryParams{
+	_, _, err = m.handleAddEntry(ctx, nil, addEntryParams{
 		User:  "UnknownUser",
 		Entry: "Should fail",
 	})
@@ -69,7 +70,7 @@ func TestAddDiaryEntry(t *testing.T) {
 	assert.Contains(t, err.Error(), "invalid user")
 
 	// 3. Default Date
-	_, _, err = handler(ctx, nil, addEntryParams{
+	_, _, err = m.handleAddEntry(ctx, nil, addEntryParams{
 		User:  "TestUser",
 		Entry: "Today's entry",
 	})
@@ -95,11 +96,11 @@ func TestReadDiary(t *testing.T) {
 	require.NoError(t, os.WriteFile(filepath.Join(userDir, "2023-10-05.md"), []byte("Entry 2"), 0o600))
 	require.NoError(t, os.WriteFile(filepath.Join(userDir, "2023-10-10.md"), []byte("Entry 3"), 0o600))
 
-	handler := handleReadDiary(config, logger)
+	m := New(config, logger)
 	ctx := context.Background()
 
 	// 1. Read all
-	res, _, err := handler(ctx, nil, readParams{User: "TestUser"})
+	res, _, err := m.handleReadDiary(ctx, nil, readParams{User: "TestUser"})
 	require.NoError(t, err)
 	text := res.Content[0].(*mcp.TextContent).Text
 	assert.Contains(t, text, "Entry 1")
@@ -107,7 +108,7 @@ func TestReadDiary(t *testing.T) {
 	assert.Contains(t, text, "Entry 3")
 
 	// 2. Date Range
-	res, _, err = handler(ctx, nil, readParams{
+	res, _, err = m.handleReadDiary(ctx, nil, readParams{
 		User:      "TestUser",
 		StartDate: "2023-10-02",
 		EndDate:   "2023-10-08",
@@ -119,7 +120,7 @@ func TestReadDiary(t *testing.T) {
 	assert.NotContains(t, text, "Entry 3")
 
 	// 3. Invalid User
-	_, _, err = handler(ctx, nil, readParams{User: "Unknown"})
+	_, _, err = m.handleReadDiary(ctx, nil, readParams{User: "Unknown"})
 	require.Error(t, err)
 }
 
@@ -135,11 +136,12 @@ func TestUpdateDiaryEntry(t *testing.T) {
 	require.NoError(t, os.MkdirAll(userDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(userDir, "2023-10-01.md"), []byte("Old Content"), 0o600))
 
-	handler := handleUpdateEntry(config)
+	logger := slog.Default()
+	m := New(config, logger)
 	ctx := context.Background()
 
 	// 1. Success Update
-	_, _, err := handler(ctx, nil, updateParams{
+	_, _, err := m.handleUpdateEntry(ctx, nil, updateParams{
 		User:  "TestUser",
 		Date:  "2023-10-01",
 		Entry: "New Content",
@@ -151,7 +153,7 @@ func TestUpdateDiaryEntry(t *testing.T) {
 	assert.Equal(t, "New Content\n", string(content))
 
 	// 2. Not Found
-	_, _, err = handler(ctx, nil, updateParams{
+	_, _, err = m.handleUpdateEntry(ctx, nil, updateParams{
 		User:  "TestUser",
 		Date:  "2023-10-02", // Doesn't exist
 		Entry: "Content",
@@ -172,11 +174,12 @@ func TestDeleteDiaryEntry(t *testing.T) {
 	require.NoError(t, os.MkdirAll(userDir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(userDir, "2023-10-01.md"), []byte("Content"), 0o600))
 
-	handler := handleDeleteEntry(config)
+	logger := slog.Default()
+	m := New(config, logger)
 	ctx := context.Background()
 
 	// 1. Success Delete
-	_, _, err := handler(ctx, nil, deleteParams{
+	_, _, err := m.handleDeleteEntry(ctx, nil, deleteParams{
 		User: "TestUser",
 		Date: "2023-10-01",
 	})
@@ -186,7 +189,7 @@ func TestDeleteDiaryEntry(t *testing.T) {
 	assert.True(t, os.IsNotExist(err))
 
 	// 2. Not Found
-	_, _, err = handler(ctx, nil, deleteParams{
+	_, _, err = m.handleDeleteEntry(ctx, nil, deleteParams{
 		User: "TestUser",
 		Date: "2023-10-01", // Already deleted
 	})
@@ -200,10 +203,10 @@ func TestListUsers(t *testing.T) {
 		Users: []string{"Alice", "Bob"},
 	}
 
-	handler := handleListUsers(config)
+	m := New(config, slog.Default())
 	ctx := context.Background()
 
-	res, _, err := handler(ctx, nil, listUsersParams{})
+	res, _, err := m.handleListUsers(ctx, nil, listUsersParams{})
 	require.NoError(t, err)
 
 	text := res.Content[0].(*mcp.TextContent).Text
@@ -217,10 +220,10 @@ func TestListUsers_Empty(t *testing.T) {
 		Users: []string{},
 	}
 
-	handler := handleListUsers(config)
+	m := New(config, slog.Default())
 	ctx := context.Background()
 
-	res, _, err := handler(ctx, nil, listUsersParams{})
+	res, _, err := m.handleListUsers(ctx, nil, listUsersParams{})
 	require.NoError(t, err)
 
 	text := res.Content[0].(*mcp.TextContent).Text
