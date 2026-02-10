@@ -35,7 +35,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 	e.HidePort = true
 
 	// Routes
-	e.GET("/prompt", mc.summarize)
+	e.GET("/prompt", mc.prompt)
 	e.GET("/persona", mc.switchPersona)
 	e.GET("/update", mc.update)
 
@@ -50,9 +50,9 @@ func (mc *MatrixConfig) ServeHTTP() {
 }
 
 // Handler
-func (mc *MatrixConfig) summarize(c echo.Context) error {
+func (mc *MatrixConfig) prompt(c echo.Context) error {
 	prompt := c.QueryParam("prompt")
-	mc.sendNotice(mc.DefaultRoomID(), "Creating summary: "+prompt)
+	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt: "+prompt)
 
 	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
