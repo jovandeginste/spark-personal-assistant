@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/TwiN/gocache/v2"
+	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
 )
 
 // Cache defines the interface for caching operations
@@ -30,6 +31,7 @@ type Service struct {
 
 // NewService creates a new caching service
 func NewService(storageDir string, ttl time.Duration) (*Service, error) {
+	storageDir = filepath.Clean(storageDir)
 	if err := os.MkdirAll(storageDir, 0o755); err != nil {
 		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
@@ -132,5 +134,10 @@ func (s *Service) getFilePath(key string) string {
 
 	filename := fmt.Sprintf("%x%s", hash, ext)
 
-	return filepath.Join(s.storageDir, filename)
+	path := filepath.Clean(filepath.Join(s.storageDir, filename))
+	if err := safe.IsSubPath(s.storageDir, path); err != nil {
+		return ""
+	}
+
+	return path
 }

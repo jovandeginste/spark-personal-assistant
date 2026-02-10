@@ -13,6 +13,7 @@ require (
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/go-querystring v1.1.0
+	github.com/gosimple/slug v1.15.0
 	github.com/jovandeginste/workout-tracker/v2 v2.4.1
 	github.com/labstack/echo/v4 v4.14.0
 	github.com/modelcontextprotocol/go-sdk v1.2.0
@@ -53,6 +54,7 @@ require (
 	github.com/googleapis/enterprise-certificate-proxy v0.3.11 // indirect
 	github.com/googleapis/gax-go/v2 v2.16.0 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/gosimple/unidecode v1.0.1 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect

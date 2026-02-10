@@ -24,3 +24,5 @@ diary:
   users:
     - Alice
     - Bob
+projects:
+  path: /path/to/projects

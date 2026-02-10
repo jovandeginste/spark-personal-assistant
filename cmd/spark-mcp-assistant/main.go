@@ -13,6 +13,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/googlecontacts"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/projects"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/simplemarkdown"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
@@ -27,6 +28,7 @@ type Config struct {
 	ICal           ical.Config           `mapstructure:"ical"`
 	VCF            vcf.Config            `mapstructure:"vcf"`
 	SimpleMarkdown simplemarkdown.Config `mapstructure:"simplemarkdown"`
+	Projects       projects.Config       `mapstructure:"projects"`
 	Diary          diary.Config          `mapstructure:"diary"`
 	GoogleContacts googlecontacts.Config `mapstructure:"googlecontacts"`
 	Port           string                `mapstructure:"port"`
@@ -184,6 +186,7 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 		ical.New(config.ICal, cacheService, logger),
 		vcf.New(config.VCF, cacheService, logger),
 		simplemarkdown.New(config.SimpleMarkdown, logger),
+		projects.New(config.Projects, logger),
 		diary.New(config.Diary, logger),
 		googlecontacts.New(config.GoogleContacts, logger),
 	}

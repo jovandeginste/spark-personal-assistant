@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
+	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -129,12 +130,20 @@ func (m *Module) handleAddEntry(ctx context.Context, request *mcp.CallToolReques
 		params.Time = time.Now().Format("15:04")
 	}
 
-	userDir := filepath.Join(config.Path, params.User)
+	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
+	if err := safe.IsSubPath(config.Path, userDir); err != nil {
+		return nil, nil, fmt.Errorf("invalid user path")
+	}
+
 	if err := os.MkdirAll(userDir, 0o755); err != nil {
 		return nil, nil, fmt.Errorf("failed to create user directory: %w", err)
 	}
 
-	filename := filepath.Join(userDir, params.Date+".md")
+	filename := filepath.Clean(filepath.Join(userDir, params.Date+".md"))
+	if err := safe.IsSubPath(userDir, filename); err != nil {
+		return nil, nil, fmt.Errorf("invalid date/filename: %w", err)
+	}
+
 	f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to open diary file: %w", err)
@@ -168,8 +177,16 @@ func (m *Module) handleUpdateEntry(ctx context.Context, request *mcp.CallToolReq
 		return nil, nil, errors.New("date is required for update")
 	}
 
-	userDir := filepath.Join(config.Path, params.User)
-	filename := filepath.Join(userDir, params.Date+".md")
+	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
+	if err := safe.IsSubPath(config.Path, userDir); err != nil {
+		return nil, nil, fmt.Errorf("invalid user path")
+	}
+
+	filename := filepath.Clean(filepath.Join(userDir, params.Date+".md"))
+
+	if err := safe.IsSubPath(userDir, filename); err != nil {
+		return nil, nil, fmt.Errorf("invalid date/filename: %w", err)
+	}
 
 	// Check if file exists
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
@@ -204,8 +221,16 @@ func (m *Module) handleDeleteEntry(ctx context.Context, request *mcp.CallToolReq
 		return nil, nil, errors.New("date is required for deletion")
 	}
 
-	userDir := filepath.Join(config.Path, params.User)
-	filename := filepath.Join(userDir, params.Date+".md")
+	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
+	if err := safe.IsSubPath(config.Path, userDir); err != nil {
+		return nil, nil, fmt.Errorf("invalid user path")
+	}
+
+	filename := filepath.Clean(filepath.Join(userDir, params.Date+".md"))
+
+	if err := safe.IsSubPath(userDir, filename); err != nil {
+		return nil, nil, fmt.Errorf("invalid date/filename: %w", err)
+	}
 
 	if err := os.Remove(filename); err != nil {
 		if os.IsNotExist(err) {
@@ -253,7 +278,11 @@ func (m *Module) handleReadDiary(ctx context.Context, request *mcp.CallToolReque
 		return nil, nil, fmt.Errorf("invalid user: %s", params.User)
 	}
 
-	userDir := filepath.Join(config.Path, params.User)
+	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
+	if err := safe.IsSubPath(config.Path, userDir); err != nil {
+		return nil, nil, fmt.Errorf("invalid user path")
+	}
+
 	entries, err := os.ReadDir(userDir)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -276,7 +305,7 @@ func (m *Module) handleReadDiary(ctx context.Context, request *mcp.CallToolReque
 			continue
 		}
 
-		content, err := os.ReadFile(filepath.Join(userDir, entry.Name()))
+		content, err := os.ReadFile(filepath.Clean(filepath.Join(userDir, entry.Name())))
 		if err != nil {
 			logger.Error("failed to read diary entry", "file", entry.Name(), "error", err)
 			continue

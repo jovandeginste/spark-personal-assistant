@@ -124,7 +124,7 @@ func (a *App) setMatrixCryptoStorePath() error {
 	}
 
 	dirname := filepath.Dir(absPath)
-	a.Config.Matrix.CryptoStore = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Matrix.CryptoStore))
+	a.Config.Matrix.CryptoStore = filepath.Clean(filepath.Join(dirname, a.Config.Matrix.CryptoStore))
 
 	return nil
 }
@@ -144,7 +144,7 @@ func (a *App) setAssistantStylePath() error {
 	}
 
 	dirname := filepath.Dir(absPath)
-	a.Config.Assistant.File = filepath.Join(filepath.Clean(dirname), filepath.Clean(a.Config.Assistant.File))
+	a.Config.Assistant.File = filepath.Clean(filepath.Join(dirname, a.Config.Assistant.File))
 
 	return nil
 }

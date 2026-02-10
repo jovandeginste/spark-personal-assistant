@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"path/filepath"
 	"time"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -45,6 +46,7 @@ func (m *Module) Register(server *mcp.Server) error {
 	logger.Info("Registering MCP package")
 
 	config := m.Config().(Config)
+	config.Path = filepath.Clean(config.Path)
 	_, err := m.loadContacts(config.Path)
 	if err != nil {
 		logger.Error("Failed to load contacts", "error", err)
@@ -69,6 +71,7 @@ func (m *Module) Register(server *mcp.Server) error {
 
 func (m *Module) handleGetContact(ctx context.Context, request *mcp.CallToolRequest, params contactParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	config.Path = filepath.Clean(config.Path)
 	logger := m.Logger()
 
 	logger.Debug("Get contact", "query", params.Query)
@@ -106,6 +109,7 @@ func (m *Module) handleGetContact(ctx context.Context, request *mcp.CallToolRequ
 
 func (m *Module) handleGetBirthdays(ctx context.Context, request *mcp.CallToolRequest, params birthdayParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	config.Path = filepath.Clean(config.Path)
 	logger := m.Logger()
 
 	logger.Debug("Get birthdays", "date", params.Date, "start_date", params.StartDate, "end_date", params.EndDate)
@@ -171,5 +175,6 @@ func (m *Module) Enabled() error {
 	if config.Path == "" {
 		return errors.New("vcf path is not configured")
 	}
+	config.Path = filepath.Clean(config.Path)
 	return nil
 }

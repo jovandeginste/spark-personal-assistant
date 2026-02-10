@@ -324,6 +324,7 @@ func writeLines(path string, lines []string) error {
 }
 
 func getTodoPath(basePath, user string) string {
+	basePath = filepath.Clean(basePath)
 	if user == "" {
 		return basePath
 	}
