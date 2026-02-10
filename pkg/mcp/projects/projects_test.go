@@ -114,7 +114,7 @@ func TestModule(t *testing.T) {
 		assert.Contains(t, text, "## File: my-notes.md")
 		assert.Contains(t, text, "Some project notes")
 	})
-	
+
 	t.Run("Security Checks", func(t *testing.T) {
 		// Attempt to escape root
 		params := createProjectParams{

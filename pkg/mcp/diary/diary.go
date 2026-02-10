@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -132,7 +132,7 @@ func (m *Module) handleAddEntry(ctx context.Context, request *mcp.CallToolReques
 
 	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
 	if err := safe.IsSubPath(config.Path, userDir); err != nil {
-		return nil, nil, fmt.Errorf("invalid user path")
+		return nil, nil, errors.New("invalid user path")
 	}
 
 	if err := os.MkdirAll(userDir, 0o755); err != nil {
@@ -179,7 +179,7 @@ func (m *Module) handleUpdateEntry(ctx context.Context, request *mcp.CallToolReq
 
 	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
 	if err := safe.IsSubPath(config.Path, userDir); err != nil {
-		return nil, nil, fmt.Errorf("invalid user path")
+		return nil, nil, errors.New("invalid user path")
 	}
 
 	filename := filepath.Clean(filepath.Join(userDir, params.Date+".md"))
@@ -223,7 +223,7 @@ func (m *Module) handleDeleteEntry(ctx context.Context, request *mcp.CallToolReq
 
 	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
 	if err := safe.IsSubPath(config.Path, userDir); err != nil {
-		return nil, nil, fmt.Errorf("invalid user path")
+		return nil, nil, errors.New("invalid user path")
 	}
 
 	filename := filepath.Clean(filepath.Join(userDir, params.Date+".md"))
@@ -280,7 +280,7 @@ func (m *Module) handleReadDiary(ctx context.Context, request *mcp.CallToolReque
 
 	userDir := filepath.Clean(filepath.Join(config.Path, params.User))
 	if err := safe.IsSubPath(config.Path, userDir); err != nil {
-		return nil, nil, fmt.Errorf("invalid user path")
+		return nil, nil, errors.New("invalid user path")
 	}
 
 	entries, err := os.ReadDir(userDir)

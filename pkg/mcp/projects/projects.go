@@ -10,8 +10,8 @@ import (
 	"strings"
 
 	"github.com/gosimple/slug"
-	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -35,7 +35,7 @@ func (m *Module) Enabled() error {
 		return errors.New("projects path is not configured")
 	}
 	// Verify directory exists or create it
-	if err := os.MkdirAll(filepath.Clean(config.Path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Clean(config.Path), 0o755); err != nil {
 		return fmt.Errorf("failed to create projects directory: %w", err)
 	}
 	return nil
@@ -168,12 +168,12 @@ func (m *Module) handleCreateProject(ctx context.Context, request *mcp.CallToolR
 		return nil, nil, fmt.Errorf("project '%s' already exists", safeName)
 	}
 
-	if err := os.Mkdir(projectPath, 0755); err != nil {
+	if err := os.Mkdir(projectPath, 0o755); err != nil {
 		return nil, nil, fmt.Errorf("failed to create project directory: %w", err)
 	}
 
 	indexPath := filepath.Clean(filepath.Join(projectPath, "index.md"))
-	if err := os.WriteFile(indexPath, []byte(params.Synopsis), 0644); err != nil {
+	if err := os.WriteFile(indexPath, []byte(params.Synopsis), 0o600); err != nil {
 		return nil, nil, fmt.Errorf("failed to write index.md: %w", err)
 	}
 
@@ -194,7 +194,7 @@ func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequ
 
 	safeName := slug.Make(params.Name)
 	projectPath := filepath.Clean(filepath.Join(config.Path, safeName))
-	
+
 	// Security check to ensure we stay within config.Path
 	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
 		return nil, nil, errors.New("invalid project path")
@@ -252,7 +252,7 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 
 	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
 	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
-		return nil, nil, fmt.Errorf("invalid project path")
+		return nil, nil, errors.New("invalid project path")
 	}
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
@@ -261,10 +261,10 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 
 	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
 	if err := safe.IsSubPath(projectPath, filePath); err != nil {
-		return nil, nil, fmt.Errorf("invalid file path")
+		return nil, nil, errors.New("invalid file path")
 	}
 
-	if err := os.WriteFile(filePath, []byte(params.Content), 0644); err != nil {
+	if err := os.WriteFile(filePath, []byte(params.Content), 0o600); err != nil {
 		return nil, nil, fmt.Errorf("failed to write file: %w", err)
 	}
 

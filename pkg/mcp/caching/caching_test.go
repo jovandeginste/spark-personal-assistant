@@ -127,16 +127,16 @@ func TestPathSafety(t *testing.T) {
 	// Note: The current implementation hashes the key, so this acts more as a verification
 	// that even with malicious keys, we get a safe filename within the storage dir.
 	key := "../../etc/passwd"
-	
+
 	// We access unexported getFilePath using a trick or just inspect the result of SetFile
 	// Since we are in the same package (caching), we can call getFilePath if we change package name to caching
 	// But commonly tests are in caching_test package.
 	// Let's assume this file is `package caching` based on the file creation.
-	
+
 	path := service.getFilePath(key)
 	assert.NotEmpty(t, path)
 	assert.Contains(t, path, tempDir)
-	
+
 	// Check that it's NOT pointing to /etc/passwd
 	rel, err := filepath.Rel(tempDir, path)
 	require.NoError(t, err)
