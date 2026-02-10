@@ -28,5 +28,10 @@ run-spark:
 run-mcp:
 	go run ./cmd/spark-mcp-assistant/
 
-build-docker:
-	docker build -t spark-personal-assistant --pull .
+build-docker: build-docker-spark build-docker-mcp
+
+build-docker-spark:
+	docker build --target spark -t spark-personal-assistant --pull .
+
+build-docker-mcp:
+	docker build --target spark-mcp-assistant -t spark-mcp-assistant --pull .

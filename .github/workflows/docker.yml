@@ -32,8 +32,8 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
+      - name: Extract metadata (tags, labels) for Docker (spark)
+        id: meta-spark
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -45,13 +45,39 @@ jobs:
             type=semver,pattern={{major}}
             type=semver,pattern=release
             type=sha
-      - name: Build and push Docker image
+      - name: Build and push Docker image (spark)
         uses: docker/build-push-action@v6
         with:
           context: .
+          target: spark
           platforms: linux/amd64
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-spark.outputs.tags }}
+          labels: ${{ steps.meta-spark.outputs.labels }}
+
+      - name: Extract metadata (tags, labels) for Docker (spark-mcp-assistant)
+        id: meta-mcp
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mcp
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=semver,pattern=release
+            type=sha
+      - name: Build and push Docker image (spark-mcp-assistant)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: spark-mcp-assistant
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: true
+          tags: ${{ steps.meta-mcp.outputs.tags }}
+          labels: ${{ steps.meta-mcp.outputs.labels }}

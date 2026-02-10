@@ -12,12 +12,18 @@ COPY vendor ./vendor
 
 RUN go build -tags=goolm -o /commands/ ./cmd/...
 
-FROM alpine:latest
+FROM alpine:latest AS base
 
 RUN apk add --no-cache tzdata
-COPY --from=backend /commands/* /app/
-COPY personas /personas
 
 VOLUME /data
 WORKDIR /data
+
+FROM base AS spark
+COPY personas /personas
+COPY --from=backend /commands/spark /app/
 ENTRYPOINT ["/app/spark"]
+
+FROM base AS spark-mcp-assistant
+COPY --from=backend /commands/spark-mcp-assistant /app/
+ENTRYPOINT ["/app/spark-mcp-assistant"]
