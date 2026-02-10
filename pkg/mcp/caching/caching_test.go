@@ -114,7 +114,9 @@ func TestFileCacheErrors(t *testing.T) {
 	// Make storage dir read-only
 	err = os.Chmod(tempDir, 0o400)
 	require.NoError(t, err)
-	defer os.Chmod(tempDir, 0o755) // Restore
+	defer func() {
+		_ = os.Chmod(tempDir, 0o600) // Restore
+	}()
 
 	_, err = service.SetFile("perm-error", func() (io.ReadCloser, error) {
 		return io.NopCloser(bytes.NewReader([]byte("data"))), nil

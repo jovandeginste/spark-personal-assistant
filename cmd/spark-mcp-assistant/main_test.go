@@ -34,7 +34,7 @@ port: ":9999"
 weather:
   apiurl: "http://test-weather.com"
 `
-	err = os.WriteFile(tmpDir+"/mcp-config.yaml", []byte(configContent), 0644)
+	err = os.WriteFile(tmpDir+"/mcp-config.yaml", []byte(configContent), 0o600)
 	assert.NoError(t, err)
 
 	// Change working directory to temp dir so viper finds the config
