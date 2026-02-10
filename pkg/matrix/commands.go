@@ -98,6 +98,11 @@ func (mc *MatrixConfig) performCommandPing() (string, error) {
 }
 
 func (mc *MatrixConfig) parseInput(input string) (string, error) {
+	if !strings.HasPrefix(input, "!") {
+		return "", nil
+	}
+
+	input = strings.TrimPrefix(input, "!")
 	cmd := strings.SplitN(input, " ", 3)
 
 	switch cmd[0] {
