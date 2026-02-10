@@ -53,7 +53,9 @@ func cleanDuration(d time.Duration) string {
 
 	r := d.String()
 	r = strings.TrimSuffix(r, "0s")
-	r = strings.TrimSuffix(r, "0m")
+	if strings.HasSuffix(r, "h0m") {
+		r = strings.TrimSuffix(r, "0m")
+	}
 
 	return r
 }
