@@ -75,11 +75,6 @@ ical:
       url: "https://example.com/calendar.ics"
 vcf:
   path: /path/to/contacts.vcf
-simplemarkdown:
-  path: /path/to/markdown/files
-  users:
-    - alice
-    - bob
 googlecontacts:
   client_secret: '{"installed":{"client_id":"...","client_secret":"..."}}'
   token_file: /path/to/token.json
