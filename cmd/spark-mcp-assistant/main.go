@@ -152,10 +152,6 @@ func loadConfig() (*Config, error) {
 	viper.SetDefault("port", ":8081")
 	viper.SetDefault("weather.apiurl", "https://api.open-meteo.com/v1/forecast")
 
-	viper.SetDefault("kitchenowl.apiurl", "https://kitchenowl.thuis.dwarfy.be/api")
-	viper.SetDefault("kitchenowl.householdid", 1)
-	viper.SetDefault("kitchenowl.shoppinglistid", 1)
-
 	// Environment variables override config file
 	viper.SetEnvPrefix("MCP")
 	viper.AutomaticEnv()

@@ -46,14 +46,16 @@ func TestEnabled(t *testing.T) {
 		{
 			name: "Valid Config",
 			config: Config{
-				Token: "some-token",
+				APIURL: "http://example.com",
+				Token:  "some-token",
 			},
 			expectedError: "",
 		},
 		{
 			name: "Missing Token",
 			config: Config{
-				Token: "",
+				APIURL: "http://example.com",
+				Token:  "",
 			},
 			expectedError: "kitchenowl token is not configured",
 		},

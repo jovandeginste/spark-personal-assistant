@@ -236,6 +236,64 @@ func TestSearchRecipes(t *testing.T) {
 	assert.Len(t, foundRecipes, 0)
 }
 
+func TestSearchItems(t *testing.T) {
+	// Setup mock server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/household/1/item/search", r.URL.Path)
+		query := r.URL.Query().Get("query")
+
+		var response []map[string]any
+		switch query {
+		case "milk":
+			response = []map[string]any{
+				{"id": 1, "name": "Whole Milk"},
+				{"id": 2, "name": "Almond Milk"},
+			}
+		case "bread":
+			response = []map[string]any{
+				{"id": 3, "name": "Whole Wheat Bread"},
+			}
+		default:
+			response = []map[string]any{}
+		}
+
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer ts.Close()
+
+	config := Config{
+		APIURL:      ts.URL,
+		Token:       "token",
+		HouseholdID: 1,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+	cache, _ := caching.NewService(os.TempDir(), time.Hour)
+	module := New(config, cache, logger)
+
+	// Test case: Multiple queries
+	params := itemSearchParams{
+		Query: []string{"milk", "bread"},
+	}
+	result, _, err := module.handleItemSearch(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	var foundItems []map[string]any
+	err = json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &foundItems)
+	assert.NoError(t, err)
+
+	// Should have 3 items total (2 milks + 1 bread)
+	assert.Len(t, foundItems, 3)
+
+	names := make([]string, 0, 3)
+	for _, item := range foundItems {
+		names = append(names, item["name"].(string))
+	}
+	assert.Contains(t, names, "Whole Milk")
+	assert.Contains(t, names, "Almond Milk")
+	assert.Contains(t, names, "Whole Wheat Bread")
+}
+
 func TestGetShoppingList(t *testing.T) {
 	// Mock server
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -316,5 +374,5 @@ func TestAddShoppingListItem(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify result
-	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, "to the shopping list")
+	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, "Added 'Apples' to the shopping list")
 }

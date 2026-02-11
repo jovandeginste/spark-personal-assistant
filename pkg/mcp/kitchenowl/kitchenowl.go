@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -71,6 +72,10 @@ type recipeSearchParams struct {
 	Query []string `json:"query" jsonschema:"Search query"`
 }
 
+type itemSearchParams struct {
+	Query []string `json:"query" jsonschema:"Search query"`
+}
+
 type shoppingListAddParams struct {
 	Name string `json:"name" jsonschema:"Name of the item to add"`
 }
@@ -102,6 +107,11 @@ func (m *Module) Register(server *mcp.Server) error {
 		Name:        "recipe_search",
 		Description: "Search for recipes by name or description",
 	}, m.handleRecipeSearch)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "item_search",
+		Description: "Search for items/ingredients",
+	}, m.handleItemSearch)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "shoppinglist",
@@ -271,6 +281,62 @@ func (m *Module) handleRecipeSearch(ctx context.Context, request *mcp.CallToolRe
 	}, nil, nil
 }
 
+func (m *Module) handleItemSearch(ctx context.Context, request *mcp.CallToolRequest, params itemSearchParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "itemSearch")
+	logger.Debug("Searching items", "params", params)
+
+	var allItems []map[string]any
+	seenIDs := make(map[string]bool)
+
+	for _, q := range params.Query {
+		u := fmt.Sprintf("%s/household/%d/item/search?query=%s", config.APIURL, config.HouseholdID, url.QueryEscape(q))
+		body, err := generic.ReadResourceWithHeaders(u, map[string]string{
+			"Authorization": config.Token,
+		})
+		if err != nil {
+			logger.Error("Failed to search items", "query", q, "error", err)
+			continue
+		}
+
+		data, err := io.ReadAll(body)
+		body.Close()
+		if err != nil {
+			logger.Error("Failed to read response", "query", q, "error", err)
+			continue
+		}
+
+		var items []map[string]any
+		if err := json.Unmarshal(data, &items); err != nil {
+			logger.Error("Failed to unmarshal response", "query", q, "error", err)
+			continue
+		}
+
+		for _, item := range items {
+			id := fmt.Sprintf("%v", item["id"])
+			if seenIDs[id] {
+				continue
+			}
+			seenIDs[id] = true
+			allItems = append(allItems, item)
+		}
+	}
+
+	resultJSON, err := json.Marshal(allItems)
+	if err != nil {
+		logger.Error("Failed to marshal results", "error", err)
+		return nil, nil, fmt.Errorf("failed to marshal results: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(resultJSON),
+			},
+		},
+	}, nil, nil
+}
+
 func (m *Module) handleShoppingList(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
 	logger := m.Logger().With("handler", "shoppinglist")
 	logger.Debug("Fetching shopping list", "params", params)
@@ -330,6 +396,9 @@ func (m *Module) handleShoppingListAdd(ctx context.Context, request *mcp.CallToo
 
 func (m *Module) Enabled() error {
 	config := m.Config().(Config)
+	if config.APIURL == "" {
+		return errors.New("kitchenowl api url is not configured")
+	}
 	if config.Token == "" {
 		return errors.New("kitchenowl token is not configured")
 	}
