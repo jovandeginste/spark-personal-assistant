@@ -174,20 +174,20 @@ END:VCALENDAR`
 
 	// 2. Test simple query match
 	cal := Calendar{Name: "Test Calendar", URL: ts.URL}
-	events, err := m.searchEvents(cal, "birthday", "", "")
+	events, err := m.searchEvents(cal, []string{"birthday"}, "", "")
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, "My Birthday", events[0].Summary)
 
 	// 3. Test description match
-	events, err = m.searchEvents(cal, "delivery", "", "")
+	events, err = m.searchEvents(cal, []string{"delivery"}, "", "")
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, "Project Deadline", events[0].Summary)
 
 	// 4. Test date range filtering
 	// Should only find New Year's Day in Jan 2026
-	events, err = m.searchEvents(cal, "Day", "2026-01-01", "2026-01-31")
+	events, err = m.searchEvents(cal, []string{"Day"}, "2026-01-01", "2026-01-31")
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, "New Year's Day", events[0].Summary)
@@ -197,19 +197,19 @@ END:VCALENDAR`
 	// So we need to ensure the query doesn't match the Feb event if we want empty result,
 	// OR check that we DO find the birthday if we search for Day in Feb.
 	// The original intent was to check that "New Year's Day" is NOT found.
-	events, err = m.searchEvents(cal, "Year", "2026-02-01", "2026-12-31")
+	events, err = m.searchEvents(cal, []string{"Year"}, "2026-02-01", "2026-12-31")
 	require.NoError(t, err)
 	assert.Empty(t, events)
 
 	// "My Birthday" is in Feb (today!) and has description "Party time!" - not "Day"
 	// But check if "Day" is in "My Birthday" -> Yes, "day" is in "Birthday"
 	// Let's use a more specific query for the negative test
-	events, err = m.searchEvents(cal, "Year", "2026-02-01", "2026-12-31")
+	events, err = m.searchEvents(cal, []string{"Year"}, "2026-02-01", "2026-12-31")
 	require.NoError(t, err)
 	assert.Empty(t, events)
 
 	// 5. Test no matches
-	events, err = m.searchEvents(cal, "NonexistentEvent", "", "")
+	events, err = m.searchEvents(cal, []string{"NonexistentEvent"}, "", "")
 	require.NoError(t, err)
 	assert.Empty(t, events)
 
@@ -221,12 +221,12 @@ END:VCALENDAR`
 	}
 	// "Official" appears in calendar description, but not in any event
 	// Should return all events within the default time range (all 3 events in the mock)
-	events, err = m.searchEvents(calWithMeta, "Official", "", "")
+	events, err = m.searchEvents(calWithMeta, []string{"Official"}, "", "")
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 
 	// "Work" appears in calendar name
-	events, err = m.searchEvents(calWithMeta, "Work", "", "")
+	events, err = m.searchEvents(calWithMeta, []string{"Work"}, "", "")
 	require.NoError(t, err)
 	require.Len(t, events, 3)
 }

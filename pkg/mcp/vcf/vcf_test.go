@@ -192,23 +192,23 @@ func TestFindContactByName(t *testing.T) {
 	}
 
 	tests := []struct {
-		query    string
+		query    []string
 		expected int
 	}{
-		{"John", 2},        // Matches John Doe (name) and Bob Johnson (name contains "ohn")
-		{"doe", 1},         // Matches John Doe (name)
-		{"Smith", 1},       // Matches Jane Smith (name)
-		{"example.com", 2}, // Matches John and Jane (email)
-		{"jsmith", 1},      // Matches Jane (email)
-		{"alice", 0},       // No match
-		{"Main St", 1},     // Matches John Doe (address)
-		{"Anytown", 1},     // Matches John Doe (address)
-		{"USA", 1},         // Matches John Doe (address)
-		{"anytown", 1},     // Matches John Doe (address) (case insensitive)
-		{"usa", 1},         // Matches John Doe (address) (case insensitive)
-		{"town", 1},        // Matches John Doe (partial city "Anytown")
-		{"US", 1},          // Matches John Doe (partial country "USA")
-		{"", 3},            // Matches all
+		{[]string{"John"}, 2},        // Matches John Doe (name) and Bob Johnson (name contains "ohn")
+		{[]string{"doe"}, 1},         // Matches John Doe (name)
+		{[]string{"Smith"}, 1},       // Matches Jane Smith (name)
+		{[]string{"example.com"}, 2}, // Matches John and Jane (email)
+		{[]string{"jsmith"}, 1},      // Matches Jane (email)
+		{[]string{"alice"}, 0},       // No match
+		{[]string{"Main St"}, 1},     // Matches John Doe (address)
+		{[]string{"Anytown"}, 1},     // Matches John Doe (address)
+		{[]string{"USA"}, 1},         // Matches John Doe (address)
+		{[]string{"anytown"}, 1},     // Matches John Doe (address) (case insensitive)
+		{[]string{"usa"}, 1},         // Matches John Doe (address) (case insensitive)
+		{[]string{"town"}, 1},        // Matches John Doe (partial city "Anytown")
+		{[]string{"US"}, 1},          // Matches John Doe (partial country "USA")
+		{[]string{""}, 3},            // Matches all
 	}
 
 	for _, tt := range tests {

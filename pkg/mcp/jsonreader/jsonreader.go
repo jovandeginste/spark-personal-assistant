@@ -70,7 +70,7 @@ type dateParams struct {
 }
 
 type queryParams struct {
-	Query string `json:"query" jsonschema:"The keyword to search for in summary or description"`
+	Query []string `json:"query" jsonschema:"The keywords to search for in summary or description"`
 }
 
 func (m *Module) handleEventsByDate(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
@@ -179,13 +179,20 @@ func (m *Module) filterEventsByDate(events []Event, params dateParams) []Event {
 	return results
 }
 
-func (m *Module) filterEventsByQuery(events []Event, query string) []Event {
+func (m *Module) filterEventsByQuery(events []Event, queries []string) []Event {
 	var results []Event
-	q := strings.ToLower(query)
 
 	for _, e := range events {
-		if strings.Contains(strings.ToLower(e.Summary), q) ||
-			strings.Contains(strings.ToLower(e.Description), q) {
+		match := false
+		for _, q := range queries {
+			qs := strings.ToLower(q)
+			if strings.Contains(strings.ToLower(e.Summary), qs) ||
+				strings.Contains(strings.ToLower(e.Description), qs) {
+				match = true
+				break
+			}
+		}
+		if match {
 			results = append(results, e)
 		}
 	}

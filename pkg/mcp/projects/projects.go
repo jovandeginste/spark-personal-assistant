@@ -101,7 +101,7 @@ func (m *Module) handleListProjects(ctx context.Context, request *mcp.CallToolRe
 		return nil, nil, fmt.Errorf("failed to list projects: %w", err)
 	}
 
-	var projects []string
+	projects := make([]string, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
 			projects = append(projects, entry.Name())

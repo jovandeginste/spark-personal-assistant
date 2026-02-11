@@ -45,7 +45,7 @@ type icalParams struct {
 }
 
 type searchParams struct {
-	Query string `json:"query" jsonschema:"The search query string"`
+	Query []string `json:"query" jsonschema:"The search query string(s)"`
 	sparkmcp.DateRangeParams
 }
 
@@ -317,7 +317,7 @@ func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) 
 	return results, nil
 }
 
-func (m *Module) searchEvents(cal Calendar, query string, startDateStr, endDateStr string) ([]Event, error) {
+func (m *Module) searchEvents(cal Calendar, query []string, startDateStr, endDateStr string) ([]Event, error) {
 	icsPath, err := m.fetchAndCacheICS(cal.URL)
 	if err != nil {
 		return nil, fmt.Errorf("fetching ICS: %w", err)
@@ -344,8 +344,18 @@ func (m *Module) searchEvents(cal Calendar, query string, startDateStr, endDateS
 		return nil, fmt.Errorf("parsing ICS: %w", err)
 	}
 
-	queryLower := strings.ToLower(query)
-	calendarMatch := strings.Contains(strings.ToLower(cal.Name), queryLower) || strings.Contains(strings.ToLower(cal.Description), queryLower)
+	queryLower := make([]string, 0, len(query))
+	for _, q := range query {
+		queryLower = append(queryLower, strings.ToLower(q))
+	}
+	// Check if any query matches the calendar name/description
+	calendarMatch := false
+	for _, q := range queryLower {
+		if strings.Contains(strings.ToLower(cal.Name), q) || strings.Contains(strings.ToLower(cal.Description), q) {
+			calendarMatch = true
+			break
+		}
+	}
 
 	var results []Event
 
@@ -413,18 +423,20 @@ func determineSearchRange(startDateStr, endDateStr string) (*time.Time, *time.Ti
 	return start, end, nil
 }
 
-func isMatch(e gocal.Event, calendarMatch bool, queryLower string) bool {
+func isMatch(e gocal.Event, calendarMatch bool, queryLower []string) bool {
 	if calendarMatch {
 		return true
 	}
 
-	switch {
-	case strings.Contains(strings.ToLower(e.Summary), queryLower):
-		return true
-	case strings.Contains(strings.ToLower(e.Description), queryLower):
-		return true
-	case strings.Contains(strings.ToLower(e.Location), queryLower):
-		return true
+	for _, q := range queryLower {
+		switch {
+		case strings.Contains(strings.ToLower(e.Summary), q):
+			return true
+		case strings.Contains(strings.ToLower(e.Description), q):
+			return true
+		case strings.Contains(strings.ToLower(e.Location), q):
+			return true
+		}
 	}
 	return false
 }

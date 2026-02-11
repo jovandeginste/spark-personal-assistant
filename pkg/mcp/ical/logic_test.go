@@ -65,21 +65,26 @@ func TestIsMatch(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		query         string
+		query         []string
 		calendarMatch bool
 		expected      bool
 	}{
-		{"Match Summary", "meeting", false, true},
-		{"Match Description", "alpha", false, true},
-		{"Match Location", "101", false, true},
-		{"No Match", "xyz", false, false},
-		{"Calendar Match", "xyz", true, true},
-		{"Case Insensitive", "BOB", false, true},
+		{"Match Summary", []string{"meeting"}, false, true},
+		{"Match Description", []string{"alpha"}, false, true},
+		{"Match Location", []string{"101"}, false, true},
+		{"No Match", []string{"xyz"}, false, false},
+		{"Calendar Match", []string{"xyz"}, true, true},
+		{"Case Insensitive", []string{"BOB"}, false, true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isMatch(evt, tt.calendarMatch, strings.ToLower(tt.query))
+			// Pre-convert queries to lower case as the function expects
+			queriesLower := make([]string, 0, len(tt.query))
+			for _, q := range tt.query {
+				queriesLower = append(queriesLower, strings.ToLower(q))
+			}
+			result := isMatch(evt, tt.calendarMatch, queriesLower)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

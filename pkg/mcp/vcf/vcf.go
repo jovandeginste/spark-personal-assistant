@@ -32,7 +32,7 @@ func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
 }
 
 type contactParams struct {
-	Query string `json:"query" jsonschema:"Name, email, or address of the contact to find (case-insensitive)"`
+	Query []string `json:"query" jsonschema:"Names, emails, or addresses of the contacts to find (case-insensitive)"`
 }
 
 type birthdayParams struct {

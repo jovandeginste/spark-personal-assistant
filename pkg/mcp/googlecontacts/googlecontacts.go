@@ -32,7 +32,7 @@ func New(config Config, logger *slog.Logger) *Module {
 }
 
 type contactsParams struct {
-	Query string `json:"query" jsonschema:"The query to search contacts for (name, email, phone)"`
+	Query []string `json:"query" jsonschema:"The query to search contacts for (name, email, phone)"`
 }
 
 type dateParams struct {
@@ -40,7 +40,7 @@ type dateParams struct {
 }
 
 type locationParams struct {
-	Query string `json:"query" jsonschema:"The city, country, or other location keyword to search for"`
+	Query []string `json:"query" jsonschema:"The city, country, or other location keyword to search for"`
 }
 
 var readMask = []string{
@@ -148,7 +148,8 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func (m *Module) searchContacts(ctx context.Context, config Config, query string) (string, error) {
+// searchContacts now accepts a slice of strings
+func (m *Module) searchContacts(ctx context.Context, config Config, query []string) (string, error) {
 	client := getClient(&config)
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
@@ -157,22 +158,45 @@ func (m *Module) searchContacts(ctx context.Context, config Config, query string
 	}
 
 	// If query is empty, list connections instead of searching
-	if query == "" {
+	if len(query) == 0 {
 		return listConnections(srv)
 	}
 
-	call := srv.People.SearchContacts().Query(query).ReadMask(strings.Join(readMask, ","))
+	// We'll collect results from all queries
+	var allResults []*people.Person
 
-	r, err := call.Do()
-	if err != nil {
-		return "", fmt.Errorf("unable to search contacts: %w", err)
+	for _, q := range query {
+		if q == "" {
+			continue
+		}
+		call := srv.People.SearchContacts().Query(q).ReadMask(strings.Join(readMask, ","))
+
+		r, err := call.Do()
+		if err != nil {
+			// Log error but continue with other queries?
+			// For now, let's fail if one fails, or we could log and continue
+			return "", fmt.Errorf("unable to search contacts for query %q: %w", q, err)
+		}
+		for _, res := range r.Results {
+			allResults = append(allResults, res.Person)
+		}
 	}
 
-	if len(r.Results) == 0 {
+	if len(allResults) == 0 {
 		return "No contacts found.", nil
 	}
 
-	j, err := json.Marshal(r.Results)
+	// Remove duplicates based on ResourceName
+	uniqueResults := make([]*people.Person, 0, len(allResults))
+	seen := make(map[string]bool)
+	for _, p := range allResults {
+		if !seen[p.ResourceName] {
+			seen[p.ResourceName] = true
+			uniqueResults = append(uniqueResults, p)
+		}
+	}
+
+	j, err := json.Marshal(uniqueResults)
 	if err != nil {
 		return "", err
 	}
@@ -340,31 +364,33 @@ func (m *Module) searchContactsByLocation(ctx context.Context, config Config, pa
 	return string(j), nil
 }
 
-func matchesLocation(person *people.Person, query string) bool {
-	q := strings.ToLower(query)
-	for _, address := range person.Addresses {
-		// Check formatted address
-		if strings.Contains(strings.ToLower(address.FormattedValue), q) {
-			return true
+func matchesLocation(person *people.Person, queries []string) bool {
+	for _, query := range queries {
+		q := strings.ToLower(query)
+		for _, address := range person.Addresses {
+			// Check formatted address
+			if strings.Contains(strings.ToLower(address.FormattedValue), q) {
+				return true
+			}
+			// Check components if available
+			if strings.Contains(strings.ToLower(address.City), q) {
+				return true
+			}
+			if strings.Contains(strings.ToLower(address.Country), q) {
+				return true
+			}
+			if strings.Contains(strings.ToLower(address.Region), q) {
+				return true
+			}
+			if strings.Contains(strings.ToLower(address.StreetAddress), q) {
+				return true
+			}
 		}
-		// Check components if available
-		if strings.Contains(strings.ToLower(address.City), q) {
-			return true
-		}
-		if strings.Contains(strings.ToLower(address.Country), q) {
-			return true
-		}
-		if strings.Contains(strings.ToLower(address.Region), q) {
-			return true
-		}
-		if strings.Contains(strings.ToLower(address.StreetAddress), q) {
-			return true
-		}
-	}
-	// Also check locations field if present (though often redundant with addresses)
-	for _, loc := range person.Locations {
-		if strings.Contains(strings.ToLower(loc.Value), q) {
-			return true
+		// Also check locations field if present (though often redundant with addresses)
+		for _, loc := range person.Locations {
+			if strings.Contains(strings.ToLower(loc.Value), q) {
+				return true
+			}
 		}
 	}
 	return false

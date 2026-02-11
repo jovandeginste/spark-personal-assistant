@@ -261,33 +261,41 @@ func findBirthdays(contacts []Contact, start, end Date) []Contact {
 	return results
 }
 
-func findContactByName(contacts []Contact, query string) []Contact {
+func findContactByName(contacts []Contact, queries []string) []Contact {
 	var results []Contact
-	query = strings.ToLower(query)
 	for _, c := range contacts {
-		// Search name
-		if strings.Contains(strings.ToLower(c.Name), query) {
+		match := false
+		for _, q := range queries {
+			query := strings.ToLower(q)
+
+			// Search name
+			if strings.Contains(strings.ToLower(c.Name), query) {
+				match = true
+				break
+			}
+			// Search emails
+			for _, email := range c.Emails {
+				if strings.Contains(strings.ToLower(email), query) {
+					match = true
+					break
+				}
+			}
+			if match {
+				break
+			}
+			// Search addresses
+			for _, addr := range c.Addresses {
+				if strings.Contains(strings.ToLower(addr.FullAddress), query) {
+					match = true
+					break
+				}
+			}
+			if match {
+				break
+			}
+		}
+		if match {
 			results = append(results, c)
-			continue
-		}
-		// Search emails
-		matchFound := false
-		for _, email := range c.Emails {
-			if strings.Contains(strings.ToLower(email), query) {
-				results = append(results, c)
-				matchFound = true
-				break
-			}
-		}
-		if matchFound {
-			continue
-		}
-		// Search addresses
-		for _, addr := range c.Addresses {
-			if strings.Contains(strings.ToLower(addr.FullAddress), query) {
-				results = append(results, c)
-				break
-			}
 		}
 	}
 	return results

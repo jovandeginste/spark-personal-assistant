@@ -111,37 +111,42 @@ func TestLocationLogic(t *testing.T) {
 
 	tests := []struct {
 		name  string
-		query string
+		query []string
 		want  bool
 	}{
 		{
 			name:  "Match City",
-			query: "New York",
+			query: []string{"New York"},
 			want:  true,
 		},
 		{
 			name:  "Match Country",
-			query: "usa",
+			query: []string{"usa"},
 			want:  true,
 		},
 		{
 			name:  "Match Street",
-			query: "Main St",
+			query: []string{"Main St"},
 			want:  true,
 		},
 		{
 			name:  "No Match",
-			query: "London",
+			query: []string{"London"},
 			want:  false,
 		},
 		{
 			name:  "Match Location",
-			query: "Office",
+			query: []string{"Office"},
 			want:  true,
 		},
 		{
 			name:  "Partial Match Case Insensitive",
-			query: "new yor",
+			query: []string{"new yor"},
+			want:  true,
+		},
+		{
+			name:  "Match One of Multiple",
+			query: []string{"London", "New York"},
 			want:  true,
 		},
 	}
