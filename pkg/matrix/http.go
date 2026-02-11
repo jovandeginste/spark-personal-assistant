@@ -2,10 +2,8 @@ package matrix
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -73,16 +71,7 @@ func (mc *MatrixConfig) switchPersona(c echo.Context) error {
 }
 
 func (mc *MatrixConfig) update(c echo.Context) error {
-	mc.sendNotice(mc.DefaultRoomID(), "Updating MCP servers...")
-
 	results := mc.App.UpdateMCPServers(c.Request().Context())
-
-	var out strings.Builder
-	out.WriteString("Update results:\n")
-	for name, res := range results {
-		out.WriteString(fmt.Sprintf("- %s: %s\n", name, res))
-	}
-	mc.sendNotice(mc.DefaultRoomID(), out.String())
 
 	success := true
 	for _, msg := range results {
