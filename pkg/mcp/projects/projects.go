@@ -93,6 +93,9 @@ type updateProjectParams struct {
 
 func (m *Module) handleListProjects(ctx context.Context, request *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "listProjects")
+	logger.Debug("Listing projects")
+
 	entries, err := os.ReadDir(filepath.Clean(config.Path))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list projects: %w", err)
@@ -116,6 +119,9 @@ func (m *Module) handleListProjects(ctx context.Context, request *mcp.CallToolRe
 
 func (m *Module) handleProjectSummaries(ctx context.Context, request *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "projectSummaries")
+	logger.Debug("Listing project summaries")
+
 	entries, err := os.ReadDir(filepath.Clean(config.Path))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to list projects: %w", err)
@@ -150,6 +156,9 @@ func (m *Module) handleProjectSummaries(ctx context.Context, request *mcp.CallTo
 
 func (m *Module) handleCreateProject(ctx context.Context, request *mcp.CallToolRequest, params createProjectParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "createProject")
+	logger.Debug("Creating project", "name", params.Name)
+
 	if params.Name == "" {
 		return nil, nil, errors.New("project name is required")
 	}
@@ -188,6 +197,8 @@ func (m *Module) handleCreateProject(ctx context.Context, request *mcp.CallToolR
 
 func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequest, params getProjectParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "getProject")
+
 	if params.Name == "" {
 		return nil, nil, errors.New("project name is required")
 	}
@@ -216,7 +227,7 @@ func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequ
 			filePath := filepath.Clean(filepath.Join(projectPath, entry.Name()))
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {
-				m.Logger().Error("Failed to read file", "file", filePath, "error", err)
+				logger.Error("Failed to read file", "file", filePath, "error", err)
 				continue
 			}
 			contentBuilder.WriteString(fmt.Sprintf("## File: %s\n\n%s\n\n---\n\n", entry.Name(), string(fileContent)))
@@ -234,6 +245,9 @@ func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequ
 
 func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolRequest, params updateProjectParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "updateProject")
+	logger.Debug("Updating project", "project", params.Project, "file", params.FileName)
+
 	if params.Project == "" || params.FileName == "" {
 		return nil, nil, errors.New("project and file_name are required")
 	}

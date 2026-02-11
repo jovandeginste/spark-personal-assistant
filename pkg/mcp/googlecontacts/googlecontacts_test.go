@@ -30,55 +30,64 @@ func TestDateLogic(t *testing.T) {
 	}
 
 	tests := []struct {
-		name   string
-		params dateParams
-		want   bool
+		name       string
+		params     dateParams
+		start, end string
+		want       bool
 	}{
 		{
-			name:   "Exact match birthday",
-			params: dateParams{Date: "05-15"},
-			want:   true,
+			name:  "Exact match birthday",
+			start: "05-15",
+			end:   "05-15",
+			want:  true,
 		},
 		{
-			name:   "Exact match anniversary",
-			params: dateParams{Date: "12-25"},
-			want:   true,
+			name:  "Exact match anniversary",
+			start: "12-25",
+			end:   "12-25",
+			want:  true,
 		},
 		{
-			name:   "No match",
-			params: dateParams{Date: "01-01"},
-			want:   false,
+			name:  "No match",
+			start: "01-01",
+			end:   "01-01",
+			want:  false,
 		},
 		{
-			name:   "Range match birthday",
-			params: dateParams{StartDate: "05-01", EndDate: "05-31"},
-			want:   true,
+			name:  "Range match birthday",
+			start: "05-01",
+			end:   "05-31",
+			want:  true,
 		},
 		{
-			name:   "Range match anniversary",
-			params: dateParams{StartDate: "12-01", EndDate: "12-31"},
-			want:   true,
+			name:  "Range match anniversary",
+			start: "12-01",
+			end:   "12-31",
+			want:  true,
 		},
 		{
-			name:   "Range no match",
-			params: dateParams{StartDate: "06-01", EndDate: "06-30"},
-			want:   false,
+			name:  "Range no match",
+			start: "06-01",
+			end:   "06-30",
+			want:  false,
 		},
 		{
-			name:   "Wrap around range match (Dec to Jan)",
-			params: dateParams{StartDate: "12-20", EndDate: "01-10"},
-			want:   true,
+			name:  "Wrap around range match (Dec to Jan)",
+			start: "12-20",
+			end:   "01-10",
+			want:  true,
 		},
 		{
-			name:   "Wrap around range no match",
-			params: dateParams{StartDate: "12-26", EndDate: "01-10"},
-			want:   false, // Person is 12-25, range starts 12-26
+			name:  "Wrap around range no match",
+			start: "12-26",
+			end:   "01-10",
+			want:  false, // Person is 12-25, range starts 12-26
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := matchesDate(person, tt.params)
+			got := matchesDate(person, tt.start, tt.end)
 			assert.Equal(t, tt.want, got)
 		})
 	}
@@ -150,25 +159,25 @@ func TestCheckDate(t *testing.T) {
 	d := &people.Date{Month: 5, Day: 5}
 
 	tests := []struct {
-		name   string
-		params dateParams
-		want   bool
+		name       string
+		start, end string
+		want       bool
 	}{
-		{"Exact match", dateParams{Date: "05-05"}, true},
-		{"Exact mismatch", dateParams{Date: "05-06"}, false},
-		{"In range", dateParams{StartDate: "05-01", EndDate: "05-10"}, true},
-		{"Out range", dateParams{StartDate: "06-01", EndDate: "06-10"}, false},
-		{"Wrap range in", dateParams{StartDate: "12-01", EndDate: "05-06"}, true},
-		{"Wrap range out", dateParams{StartDate: "12-01", EndDate: "05-04"}, false},
-		{"Nil date", dateParams{Date: "05-05"}, false}, // Special case for manual call
+		{"Exact match", "05-05", "05-05", true},
+		{"Exact mismatch", "05-06", "05-06", false},
+		{"In range", "05-01", "05-10", true},
+		{"Out range", "06-01", "06-10", false},
+		{"Wrap range in", "12-01", "05-06", true},
+		{"Wrap range out", "12-01", "05-04", false},
+		{"Nil date", "05-05", "05-05", false}, // Special case for manual call
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.name == "Nil date" {
-				assert.False(t, checkDate(nil, tt.params))
+				assert.False(t, checkDate(nil, tt.start, tt.end))
 			} else {
-				assert.Equal(t, tt.want, checkDate(d, tt.params))
+				assert.Equal(t, tt.want, checkDate(d, tt.start, tt.end))
 			}
 		})
 	}

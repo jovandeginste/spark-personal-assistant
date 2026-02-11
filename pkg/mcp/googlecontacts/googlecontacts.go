@@ -36,9 +36,7 @@ type contactsParams struct {
 }
 
 type dateParams struct {
-	Date      string `json:"date,omitempty" jsonschema:"The date to search for (MM-DD)"`
-	StartDate string `json:"start_date,omitempty" jsonschema:"The start date to search for (MM-DD)"`
-	EndDate   string `json:"end_date,omitempty" jsonschema:"The end date to search for (MM-DD)"`
+	sparkmcp.DateRangeParams
 }
 
 type locationParams struct {
@@ -58,21 +56,21 @@ func (m *Module) Register(server *mcp.Server) error {
 	logger.Info("Registering MCP package")
 
 	tool := &mcp.Tool{
-		Name:        "google_contacts",
+		Name:        "contacts",
 		Description: "Search for Google Contacts",
 	}
 
 	mcp.AddTool(server, tool, m.handleContacts)
 
 	dateTool := &mcp.Tool{
-		Name:        "google_contacts_by_date",
-		Description: "Search for Google Contacts by date (birthday, anniversary, etc)",
+		Name:        "birthdays",
+		Description: "Search for Google Contacts events by date (birthday, anniversary, etc)",
 	}
 
 	mcp.AddTool(server, dateTool, m.handleContactsByDate)
 
 	locationTool := &mcp.Tool{
-		Name:        "google_contacts_by_location",
+		Name:        "contacts_by_location",
 		Description: "Search for Google Contacts by location (address, city, country, etc)",
 	}
 
@@ -83,7 +81,7 @@ func (m *Module) Register(server *mcp.Server) error {
 
 func (m *Module) handleContacts(ctx context.Context, request *mcp.CallToolRequest, params contactsParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "contacts")
 
 	logger.Debug("Search google contacts", "query", params.Query)
 	result, err := m.searchContacts(ctx, config, params.Query)
@@ -103,12 +101,13 @@ func (m *Module) handleContacts(ctx context.Context, request *mcp.CallToolReques
 
 func (m *Module) handleContactsByDate(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "contactsByDate")
 
-	logger.Debug("Search google contacts by date", "date", params.Date, "start_date", params.StartDate, "end_date", params.EndDate)
-	result, err := m.searchContactsByDate(ctx, config, params)
+	start, end := params.GetDateRange()
+	logger.Debug("Search google contacts by date", "start", start, "end", end)
+	result, err := m.searchContactsByDate(ctx, config, start, end)
 	if err != nil {
-		logger.Error("Failed to search contacts by date", "params", params, "error", err)
+		logger.Error("Failed to search contacts by date", "start", start, "end", end, "error", err)
 		return nil, nil, err
 	}
 
@@ -123,7 +122,7 @@ func (m *Module) handleContactsByDate(ctx context.Context, request *mcp.CallTool
 
 func (m *Module) handleContactsByLocation(ctx context.Context, request *mcp.CallToolRequest, params locationParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "contactsByLocation")
 
 	logger.Debug("Search google contacts by location", "query", params.Query)
 	result, err := m.searchContactsByLocation(ctx, config, params)
@@ -227,7 +226,7 @@ func fetchAllConnections(srv *people.Service) ([]*people.Person, error) {
 	return allConnections, nil
 }
 
-func (m *Module) searchContactsByDate(ctx context.Context, config Config, params dateParams) (string, error) {
+func (m *Module) searchContactsByDate(ctx context.Context, config Config, start, end string) (string, error) {
 	client := getClient(&config)
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
@@ -242,7 +241,7 @@ func (m *Module) searchContactsByDate(ctx context.Context, config Config, params
 
 	var results []*people.Person
 	for _, person := range connections {
-		if matchesDate(person, params) {
+		if matchesDate(person, start, end) {
 			results = append(results, person)
 		}
 	}
@@ -259,42 +258,50 @@ func (m *Module) searchContactsByDate(ctx context.Context, config Config, params
 	return string(j), nil
 }
 
-func matchesDate(person *people.Person, params dateParams) bool {
+func matchesDate(person *people.Person, start, end string) bool {
 	for _, birthday := range person.Birthdays {
-		if checkDate(birthday.Date, params) {
+		if checkDate(birthday.Date, start, end) {
 			return true
 		}
 	}
 	for _, event := range person.Events {
-		if checkDate(event.Date, params) {
+		if checkDate(event.Date, start, end) {
 			return true
 		}
 	}
 	return false
 }
 
-func checkDate(date *people.Date, params dateParams) bool {
+func toMMDD(s string) string {
+	if len(s) == 10 && s[4] == '-' {
+		return s[5:]
+	}
+	return s
+}
+
+func checkDate(date *people.Date, startStr, endStr string) bool {
 	if date == nil {
 		return false
 	}
 	// Format as MM-DD
 	d := fmt.Sprintf("%02d-%02d", date.Month, date.Day)
 
-	if params.Date != "" && d == params.Date {
-		return true
+	start := toMMDD(startStr)
+	end := toMMDD(endStr)
+
+	if start == "" || end == "" {
+		return false
 	}
 
-	if params.StartDate != "" && params.EndDate != "" {
-		if params.StartDate <= params.EndDate {
-			// Normal range (e.g. 01-01 to 01-31)
-			if d >= params.StartDate && d <= params.EndDate {
-				return true
-			}
-		} else {
-			// Wrap around range (e.g. 12-01 to 01-31)
-			if d >= params.StartDate || d <= params.EndDate {
-				return true
-			}
+	if start <= end {
+		// Normal range (e.g. 01-01 to 01-31)
+		if d >= start && d <= end {
+			return true
+		}
+	} else {
+		// Wrap around range (e.g. 12-01 to 01-31)
+		if d >= start || d <= end {
+			return true
 		}
 	}
 

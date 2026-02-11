@@ -46,9 +46,8 @@ type Config struct {
 }
 
 type weatherParams struct {
-	Location  string `json:"location" jsonschema:"The location to get weather report for"`
-	StartDate string `json:"start_date" jsonschema:"The first date in the range to get weather report for"`
-	EndDate   string `json:"end_date" jsonschema:"The last date in the range to get weather report for"`
+	Location string `json:"location" jsonschema:"The location to get weather report for"`
+	sparkmcp.DateRangeParams
 }
 
 type Module struct {
@@ -78,17 +77,19 @@ func (m *Module) Register(server *mcp.Server) error {
 	}
 
 	handler := func(ctx context.Context, request *mcp.CallToolRequest, params weatherParams) (*mcp.CallToolResult, any, error) {
-		logger.Debug("Fetching weather info", "location", params.Location, "start_date", params.StartDate, "end_date", params.EndDate)
-		result, err := m.getWeatherInfo(config.APIURL, params.Location, params.StartDate, params.EndDate)
+		reqLogger := logger.With("handler", "weather")
+		startDate, endDate := params.GetDateRange()
+		reqLogger.Debug("Fetching weather info", "location", params.Location, "start_date", startDate, "end_date", endDate)
+		result, err := m.getWeatherInfo(config.APIURL, params.Location, startDate, endDate)
 		if err != nil {
-			logger.Error("Failed to get weather info", "location", params.Location, "error", err)
+			reqLogger.Error("Failed to get weather info", "location", params.Location, "error", err)
 			return nil, nil, err
 		}
 
 		return &mcp.CallToolResult{
 			Content: []mcp.Content{
 				&mcp.TextContent{
-					Text: fmt.Sprintf("Weather report for %s from %s to %s: %s", params.Location, params.StartDate, params.EndDate, result),
+					Text: fmt.Sprintf("Weather report for %s from %s to %s: %s", params.Location, startDate, endDate, result),
 				},
 			},
 		}, nil, nil

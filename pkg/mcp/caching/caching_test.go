@@ -112,10 +112,10 @@ func TestFileCacheErrors(t *testing.T) {
 
 	// Test File Create Error (permission)
 	// Make storage dir read-only
-	err = os.Chmod(tempDir, 0o400)
+	err = os.Chmod(tempDir, 0o500) //nolint:gosec // 500 = r-x, so we can't write, but we can traverse
 	require.NoError(t, err)
 	defer func() {
-		_ = os.Chmod(tempDir, 0o600) // Restore
+		_ = os.Chmod(tempDir, 0o755) //nolint:gosec // Restore to writable for cleanup
 	}()
 
 	_, err = service.SetFile("perm-error", func() (io.ReadCloser, error) {

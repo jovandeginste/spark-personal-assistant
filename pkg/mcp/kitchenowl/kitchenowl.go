@@ -76,7 +76,7 @@ func (m *Module) Register(server *mcp.Server) error {
 }
 
 func (m *Module) handleMealPlan(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "mealplan")
 	logger.Debug("Fetching planned meals", "params", params)
 	result, err := m.getPlannedMeals()
 	if err != nil {
@@ -111,7 +111,7 @@ func (m *Module) handleMealPlan(ctx context.Context, request *mcp.CallToolReques
 
 func (m *Module) handleMealPlanUpdate(ctx context.Context, request *mcp.CallToolRequest, params kitchenOwlParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "mealplanUpdate")
 	logger.Debug("Forcing update of planned meals")
 	// Use ForceUpdateFile logic here
 	u := fmt.Sprintf("%s/household/%d/planner", config.APIURL, config.HouseholdID)

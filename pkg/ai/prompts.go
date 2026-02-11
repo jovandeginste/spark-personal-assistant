@@ -27,6 +27,7 @@ var promptPreamble = []string{
 	"Your entire response should be formatted in Markdown",
 	"Use the metric system and 24 hour clock notation.",
 	"The names in the user data are your employers' names",
+	"Use your tools to collect all relevant information.",
 }
 
 func (a AssistantConfig) PromptPreamble() []string {
@@ -68,7 +69,6 @@ func PromptWeek(assistant *AssistantConfig, data any) ([]string, error) {
 		[]string{
 			"Only include the coming week's events.",
 			"Compile a schedule and a summarized overview of todo's, and reminders.",
-			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,
@@ -86,7 +86,6 @@ func PromptToday(assistant *AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Start your response with a suitable greeting and comment about today's weather forecast if you have this information. Only include today's and tomorrow's events. Add pointers regarding the weather if relevant. Be verbose.",
-			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,
@@ -104,7 +103,6 @@ func PromptFull(assistant *AssistantConfig, data any) ([]string, error) {
 	c := append(assistant.PromptPreamble(),
 		[]string{
 			"Add a quick summary of the past week's important events. Add a quick summary of future important events - one line per day. Add weather information for events with outside events.",
-			"Use your tools to fetch the necessary information.",
 			"Information:",
 			string(j),
 		}...,

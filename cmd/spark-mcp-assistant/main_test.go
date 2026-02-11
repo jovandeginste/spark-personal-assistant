@@ -20,7 +20,7 @@ func TestAllModules(t *testing.T) {
 	modules := allModules(config, logger, cacheService)
 
 	assert.NotEmpty(t, modules)
-	assert.Len(t, modules, 6)
+	assert.Len(t, modules, 7)
 }
 
 func TestLoadConfig(t *testing.T) {

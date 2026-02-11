@@ -41,14 +41,12 @@ func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
 }
 
 type icalParams struct {
-	StartDate string `json:"start_date" jsonschema:"The start date to retrieve events for (YYYY-MM-DD)"`
-	EndDate   string `json:"end_date,omitempty" jsonschema:"Optional end date (YYYY-MM-DD)"`
+	sparkmcp.DateRangeParams
 }
 
 type searchParams struct {
-	Query     string `json:"query" jsonschema:"The search query string"`
-	StartDate string `json:"start_date,omitempty" jsonschema:"Optional start date for search range (YYYY-MM-DD)"`
-	EndDate   string `json:"end_date,omitempty" jsonschema:"Optional end date for search range (YYYY-MM-DD)"`
+	Query string `json:"query" jsonschema:"The search query string"`
+	sparkmcp.DateRangeParams
 }
 
 type updateParams struct {
@@ -93,25 +91,14 @@ func (m *Module) Enabled() error {
 
 func (m *Module) handleListEvents(ctx context.Context, request *mcp.CallToolRequest, params icalParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "listEvents")
 
-	logger.Debug("List events", "start_date", params.StartDate, "end_date", params.EndDate)
-	start, err := time.Parse("2006-01-02", params.StartDate)
+	logger.Debug("List events", "date", params.Date, "start_date", params.StartDate, "end_date", params.EndDate)
+
+	start, end, err := params.ParseDateRange()
 	if err != nil {
-		logger.Error("Invalid start_date format", "error", err, "start_date", params.StartDate)
-		return nil, nil, fmt.Errorf("invalid start_date format: %w", err)
-	}
-
-	var end time.Time
-	if params.EndDate != "" {
-		end, err = time.Parse("2006-01-02", params.EndDate)
-		if err != nil {
-			logger.Error("Invalid end_date format", "error", err, "end_date", params.EndDate)
-			return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
-		}
-	} else {
-		// Default to same day if no end date provided
-		end = start
+		logger.Error("Invalid date format", "error", err)
+		return nil, nil, fmt.Errorf("invalid date format: %w", err)
 	}
 
 	var allEvents []Event
@@ -154,12 +141,14 @@ func (m *Module) handleListEvents(ctx context.Context, request *mcp.CallToolRequ
 
 func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRequest, params searchParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "searchEvents")
 
-	logger.Debug("Search events", "query", params.Query, "start_date", params.StartDate, "end_date", params.EndDate)
+	startDate, endDate := params.GetDateRange()
+
+	logger.Debug("Search events", "query", params.Query, "start_date", startDate, "end_date", endDate)
 	var allEvents []Event
 	for _, cal := range config.Calendars {
-		events, err := m.searchEvents(cal, params.Query, params.StartDate, params.EndDate)
+		events, err := m.searchEvents(cal, params.Query, startDate, endDate)
 		if err != nil {
 			logger.Error("Search failed", "calendar", cal.Name, "error", err)
 			return nil, nil, fmt.Errorf("search failed on %s: %w", cal.Name, err)
@@ -197,7 +186,7 @@ func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRe
 
 func (m *Module) handleUpdateCalendar(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "updateCalendar")
 
 	logger.Debug("Update calendar", "force", params.Force)
 	successCount := 0

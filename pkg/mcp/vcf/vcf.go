@@ -36,9 +36,7 @@ type contactParams struct {
 }
 
 type birthdayParams struct {
-	Date      string `json:"date,omitempty" jsonschema:"Specific date to check for birthdays (MM-DD)"`
-	StartDate string `json:"start_date,omitempty" jsonschema:"Start date for birthday range search (MM-DD)"`
-	EndDate   string `json:"end_date,omitempty" jsonschema:"End date for birthday range search (MM-DD)"`
+	sparkmcp.DateRangeParams
 }
 
 func (m *Module) Register(server *mcp.Server) error {
@@ -72,7 +70,7 @@ func (m *Module) Register(server *mcp.Server) error {
 func (m *Module) handleGetContact(ctx context.Context, request *mcp.CallToolRequest, params contactParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
 	config.Path = filepath.Clean(config.Path)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "getContact")
 
 	logger.Debug("Get contact", "query", params.Query)
 	contacts, err := m.loadContacts(config.Path)
@@ -110,9 +108,10 @@ func (m *Module) handleGetContact(ctx context.Context, request *mcp.CallToolRequ
 func (m *Module) handleGetBirthdays(ctx context.Context, request *mcp.CallToolRequest, params birthdayParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
 	config.Path = filepath.Clean(config.Path)
-	logger := m.Logger()
+	logger := m.Logger().With("handler", "getBirthdays")
 
-	logger.Debug("Get birthdays", "date", params.Date, "start_date", params.StartDate, "end_date", params.EndDate)
+	startDate, endDate := params.GetDateRange()
+	logger.Debug("Get birthdays", "start_date", startDate, "end_date", endDate)
 	contacts, err := m.loadContacts(config.Path)
 	if err != nil {
 		logger.Error("Failed to load contacts", "error", err)
@@ -121,30 +120,42 @@ func (m *Module) handleGetBirthdays(ctx context.Context, request *mcp.CallToolRe
 
 	var results []Contact
 
-	// If specific date provided
-	switch {
-	case params.Date != "":
-		date, err := parseDate(params.Date)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid date format: %w", err)
+	// Use generic helper to determine query mode
+	// But VCF logic uses Date{Month, Day} structs, so we need to parse.
+	// We can reuse the existing `parseDate` which handles MM-DD.
+	// `DateRangeParams` uses YYYY-MM-DD or MM-DD.
+	// `params.GetDateRange()` handles precedence.
+
+	// Helper to parse safely
+	safeParse := func(d string) (Date, error) {
+		if d == "" {
+			return Date{}, nil
 		}
-		results = findBirthdays(contacts, date, date)
-	case params.StartDate != "" && params.EndDate != "":
-		start, err := parseDate(params.StartDate)
+		return parseDate(d)
+	}
+
+	// Logic adaptation:
+	var start, end Date
+	if startDate == "" && endDate == "" {
+		now := time.Now()
+		start = Date{Month: int(now.Month()), Day: now.Day()}
+		end = start
+	} else {
+		var err error
+		start, err = safeParse(startDate)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid start_date format: %w", err)
 		}
-		end, err := parseDate(params.EndDate)
-		if err != nil {
-			return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
+		if endDate != "" {
+			end, err = safeParse(endDate)
+			if err != nil {
+				return nil, nil, fmt.Errorf("invalid end_date format: %w", err)
+			}
+		} else {
+			end = start
 		}
-		results = findBirthdays(contacts, start, end)
-	default:
-		// Default to today if no params
-		now := time.Now()
-		date := Date{Month: int(now.Month()), Day: now.Day()}
-		results = findBirthdays(contacts, date, date)
 	}
+	results = findBirthdays(contacts, start, end)
 
 	if len(results) == 0 {
 		return &mcp.CallToolResult{
