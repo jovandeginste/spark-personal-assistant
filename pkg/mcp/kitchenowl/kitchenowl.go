@@ -109,18 +109,18 @@ func (m *Module) Register(server *mcp.Server) error {
 	}, m.handleRecipeSearch)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "item_search",
-		Description: "Search for items/ingredients",
-	}, m.handleItemSearch)
+		Name:        "shoppinglist_search_ingredients",
+		Description: "Search for all available ingredients",
+	}, m.handleIngredientsSearch)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "shoppinglist",
+		Name:        "shoppinglist_list_ingredients",
 		Description: "Get shopping list items",
 	}, m.handleShoppingList)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "shoppinglist_add",
-		Description: "Add an item to the shopping list",
+		Name:        "shoppinglist_add_ingredient",
+		Description: "Add an ingredient to the shopping list (first search for existing ingredients, and available ingredients, to prevent duplicates)",
 	}, m.handleShoppingListAdd)
 
 	return nil
@@ -281,7 +281,7 @@ func (m *Module) handleRecipeSearch(ctx context.Context, request *mcp.CallToolRe
 	}, nil, nil
 }
 
-func (m *Module) handleItemSearch(ctx context.Context, request *mcp.CallToolRequest, params itemSearchParams) (*mcp.CallToolResult, any, error) {
+func (m *Module) handleIngredientsSearch(ctx context.Context, request *mcp.CallToolRequest, params itemSearchParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "itemSearch")
 	logger.Debug("Searching items", "params", params)

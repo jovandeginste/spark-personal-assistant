@@ -36,7 +36,7 @@ func (a AssistantConfig) PromptPreamble() []string {
 		"Use the following style: " + a.Style,
 		"Today is: " + time.Now().Format("Monday, 2006-01-02"),
 		"The current time is: " + time.Now().Format("15:04"),
-		"Translate all events to:" + a.Language,
+		"The user's preferred language is: " + a.Language,
 	}
 
 	return append(prompt, promptPreamble...)

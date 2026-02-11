@@ -275,7 +275,7 @@ func TestSearchItems(t *testing.T) {
 	params := itemSearchParams{
 		Query: []string{"milk", "bread"},
 	}
-	result, _, err := module.handleItemSearch(context.Background(), nil, params)
+	result, _, err := module.handleIngredientsSearch(context.Background(), nil, params)
 	assert.NoError(t, err)
 
 	var foundItems []map[string]any

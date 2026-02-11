@@ -52,7 +52,6 @@ func readFile(u *url.URL) (io.ReadCloser, error) {
 }
 
 func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
-	fmt.Println(u.String())
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
