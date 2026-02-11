@@ -154,6 +154,7 @@ func loadConfig() (*Config, error) {
 
 	viper.SetDefault("kitchenowl.apiurl", "https://kitchenowl.thuis.dwarfy.be/api")
 	viper.SetDefault("kitchenowl.householdid", 1)
+	viper.SetDefault("kitchenowl.shoppinglistid", 1)
 
 	// Environment variables override config file
 	viper.SetEnvPrefix("MCP")

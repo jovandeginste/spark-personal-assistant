@@ -1,8 +1,10 @@
 package kitchenowl
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -20,9 +22,10 @@ func TestRegister(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	config := Config{
-		APIURL:      "http://example.com",
-		Token:       "token",
-		HouseholdID: 1,
+		APIURL:         "http://example.com",
+		Token:          "token",
+		HouseholdID:    1,
+		ShoppingListID: 1,
 	}
 
 	cache, _ := caching.NewService(os.TempDir(), time.Hour)
@@ -157,4 +160,161 @@ func TestHandlerLogic(t *testing.T) {
 	module.SetLogger(logger)
 	err := module.Register(server)
 	assert.NoError(t, err)
+}
+
+func TestSearchRecipes(t *testing.T) {
+	// Setup mock server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := []Recipe{
+			{
+				ID:          1,
+				Name:        "Spaghetti Bolognese",
+				Description: "Delicious pasta with meat sauce",
+			},
+			{
+				ID:          2,
+				Name:        "Vegetable Stir Fry",
+				Description: "Healthy veggies with rice",
+			},
+			{
+				ID:          3,
+				Name:        "Chocolate Cake",
+				Description: "Rich chocolate dessert",
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer ts.Close()
+
+	config := Config{
+		APIURL:      ts.URL,
+		Token:       "token",
+		HouseholdID: 1,
+	}
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+
+	cache, _ := caching.NewService(os.TempDir(), time.Hour)
+	module := New(config, cache, logger)
+
+	// Test case 1: Single query matching name
+	params := recipeSearchParams{
+		Query: []string{"Spaghetti"},
+	}
+	result, _, err := module.handleRecipeSearch(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	var foundRecipes []Recipe
+	err = json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &foundRecipes)
+	assert.NoError(t, err)
+	assert.Len(t, foundRecipes, 1)
+	assert.Equal(t, "Spaghetti Bolognese", foundRecipes[0].Name)
+
+	// Test case 2: Multiple queries matching description and name
+	params = recipeSearchParams{
+		Query: []string{"healthy", "cake"},
+	}
+	result, _, err = module.handleRecipeSearch(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &foundRecipes)
+	assert.NoError(t, err)
+	assert.Len(t, foundRecipes, 2)
+	// Order depends on how they are found, but should contain both
+	names := []string{foundRecipes[0].Name, foundRecipes[1].Name}
+	assert.Contains(t, names, "Vegetable Stir Fry")
+	assert.Contains(t, names, "Chocolate Cake")
+
+	// Test case 3: No match
+	params = recipeSearchParams{
+		Query: []string{"pizza"},
+	}
+	result, _, err = module.handleRecipeSearch(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	err = json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &foundRecipes)
+	assert.NoError(t, err)
+	assert.Len(t, foundRecipes, 0)
+}
+
+func TestGetShoppingList(t *testing.T) {
+	// Mock server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/shoppinglist/1/items", r.URL.Path)
+		assert.Equal(t, "token", r.Header.Get("Authorization"))
+
+		response := []map[string]any{
+			{
+				"id":   1,
+				"name": "Milk",
+			},
+			{
+				"id":   2,
+				"name": "Bread",
+			},
+		}
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer ts.Close()
+
+	config := Config{
+		APIURL:         ts.URL,
+		Token:          "token",
+		HouseholdID:    1,
+		ShoppingListID: 1,
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	cache, _ := caching.NewService(os.TempDir(), time.Hour)
+	module := New(config, cache, logger)
+
+	// Call handler
+	params := kitchenOwlParams{}
+	result, _, err := module.handleShoppingList(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	// Verify content
+	var items []map[string]any
+	err = json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &items)
+	assert.NoError(t, err)
+	assert.Len(t, items, 2)
+	assert.Equal(t, "Milk", items[0]["name"])
+	assert.Equal(t, "Bread", items[1]["name"])
+}
+
+func TestAddShoppingListItem(t *testing.T) {
+	// Mock server
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/shoppinglist/1/add-item-by-name", r.URL.Path)
+		assert.Equal(t, "token", r.Header.Get("Authorization"))
+		assert.Equal(t, http.MethodPost, r.Method)
+
+		var reqBody map[string]string
+		bodyBytes, _ := io.ReadAll(r.Body)
+		err := json.Unmarshal(bodyBytes, &reqBody)
+		assert.NoError(t, err)
+		assert.Equal(t, "Apples", reqBody["name"])
+
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"success": true}`))
+	}))
+	defer ts.Close()
+
+	config := Config{
+		APIURL:         ts.URL,
+		Token:          "token",
+		HouseholdID:    1,
+		ShoppingListID: 1,
+	}
+
+	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
+	cache, _ := caching.NewService(os.TempDir(), time.Hour)
+	module := New(config, cache, logger)
+
+	// Call handler
+	params := shoppingListAddParams{Name: "Apples"}
+	result, _, err := module.handleShoppingListAdd(context.Background(), nil, params)
+	assert.NoError(t, err)
+
+	// Verify result
+	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, "to the shopping list")
 }

@@ -19,6 +19,7 @@ type Cache interface {
 	GetFile(key string) (string, bool)
 	SetFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error)
 	ForceUpdateFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error)
+	RemoveFile(key string) error
 	Clear() error
 }
 
@@ -109,6 +110,20 @@ func (s *Service) SetFile(key string, dataProvider func() (io.ReadCloser, error)
 func (s *Service) ForceUpdateFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error) {
 	// Directly call SetFile, which overwrites existing file
 	return s.SetFile(key, dataProvider)
+}
+
+// RemoveFile removes a file from the cache by key
+func (s *Service) RemoveFile(key string) error {
+	filename := s.getFilePath(key)
+	if filename == "" {
+		return fmt.Errorf("invalid cache key: %s", key)
+	}
+
+	err := os.Remove(filename)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // Clear clears both in-memory and file-based caches
