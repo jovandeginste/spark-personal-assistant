@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,7 +10,47 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/personas"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
+	"maunium.net/go/mautrix"
 )
+
+func (mc *MatrixConfig) performCommandResetRecovery() (string, error) {
+	if mc.CryptoHelper == nil {
+		return "", errors.New("crypto helper is not initialized")
+	}
+
+	mach := mc.CryptoHelper.Machine()
+	recoveryKey, _, err := mach.GenerateAndUploadCrossSigningKeys(context.Background(), func(uiResp *mautrix.RespUserInteractive) any {
+		type ReqUIAuthLogin struct {
+			mautrix.BaseAuthData
+			Identifier mautrix.UserIdentifier `json:"identifier"`
+			Password   string                 `json:"password"`
+		}
+
+		return &ReqUIAuthLogin{
+			BaseAuthData: mautrix.BaseAuthData{
+				Type:    mautrix.AuthTypePassword,
+				Session: uiResp.Session,
+			},
+			Identifier: mautrix.UserIdentifier{
+				Type: mautrix.IdentifierTypeUser,
+				User: mc.App.Config.Matrix.Username, // Use Username instead of UserID (typically "@user:hs.tld") for identifier
+			},
+			Password: mc.App.Config.Matrix.Password,
+		}
+	}, "")
+	if err != nil {
+		return "", fmt.Errorf("failed to reset recovery key: %w", err)
+	}
+
+	if err = mach.SignOwnDevice(context.Background(), mach.OwnIdentity()); err != nil {
+		return "", fmt.Errorf("failed to sign own device: %w", err)
+	}
+	if err = mach.SignOwnMasterKey(context.Background()); err != nil {
+		return "", fmt.Errorf("failed to sign own master key: %w", err)
+	}
+
+	return fmt.Sprintf("New recovery key generated:\n\n`%s`\n\nPlease save this key securely.", recoveryKey), nil
+}
 
 func (mc *MatrixConfig) performCommandReset() (string, error) {
 	mc.AIData.ResetHistory()
@@ -126,6 +167,8 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 		return mc.performCommandUpdate()
 	case "ping":
 		return mc.performCommandPing()
+	case "recovery":
+		return mc.performCommandResetRecovery()
 	default:
 		return "", nil
 	}
