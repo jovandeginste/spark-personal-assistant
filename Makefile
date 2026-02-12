@@ -4,6 +4,11 @@ vendor:
 	go mod tidy
 	go mod vendor
 
+update-deps:
+	go get -u ./...
+	go mod tidy
+	go mod vendor
+
 test:
 	CGO_ENABLED=0 go test -short -count 1 -tags "goolm,sqlite_foreign_keys" -mod vendor -covermode=atomic -gcflags=all=-l ./...
 
