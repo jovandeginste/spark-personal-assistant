@@ -117,6 +117,15 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 		return true
 	}
 
+	if encryptedFile := evt.Content.AsMessage().File; encryptedFile != nil {
+		err = encryptedFile.DecryptInPlace(file)
+		if err != nil {
+			mc.App.Logger().Error("Failed to decrypt file", "error", err)
+			mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to decrypt file %s: %v", evt.Content.AsMessage().Body, err))
+			return true
+		}
+	}
+
 	if len(file) == 0 {
 		mc.App.Logger().Error("Downloaded file is empty", "filename", evt.Content.AsMessage().Body)
 		mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s: file is empty", evt.Content.AsMessage().Body))
