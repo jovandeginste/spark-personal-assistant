@@ -3,6 +3,7 @@ package matrix
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 
 	// "encoding/json"
 	"fmt"
@@ -41,81 +42,111 @@ type msg struct {
 
 func (mc *MatrixConfig) ConfigureSyncer() {
 	syncer := mc.Client.Syncer.(*mautrix.DefaultSyncer)
-	syncer.OnEventType(event.EventMessage, func(ctx context.Context, evt *event.Event) {
-		mc.AIData.CleanHistory()
-
-		body := evt.Content.AsMessage().Body
-
-		mc.App.Logger().Info(
-			"Received message",
-			"sender", evt.Sender.String(),
-			"room_id", evt.RoomID.String(),
-			"type", evt.Type.String(),
-			"id", evt.ID.String(),
-			"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
-			"body", body,
-			"history", len(mc.AIData.ChatHistory),
-		)
-
-		if err := mc.Client.MarkRead(context.Background(), evt.RoomID, evt.ID); err != nil {
-			mc.App.Logger().Error("Failed to mark message as read", "error", err)
-		}
-
-		if evt.Sender.String() == mc.Client.UserID.String() {
-			return
-		}
-
-		knownUser := slices.Contains(mc.App.Config.Matrix.Users, evt.Sender.String())
-		if !knownUser {
-			mc.App.Logger().Info("Unknown user - skipping", "user_id", evt.Sender.String())
-			return
-		}
-
-		// Handle file attachments
-		if evt.Content.AsMessage().MsgType != event.MsgText && evt.Content.AsMessage().MsgType != event.MsgEmote {
-			mc.App.Logger().Info("Received attachment", "type", evt.Content.AsMessage().MsgType, "filename", evt.Content.AsMessage().Body)
-
-			fileURL := evt.Content.AsMessage().URL
-			if fileURL == "" {
-				fileURL = evt.Content.AsMessage().File.URL
-			}
-
-			if fileURL != "" {
-				uri, err := fileURL.Parse()
-				if err != nil {
-					mc.App.Logger().Error("Failed to parse file URL", "error", err)
-					return
-				}
-
-				file, err := mc.Client.DownloadBytes(ctx, uri)
-				if err != nil {
-					mc.App.Logger().Error("Failed to download file", "error", err)
-					mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
-					return
-				}
-
-				aiURI, err := mc.AIClient.UploadFile(ctx, evt.Content.AsMessage().Body, file, evt.Content.AsMessage().Info.MimeType)
-				if err != nil {
-					mc.App.Logger().Error("Failed to upload file to AI", "error", err)
-					mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
-					return
-				}
-
-				mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
-				mc.sendNotice(evt.RoomID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
-			} else {
-				mc.App.Logger().Warn("Received attachment but no URL found", "body", evt.Content.AsMessage().Body)
-			}
-			return
-		}
-
-		if err := mc.sendResponse(evt.RoomID, evt.Sender, body); err != nil {
-			mc.sendNotice(evt.RoomID, "Failed to send response: "+err.Error())
-			mc.App.Logger().Error("Failed to send response", "error", err)
-		}
-	})
-
+	syncer.OnEventType(event.EventMessage, mc.handleMessage)
 	syncer.OnEventType(event.StateMember, mc.syncFunc)
+}
+
+func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
+	mc.AIData.CleanHistory()
+
+	body := evt.Content.AsMessage().Body
+
+	mc.App.Logger().Info(
+		"Received message",
+		"sender", evt.Sender.String(),
+		"room_id", evt.RoomID.String(),
+		"type", evt.Type.String(),
+		"id", evt.ID.String(),
+		"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
+		"body", body,
+		"history", len(mc.AIData.ChatHistory),
+	)
+
+	if err := mc.Client.MarkRead(context.Background(), evt.RoomID, evt.ID); err != nil {
+		mc.App.Logger().Error("Failed to mark message as read", "error", err)
+	}
+
+	if evt.Sender.String() == mc.Client.UserID.String() {
+		return
+	}
+
+	knownUser := slices.Contains(mc.App.Config.Matrix.Users, evt.Sender.String())
+	if !knownUser {
+		mc.App.Logger().Info("Unknown user - skipping", "user_id", evt.Sender.String())
+		return
+	}
+
+	if mc.handleAttachment(ctx, evt) {
+		return
+	}
+
+	if err := mc.sendResponse(evt.RoomID, evt.Sender, body); err != nil {
+		mc.sendNotice(evt.RoomID, "Failed to send response: "+err.Error())
+		mc.App.Logger().Error("Failed to send response", "error", err)
+	}
+}
+
+func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) bool {
+	msgType := evt.Content.AsMessage().MsgType
+	if msgType == event.MsgText || msgType == event.MsgEmote {
+		return false
+	}
+
+	mc.App.Logger().Info("Received attachment", "type", msgType, "filename", evt.Content.AsMessage().Body)
+
+	fileURL := evt.Content.AsMessage().URL
+	if fileURL == "" {
+		fileURL = evt.Content.AsMessage().File.URL
+	}
+
+	if fileURL == "" {
+		mc.App.Logger().Warn("Received attachment but no URL found", "body", evt.Content.AsMessage().Body)
+		return true
+	}
+
+	uri, err := fileURL.Parse()
+	if err != nil {
+		mc.App.Logger().Error("Failed to parse file URL", "error", err)
+		return true
+	}
+
+	file, err := mc.Client.DownloadBytes(ctx, uri)
+	if err != nil {
+		mc.App.Logger().Error("Failed to download file", "error", err)
+		mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
+		return true
+	}
+
+	if len(file) == 0 {
+		mc.App.Logger().Error("Downloaded file is empty", "filename", evt.Content.AsMessage().Body)
+		mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s: file is empty", evt.Content.AsMessage().Body))
+		return true
+	}
+
+	// Check for PDF signature if mime type is application/pdf
+	if evt.Content.AsMessage().Info.MimeType == "application/pdf" {
+		// PDF magic number is %PDF
+		if len(file) < 4 || string(file[:4]) != "%PDF" {
+			mc.App.Logger().Warn("File has PDF mime type but missing PDF header", "header", string(file[:min(4, len(file))]))
+		}
+	}
+
+	mc.App.Logger().Info("Uploading file to AI", "size", len(file), "mime", evt.Content.AsMessage().Info.MimeType, "header", hex.EncodeToString(file[:min(10, len(file))]))
+
+	aiURI, err := mc.AIClient.UploadFile(ctx, evt.Content.AsMessage().Body, file, evt.Content.AsMessage().Info.MimeType)
+	if err != nil {
+		if strings.Contains(err.Error(), "The document has no pages") {
+			mc.sendNotice(evt.RoomID, fmt.Sprintf("AI rejected the file %s: The document appears to be empty or corrupted (Gemini error: document has no pages).", evt.Content.AsMessage().Body))
+		} else {
+			mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
+		}
+		mc.App.Logger().Error("Failed to upload file to AI", "error", err)
+		return true
+	}
+
+	mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
+	mc.sendNotice(evt.RoomID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
+	return true
 }
 
 func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input string) error {
