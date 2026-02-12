@@ -43,6 +43,16 @@ func TestSanitizeSchema(t *testing.T) {
 			input:    `{"type": "array", "items": [{"type": "integer", "enum": [10, 20]}]}`,
 			expected: `{"items":[{"enum":["10","20"],"type":"string"}],"type":"array"}`,
 		},
+		{
+			name:     "Array type definition (nullable string)",
+			input:    `{"type": ["string", "null"]}`,
+			expected: `{"type":"string"}`,
+		},
+		{
+			name:     "Array type definition (nullable string reversed)",
+			input:    `{"type": ["null", "string"]}`,
+			expected: `{"type":"string"}`,
+		},
 	}
 
 	for _, tt := range tests {

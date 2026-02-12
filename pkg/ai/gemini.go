@@ -242,6 +242,25 @@ func (c geminiClient) convertToolSchema(t Tool) *genai.Schema {
 func sanitizeSchema(data any) {
 	switch v := data.(type) {
 	case map[string]any:
+		if typeVal, ok := v["type"]; ok {
+			if typeList, ok := typeVal.([]any); ok {
+				var selectedType string
+				for _, t := range typeList {
+					if s, ok := t.(string); ok && s != "null" {
+						selectedType = s
+						break
+					}
+				}
+				if selectedType != "" {
+					v["type"] = selectedType
+				} else if len(typeList) > 0 {
+					if s, ok := typeList[0].(string); ok {
+						v["type"] = s
+					}
+				}
+			}
+		}
+
 		if enumVal, ok := v["enum"]; ok {
 			if enumList, ok := enumVal.([]any); ok {
 				newEnum := make([]string, 0, len(enumList))

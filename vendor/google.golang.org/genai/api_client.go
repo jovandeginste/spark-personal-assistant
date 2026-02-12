@@ -23,6 +23,7 @@ import (
 	"io"
 	"iter"
 	"log"
+	"math"
 	"net/http"
 	"net/textproto"
 	"net/url"
@@ -258,7 +259,7 @@ func buildRequest(ctx context.Context, ac *apiClient, path string, body map[stri
 	req.Header = patchedHTTPOptions.Headers
 	timeoutSeconds := inferTimeout(ctx, ac, patchedHTTPOptions.Timeout).Seconds()
 	if timeoutSeconds > 0 {
-		req.Header.Set("x-server-timeout", strconv.FormatInt(int64(timeoutSeconds), 10))
+		req.Header.Set("x-server-timeout", strconv.FormatInt(int64(math.Ceil(timeoutSeconds)), 10))
 	}
 
 	req.Header.Set("Content-Type", "application/json")
