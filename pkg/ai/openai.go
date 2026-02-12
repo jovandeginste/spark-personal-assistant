@@ -96,7 +96,7 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	return "", nil
 }
 
-func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor) (string, error) {
+func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
 	promptMsg, err := c.convertPrompt(p, data)
@@ -168,4 +168,16 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 	}
 
 	return "", errors.New("reached maximum iterations with tool calls")
+}
+
+func (c openaiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
+	return "", errors.New("not implemented")
+}
+
+func (c openaiClient) ListFiles(ctx context.Context) ([]string, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (c openaiClient) DeleteFile(ctx context.Context, name string) error {
+	return errors.New("not implemented")
 }

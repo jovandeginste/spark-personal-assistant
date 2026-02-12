@@ -76,7 +76,7 @@ func (mc *MatrixConfig) performCommandSummarize(name string) (string, error) {
 
 	return mc.AIClient.GenerateWithTools(context.Background(), p, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		return mc.App.ExecuteMCPTool(ctx, name, args)
-	})
+	}, mc.AIData.FileURIs)
 }
 
 func (mc *MatrixConfig) performCommandUpdate() (string, error) {

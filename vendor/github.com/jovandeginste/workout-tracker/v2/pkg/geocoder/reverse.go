@@ -14,29 +14,23 @@ import (
 
 	"github.com/codingsince1985/geo-golang"
 	"github.com/google/go-querystring/query"
-	"github.com/hashicorp/go-retryablehttp"
 )
 
 var (
 	c                  *client
 	ErrClientNotSet    = errors.New("geocoder: client not set")
 	ErrAddressNotFound = errors.New("geocoder: address not found")
-
-	OSMURL          = "https://nominatim.openstreetmap.org/"
-	RetryMax        = 5
-	RetryWaitMin    = 3 * time.Second
-	ClientTimeout   = 30 * time.Second
-	RequestInterval = time.Second
 )
 
+const requestInterval = time.Second
+
 type client struct {
-	url           string
-	alwaysOffline bool
-	client        *retryablehttp.Client
-	logger        *slog.Logger
-	lastRequest   time.Time
-	userAgent     string
-	m             sync.Mutex
+	url         string
+	client      http.Client
+	logger      *slog.Logger
+	lastRequest time.Time
+	userAgent   string
+	m           sync.Mutex
 }
 
 type Query struct {
@@ -105,7 +99,7 @@ func (c *client) wait() {
 		return
 	}
 
-	d := RequestInterval - time.Since(c.lastRequest)
+	d := requestInterval - time.Since(c.lastRequest)
 	if d < 0 {
 		return
 	}
@@ -114,31 +108,11 @@ func (c *client) wait() {
 	time.Sleep(d)
 }
 
-func AllowOnline() {
-	c = nil
-}
-
-func ForceOffline() {
-	c = &client{
-		alwaysOffline: true,
-	}
-}
-
 func SetClient(l *slog.Logger, ua string) {
-	if c != nil && c.alwaysOffline {
-		return
-	}
-
-	r := retryablehttp.NewClient()
-	r.RetryMax = RetryMax
-	r.RetryWaitMin = RetryWaitMin
-	r.HTTPClient.Timeout = ClientTimeout
-	r.Logger = l
-
 	c = &client{
-		url:       OSMURL,
+		url:       "https://nominatim.openstreetmap.org/",
 		userAgent: ua,
-		client:    r,
+		client:    http.Client{},
 		logger:    l,
 	}
 }
@@ -146,10 +120,6 @@ func SetClient(l *slog.Logger, ua string) {
 func search(a string) ([]Result, error) {
 	if c == nil {
 		return nil, ErrClientNotSet
-	}
-
-	if c.alwaysOffline {
-		return nil, nil
 	}
 
 	c.wait()
@@ -169,7 +139,7 @@ func search(a string) ([]Result, error) {
 		return nil, err
 	}
 
-	req, err := retryablehttp.NewRequest(http.MethodGet, c.url+"search?"+v.Encode(), nil)
+	req, err := http.NewRequest(http.MethodGet, c.url+"search?"+v.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -229,10 +199,6 @@ func Reverse(q Query) (*geo.Address, error) {
 		return nil, ErrClientNotSet
 	}
 
-	if c.alwaysOffline {
-		return nil, nil
-	}
-
 	c.wait()
 
 	v, err := query.Values(q)
@@ -240,7 +206,7 @@ func Reverse(q Query) (*geo.Address, error) {
 		return nil, err
 	}
 
-	req, err := retryablehttp.NewRequest(http.MethodGet, c.url+"reverse?"+v.Encode(), nil)
+	req, err := http.NewRequest(http.MethodGet, c.url+"reverse?"+v.Encode(), nil)
 	if err != nil {
 		return nil, err
 	}

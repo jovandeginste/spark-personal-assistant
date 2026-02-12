@@ -275,27 +275,12 @@ func (h *StreamableHTTPHandler) ServeHTTP(w http.ResponseWriter, req *http.Reque
 	switch req.Method {
 	case http.MethodPost, http.MethodGet:
 		if req.Method == http.MethodGet && (h.opts.Stateless || sessionID == "") {
-			if h.opts.Stateless {
-				// Per MCP spec: server MUST return 405 if it doesn't offer SSE stream.
-				// In stateless mode, GET (SSE streaming) is not supported.
-				// RFC 9110 §15.5.6: 405 responses MUST include Allow header.
-				w.Header().Set("Allow", "POST")
-				http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
-			} else {
-				// In stateful mode, GET is supported but requires a session ID.
-				// This is a precondition error, similar to DELETE without session.
-				http.Error(w, "Bad Request: GET requires an Mcp-Session-Id header", http.StatusBadRequest)
-			}
+			http.Error(w, "GET requires an active session", http.StatusMethodNotAllowed)
 			return
 		}
 	default:
-		// RFC 9110 §15.5.6: 405 responses MUST include Allow header.
-		if h.opts.Stateless {
-			w.Header().Set("Allow", "POST")
-		} else {
-			w.Header().Set("Allow", "GET, POST, DELETE")
-		}
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		w.Header().Set("Allow", "GET, POST, DELETE")
+		http.Error(w, "Method Not Allowed: streamable MCP servers support GET, POST, and DELETE requests", http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -1404,26 +1389,6 @@ type StreamableClientTransport struct {
 	// It defaults to 5. To disable retries, use a negative number.
 	MaxRetries int
 
-	// DisableStandaloneSSE controls whether the client establishes a standalone SSE stream
-	// for receiving server-initiated messages.
-	//
-	// When false (the default), after initialization the client sends an HTTP GET request
-	// to establish a persistent server-sent events (SSE) connection. This allows the server
-	// to send messages to the client at any time, such as ToolListChangedNotification or
-	// other server-initiated requests and notifications. The connection persists for the
-	// lifetime of the session and automatically reconnects if interrupted.
-	//
-	// When true, the client does not establish the standalone SSE stream. The client will
-	// only receive responses to its own POST requests. Server-initiated messages will not
-	// be received.
-	//
-	// According to the MCP specification, the standalone SSE stream is optional.
-	// Setting DisableStandaloneSSE to true is useful when:
-	//   - You only need request-response communication and don't need server-initiated notifications
-	//   - The server doesn't properly handle GET requests for SSE streams
-	//   - You want to avoid maintaining a persistent connection
-	DisableStandaloneSSE bool
-
 	// TODO(rfindley): propose exporting these.
 	// If strict is set, the transport is in 'strict mode', where any violation
 	// of the MCP spec causes a failure.
@@ -1488,17 +1453,16 @@ func (t *StreamableClientTransport) Connect(ctx context.Context) (Connection, er
 	// middleware), yet only cancel the standalone stream when the connection is closed.
 	connCtx, cancel := context.WithCancel(xcontext.Detach(ctx))
 	conn := &streamableClientConn{
-		url:                  t.Endpoint,
-		client:               client,
-		incoming:             make(chan jsonrpc.Message, 10),
-		done:                 make(chan struct{}),
-		maxRetries:           maxRetries,
-		strict:               t.strict,
-		logger:               ensureLogger(t.logger), // must be non-nil for safe logging
-		ctx:                  connCtx,
-		cancel:               cancel,
-		failed:               make(chan struct{}),
-		disableStandaloneSSE: t.DisableStandaloneSSE,
+		url:        t.Endpoint,
+		client:     client,
+		incoming:   make(chan jsonrpc.Message, 10),
+		done:       make(chan struct{}),
+		maxRetries: maxRetries,
+		strict:     t.strict,
+		logger:     ensureLogger(t.logger), // must be non-nil for safe logging
+		ctx:        connCtx,
+		cancel:     cancel,
+		failed:     make(chan struct{}),
 	}
 	return conn, nil
 }
@@ -1512,10 +1476,6 @@ type streamableClientConn struct {
 	maxRetries int
 	strict     bool         // from [StreamableClientTransport.strict]
 	logger     *slog.Logger // from [StreamableClientTransport.logger]
-
-	// disableStandaloneSSE controls whether to disable the standalone SSE stream
-	// for receiving server-to-client notifications when no request is in flight.
-	disableStandaloneSSE bool // from [StreamableClientTransport.DisableStandaloneSSE]
 
 	// Guard calls to Close, as it may be called multiple times.
 	closeOnce sync.Once
@@ -1558,7 +1518,7 @@ func (c *streamableClientConn) sessionUpdated(state clientSessionState) {
 	c.mu.Unlock()
 
 	// Start the standalone SSE stream as soon as we have the initialized
-	// result, if continuous listening is enabled.
+	// result.
 	//
 	// § 2.2: The client MAY issue an HTTP GET to the MCP endpoint. This can be
 	// used to open an SSE stream, allowing the server to communicate to the
@@ -1568,11 +1528,9 @@ func (c *streamableClientConn) sessionUpdated(state clientSessionState) {
 	// initialized, we don't know whether the server requires a sessionID.
 	//
 	// § 2.5: A server using the Streamable HTTP transport MAY assign a session
-	// ID at initialization time, by including it in a Mcp-Session-Id header
+	// ID at initialization time, by including it in an Mcp-Session-Id header
 	// on the HTTP response containing the InitializeResult.
-	if !c.disableStandaloneSSE {
-		c.connectStandaloneSSE()
-	}
+	c.connectStandaloneSSE()
 }
 
 func (c *streamableClientConn) connectStandaloneSSE() {
@@ -1594,14 +1552,6 @@ func (c *streamableClientConn) connectStandaloneSSE() {
 	// [§2.2.3]: https://modelcontextprotocol.io/specification/2025-06-18/basic/transports#listening-for-messages-from-the-server
 	if resp.StatusCode == http.StatusMethodNotAllowed {
 		// The server doesn't support the standalone SSE stream.
-		resp.Body.Close()
-		return
-	}
-	if resp.Header.Get("Content-Type") != "text/event-stream" {
-		// modelcontextprotocol/go-sdk#736: some servers return 200 OK or redirect with
-		// non-SSE content type instead of text/event-stream for the standalone
-		// SSE stream.
-		c.logger.Warn(fmt.Sprintf("got Content-Type %s instead of text/event-stream for standalone SSE stream", resp.Header.Get("Content-Type")))
 		resp.Body.Close()
 		return
 	}

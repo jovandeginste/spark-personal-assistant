@@ -58,7 +58,7 @@ type Server struct {
 type ServerOptions struct {
 	// Optional instructions for connected clients.
 	Instructions string
-	// Logger may be set to a non-nil value to enable logging of server activity.
+	// If non-nil, log server activity.
 	Logger *slog.Logger
 	// If non-nil, called when "notifications/initialized" is received.
 	InitializedHandler func(context.Context, *InitializedRequest)
@@ -127,11 +127,6 @@ type ServerOptions struct {
 	//
 	// Deprecated: Use Capabilities instead.
 	HasTools bool
-	// SchemaCache, if non-nil, caches JSON schemas to avoid repeated
-	// reflection. This is useful for stateless server deployments where
-	// a new [Server] is created for each request. See [SchemaCache] for
-	// trade-offs and usage guidance.
-	SchemaCache *SchemaCache
 
 	// GetSessionID provides the next session ID to use for an incoming request.
 	// If nil, a default randomly generated ID will be used.
@@ -280,7 +275,7 @@ func (s *Server) AddTool(t *Tool, h ToolHandler) {
 	s.changeAndNotify(notificationToolListChanged, func() bool { s.tools.add(st); return true })
 }
 
-func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCache) (*Tool, ToolHandler, error) {
+func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out]) (*Tool, ToolHandler, error) {
 	tt := *t
 
 	// Special handling for an "any" input: treat as an empty object.
@@ -289,7 +284,7 @@ func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCa
 	}
 
 	var inputResolved *jsonschema.Resolved
-	if _, err := setSchema[In](&tt.InputSchema, &inputResolved, cache); err != nil {
+	if _, err := setSchema[In](&tt.InputSchema, &inputResolved); err != nil {
 		return nil, nil, fmt.Errorf("input schema: %w", err)
 	}
 
@@ -304,7 +299,7 @@ func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCa
 	)
 	if t.OutputSchema != nil || reflect.TypeFor[Out]() != reflect.TypeFor[any]() {
 		var err error
-		elemZero, err = setSchema[Out](&tt.OutputSchema, &outputResolved, cache)
+		elemZero, err = setSchema[Out](&tt.OutputSchema, &outputResolved)
 		if err != nil {
 			return nil, nil, fmt.Errorf("output schema: %v", err)
 		}
@@ -344,7 +339,7 @@ func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCa
 			}
 			// For regular errors, embed them in the tool result as per MCP spec
 			var errRes CallToolResult
-			errRes.SetError(err)
+			errRes.setError(err)
 			return &errRes, nil
 		}
 
@@ -405,75 +400,29 @@ func toolForErr[In, Out any](t *Tool, h ToolHandlerFor[In, Out], cache *SchemaCa
 // pointer: if the user provided the schema, they may have intentionally
 // derived it from the pointer type, and handling of zero values is up to them.
 //
-// If cache is non-nil, schemas are cached to avoid repeated reflection.
-//
 // TODO(rfindley): we really shouldn't ever return 'null' results. Maybe we
 // should have a jsonschema.Zero(schema) helper?
-func setSchema[T any](sfield *any, rfield **jsonschema.Resolved, cache *SchemaCache) (zero any, err error) {
-	rt := reflect.TypeFor[T]()
-	if rt.Kind() == reflect.Pointer {
-		rt = rt.Elem()
-		zero = reflect.Zero(rt).Interface()
-	}
-
+func setSchema[T any](sfield *any, rfield **jsonschema.Resolved) (zero any, err error) {
 	var internalSchema *jsonschema.Schema
-
 	if *sfield == nil {
-		// No schema provided: check cache, or generate via reflection.
-		if cache != nil {
-			if schema, resolved, ok := cache.getByType(rt); ok {
-				*sfield = schema
-				*rfield = resolved
-				return zero, nil
-			}
+		rt := reflect.TypeFor[T]()
+		if rt.Kind() == reflect.Pointer {
+			rt = rt.Elem()
+			zero = reflect.Zero(rt).Interface()
 		}
-
+		// TODO: we should be able to pass nil opts here.
 		internalSchema, err = jsonschema.ForType(rt, &jsonschema.ForOptions{})
-		if err != nil {
-			return zero, err
+		if err == nil {
+			*sfield = internalSchema
 		}
-		*sfield = internalSchema
-
-		resolved, err := internalSchema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
-		if err != nil {
-			return zero, err
-		}
-		*rfield = resolved
-		if cache != nil {
-			cache.setByType(rt, internalSchema, resolved)
-		}
-		return zero, nil
+	} else if err := remarshal(*sfield, &internalSchema); err != nil {
+		return zero, err
 	}
-
-	// Schema was provided: check cache by pointer, or resolve it.
-	if providedSchema, ok := (*sfield).(*jsonschema.Schema); ok {
-		if cache != nil {
-			if resolved, ok := cache.getBySchema(providedSchema); ok {
-				*rfield = resolved
-				return zero, nil
-			}
-		}
-		internalSchema = providedSchema
-	} else {
-		// Schema provided as different type (e.g., map): remarshal to *Schema.
-		if err := remarshal(*sfield, &internalSchema); err != nil {
-			return zero, err
-		}
-	}
-
-	resolved, err := internalSchema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
 	if err != nil {
 		return zero, err
 	}
-	*rfield = resolved
-
-	if cache != nil {
-		if providedSchema, ok := (*sfield).(*jsonschema.Schema); ok {
-			cache.setBySchema(providedSchema, resolved)
-		}
-	}
-
-	return zero, nil
+	*rfield, err = internalSchema.Resolve(&jsonschema.ResolveOptions{ValidateDefaults: true})
+	return zero, err
 }
 
 // AddTool adds a tool and typed tool handler to the server.
@@ -496,7 +445,7 @@ func setSchema[T any](sfield *any, rfield **jsonschema.Resolved, cache *SchemaCa
 // tools to conform to the MCP spec. See [ToolHandlerFor] for a detailed
 // description of this automatic behavior.
 func AddTool[In, Out any](s *Server, t *Tool, h ToolHandlerFor[In, Out]) {
-	tt, hh, err := toolForErr(t, h, s.opts.SchemaCache)
+	tt, hh, err := toolForErr(t, h)
 	if err != nil {
 		panic(fmt.Sprintf("AddTool: tool %q: %v", t.Name, err))
 	}

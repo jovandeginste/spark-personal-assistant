@@ -15,6 +15,7 @@ type AIData struct {
 	ChatHistory      []ChatHistory `json:",omitempty"`
 	EmployerQuestion []string      `json:",omitempty"`
 	UserData         UserData
+	FileURIs         []string `json:",omitempty"`
 }
 
 func (aiData *AIData) ResetHistory() {

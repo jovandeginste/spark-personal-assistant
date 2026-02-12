@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"log/slog"
 	"time"
 
+	"google.golang.org/api/iterator"
 	"google.golang.org/genai"
 )
 
@@ -98,7 +100,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	return "", nil
 }
 
-func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor) (string, error) {
+func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
 	promptContent, err := c.convertPrompt(p, data)
@@ -116,6 +118,13 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 	}
 
 	history := []*genai.Content{promptContent}
+	if len(fileURIs) > 0 {
+		files := make([]*genai.Part, 0, len(fileURIs))
+		for _, uri := range fileURIs {
+			files = append(files, &genai.Part{FileData: &genai.FileData{FileURI: uri}})
+		}
+		history = append(history, genai.NewContentFromParts(files, genai.RoleUser))
+	}
 
 	for i := range MaxToolCalls {
 		result, err := client.Models.GenerateContent(ctx, c.model, history, config)
@@ -254,4 +263,61 @@ func sanitizeSchema(data any) {
 			sanitizeSchema(val)
 		}
 	}
+}
+
+func (c geminiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	if err != nil {
+		return "", err
+	}
+
+	// Changed from client.Models.UploadFile to client.Files.Upload
+	f, err := client.Files.Upload(ctx, bytes.NewReader(content), &genai.UploadFileConfig{
+		DisplayName: name,
+		MIMEType:    mimeType,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	return f.URI, nil
+}
+
+func (c geminiClient) ListFiles(ctx context.Context) ([]string, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	if err != nil {
+		return nil, err
+	}
+
+	var uris []string
+	// Changed from client.Models.ListFiles to client.Files.List
+	iter, err := client.Files.List(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	for {
+		page, err := iter.Next(ctx)
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, f := range page.Items {
+			uris = append(uris, f.URI)
+		}
+	}
+
+	return uris, nil
+}
+
+func (c geminiClient) DeleteFile(ctx context.Context, name string) error {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	if err != nil {
+		return err
+	}
+
+	// Changed from client.Models.DeleteFile to client.Files.Delete
+	_, err = client.Files.Delete(ctx, name, nil)
+	return err
 }

@@ -71,6 +71,44 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 			return
 		}
 
+		// Handle file attachments
+		if evt.Content.AsMessage().MsgType != event.MsgText && evt.Content.AsMessage().MsgType != event.MsgEmote {
+			mc.App.Logger().Info("Received attachment", "type", evt.Content.AsMessage().MsgType, "filename", evt.Content.AsMessage().Body)
+
+			fileURL := evt.Content.AsMessage().URL
+			if fileURL == "" {
+				fileURL = evt.Content.AsMessage().File.URL
+			}
+
+			if fileURL != "" {
+				uri, err := fileURL.Parse()
+				if err != nil {
+					mc.App.Logger().Error("Failed to parse file URL", "error", err)
+					return
+				}
+
+				file, err := mc.Client.DownloadBytes(ctx, uri)
+				if err != nil {
+					mc.App.Logger().Error("Failed to download file", "error", err)
+					mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
+					return
+				}
+
+				aiURI, err := mc.AIClient.UploadFile(ctx, evt.Content.AsMessage().Body, file, evt.Content.AsMessage().Info.MimeType)
+				if err != nil {
+					mc.App.Logger().Error("Failed to upload file to AI", "error", err)
+					mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
+					return
+				}
+
+				mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
+				mc.sendNotice(evt.RoomID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
+			} else {
+				mc.App.Logger().Warn("Received attachment but no URL found", "body", evt.Content.AsMessage().Body)
+			}
+			return
+		}
+
 		if err := mc.sendResponse(evt.RoomID, evt.Sender, body); err != nil {
 			mc.sendNotice(evt.RoomID, "Failed to send response: "+err.Error())
 			mc.App.Logger().Error("Failed to send response", "error", err)
@@ -126,13 +164,16 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), ai.PromptCustom, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		return mc.App.ExecuteMCPTool(ctx, name, args)
-	})
+	}, mc.AIData.FileURIs)
 	if err != nil {
 		return "", fmt.Errorf("could not calculate response: %w", err)
 	}
 
 	mc.AIData.AddChatHistory("user", input)
 	mc.AIData.AddChatHistory("assistant", md)
+
+	// Clean up file URIs after they've been used
+	mc.AIData.FileURIs = nil
 
 	return md, nil
 }

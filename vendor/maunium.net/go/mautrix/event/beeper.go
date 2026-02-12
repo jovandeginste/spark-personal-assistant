@@ -144,7 +144,6 @@ type BeeperLinkPreview struct {
 
 	MatchedURL      string             `json:"matched_url,omitempty"`
 	ImageEncryption *EncryptedFileInfo `json:"beeper:image:encryption,omitempty"`
-	ImageBlurhash   string             `json:"beeper:image:blurhash,omitempty"`
 }
 
 type BeeperProfileExtra struct {
