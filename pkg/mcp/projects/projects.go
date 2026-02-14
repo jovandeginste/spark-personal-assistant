@@ -47,11 +47,23 @@ func (m *Module) Register(server *mcp.Server) error {
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "projects_list",
 		Description: "List all existing projects",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"_dummy": map[string]any{"type": "string"},
+			},
+		},
 	}, m.handleListProjects)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "projects_summaries",
 		Description: "Retrieve summaries (index.md) of all projects",
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"_dummy": map[string]any{"type": "string"},
+			},
+		},
 	}, m.handleProjectSummaries)
 
 	mcp.AddTool(server, &mcp.Tool{
