@@ -1,0 +1,4 @@
+drillster:
+  token_file: "drillster-token.json"
+
+port: ":8082"

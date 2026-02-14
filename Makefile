@@ -18,17 +18,22 @@ lint:
 build: build-spark build-mcp
 
 build-spark:
-	go build -o spark ./cmd/spark
+	go build -o data/spark ./cmd/spark
 
 build-mcp:
-	go build -o spark-mcp-assistant ./cmd/spark-mcp-assistant
+	go build -o data/spark-mcp-assistant ./cmd/spark-mcp-assistant
+	go build -o data/hockey-mcp-assistant ./cmd/hockey-mcp-assistant
 
 run-all:
 	$(MAKE) run-mcp &
+	$(MAKE) run-hockey &
 	$(MAKE) run-spark
 
 run-spark:
 	go run ./cmd/spark/ matrix
+
+run-hockey:
+	go run ./cmd/mcp-hockey-assistant/
 
 run-mcp:
 	go run ./cmd/spark-mcp-assistant/

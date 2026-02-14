@@ -1,6 +1,7 @@
 data/
 spark.yaml
 mcp-config.yaml
+mcp-hockey.yaml
 .aider*
 .cache
 .direnv
@@ -8,5 +9,4 @@ mcp-config.yaml
 .gomodcache
 .venv/
 /matrix.*
-/spark
-/spark-mcp-assistant
+drillster-token.json
