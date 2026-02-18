@@ -118,7 +118,7 @@ func TestParseEntryIDs(t *testing.T) {
             </div>
             
                                     
-                                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                </div>
     </div>
 
                                     <div class="entry-parent d-none" id="entry-parent-9794299-5941973">
@@ -130,7 +130,7 @@ func TestParseEntryIDs(t *testing.T) {
             </div>
             
                                     
-                                                                                                                                                                                                                                                                                                                </div>
+                                                                                                                                                                                                </div>
     </div>
 `
 	ids, err := parseEntryIDs(htmlContent)

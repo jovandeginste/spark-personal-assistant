@@ -223,16 +223,16 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 		for _, id := range entryIDs {
 			// URL: /v2/ajax/form/{formID}/entry?entryId={entryID}
 			entryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry?entryId=%d", params.FormID, id)
-			
+
 			// We need to fetch the content. The makeRequest method handles the GET.
-			result, _, err := t.makeRequest("GET", entryURL)
+			entryResult, _, err := t.makeRequest("GET", entryURL)
 			if err != nil {
 				// We can log this error if we had the logger easily accessible, or just skip.
 				continue
 			}
-			
-			if len(result.Content) > 0 {
-				if tc, ok := result.Content[0].(*sdk.TextContent); ok {
+
+			if len(entryResult.Content) > 0 {
+				if tc, ok := entryResult.Content[0].(*sdk.TextContent); ok {
 					// 5. Sanitize HTML
 					stripped := stripHTML(tc.Text)
 					finalEntries = append(finalEntries, FormEntry{
@@ -260,4 +260,3 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 
 	sdk.AddTool(server, tool, handler)
 }
-

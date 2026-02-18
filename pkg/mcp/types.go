@@ -2,6 +2,8 @@ package mcp
 
 import (
 	"time"
+
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 )
 
 type DateRangeParams struct {
@@ -50,4 +52,8 @@ func (p DateRangeParams) ParseDateRange() (time.Time, time.Time, error) {
 	}
 
 	return start, end, nil
+}
+
+func ToHumanTime(t time.Time) humantime.HumanTime {
+	return humantime.HumanTime{Time: t}
 }

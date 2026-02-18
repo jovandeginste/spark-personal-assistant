@@ -102,8 +102,8 @@ func TestSetTimes(t *testing.T) {
 	evt := Event{}
 	err := evt.SetTimes(gocalEvt)
 	assert.NoError(t, err)
-	assert.Equal(t, now, evt.Start)
-	assert.Equal(t, later, evt.End)
+	assert.Equal(t, now, evt.Start.Time)
+	assert.Equal(t, later, evt.End.Time)
 	// Duration logic might need specific check depending on cleanDuration implementation
 	// But basic invocation should pass
 }

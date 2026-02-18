@@ -13,6 +13,7 @@ import (
 
 	"github.com/apognu/gocal"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -251,13 +252,13 @@ func (m *Module) StartPrefetch() {
 }
 
 type Event struct {
-	CalendarName string    `json:"calendar_name,omitempty"`
-	Summary      string    `json:"summary"`
-	Start        time.Time `json:"start"`
-	End          time.Time `json:"end"`
-	Duration     string    `json:"duration"`
-	Description  string    `json:"description,omitempty"`
-	Location     string    `json:"location,omitempty"`
+	CalendarName string              `json:"calendar_name,omitempty"`
+	Summary      string              `json:"summary"`
+	Start        humantime.HumanTime `json:"start"`
+	End          humantime.HumanTime `json:"end"`
+	Duration     string              `json:"duration"`
+	Description  string              `json:"description,omitempty"`
+	Location     string              `json:"location,omitempty"`
 }
 
 func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) {
@@ -476,7 +477,7 @@ func (e *Event) SetStart(event gocal.Event) error {
 		return err
 	}
 
-	e.Start = t
+	e.Start = sparkmcp.ToHumanTime(t)
 	return nil
 }
 
@@ -489,7 +490,7 @@ func (e *Event) SetEnd(event gocal.Event) error {
 		return err
 	}
 
-	e.End = t
+	e.End = sparkmcp.ToHumanTime(t)
 	return nil
 }
 
