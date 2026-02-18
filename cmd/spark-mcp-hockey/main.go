@@ -27,7 +27,7 @@ func main() {
 		lvl.Set(slog.LevelDebug)
 	}
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})).With("app", "mcp-hockey-assistant")
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})).With("app", "spark-mcp-hockey")
 
 	config, err := loadConfig()
 	if err != nil {
@@ -49,7 +49,7 @@ func main() {
 
 	sseHandler := sdk.NewSSEHandler(func(r *http.Request) *sdk.Server {
 		server := sdk.NewServer(&sdk.Implementation{
-			Name:    "mcp-hockey-assistant",
+			Name:    "spark-mcp-hockey",
 			Version: "1.0.0",
 		}, &sdk.ServerOptions{
 			Logger: logger,

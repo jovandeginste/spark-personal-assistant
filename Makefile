@@ -22,10 +22,10 @@ build-spark:
 
 build-mcp:
 	go build -o data/spark-mcp-assistant ./cmd/spark-mcp-assistant
-	go build -o data/hockey-mcp-assistant ./cmd/mcp-hockey-assistant
+	go build -o data/spark-mcp-hockey ./cmd/spark-mcp-hockey
 
 run-all:
-	$(MAKE) run-mcp &
+	$(MAKE) run-assistant &
 	$(MAKE) run-hockey &
 	$(MAKE) run-spark
 
@@ -33,9 +33,9 @@ run-spark:
 	go run ./cmd/spark/ matrix
 
 run-hockey:
-	go run ./cmd/mcp-hockey-assistant/
+	go run ./cmd/spark-mcp-hockey/
 
-run-mcp:
+run-assistant:
 	go run ./cmd/spark-mcp-assistant/
 
 build-docker: build-docker-spark build-docker-mcp

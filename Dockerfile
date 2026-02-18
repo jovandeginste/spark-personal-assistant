@@ -27,3 +27,7 @@ ENTRYPOINT ["/app/spark"]
 FROM base AS spark-mcp-assistant
 COPY --from=backend /commands/spark-mcp-assistant /app/
 ENTRYPOINT ["/app/spark-mcp-assistant"]
+
+FROM base AS spark-mcp-hockey
+COPY --from=backend /commands/spark-mcp-hockey /app/
+ENTRYPOINT ["/app/spark-mcp-hockey"]

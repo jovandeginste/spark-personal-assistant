@@ -1,17 +1,14 @@
 #
 name: Create and publish a Docker image
-
 # Configures this workflow to run every time a change is pushed to the branch called `release`.
 on:
   push:
     branches: ["master"]
     tags: ["v*"]
-
 # Defines two custom environment variables for the workflow. These are used for the Container registry domain, and a name for the Docker image that this workflow builds.
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-
 # There is a single job in this workflow. It's configured to run on the latest available version of Ubuntu.
 jobs:
   build-and-push-image:
@@ -32,19 +29,6 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Extract metadata (tags, labels) for Docker (spark)
-        id: meta-spark
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=semver,pattern=release
-            type=sha
       - name: Build and push Docker image (spark)
         uses: docker/build-push-action@v6
         with:
@@ -54,22 +38,8 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
-          tags: ${{ steps.meta-spark.outputs.tags }}
-          labels: ${{ steps.meta-spark.outputs.labels }}
-
-      - name: Extract metadata (tags, labels) for Docker (spark-mcp-assistant)
-        id: meta-mcp
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-mcp
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=semver,pattern=release
-            type=sha
+            ghcr.io/jovandeginste/spark-personal-assistant:latest
       - name: Build and push Docker image (spark-mcp-assistant)
         uses: docker/build-push-action@v6
         with:
@@ -79,5 +49,16 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           push: true
-          tags: ${{ steps.meta-mcp.outputs.tags }}
-          labels: ${{ steps.meta-mcp.outputs.labels }}
+          tags: |
+            ghcr.io/jovandeginste/spark-mcp-assistant:latest
+      - name: Build and push Docker image (spark-mcp-hockey)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: spark-mcp-hockey
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          push: true
+          tags: |
+            ghcr.io/jovandeginste/spark-mcp-hockey:latest
