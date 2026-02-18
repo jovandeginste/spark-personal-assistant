@@ -1,4 +1,5 @@
 drillster:
-  token_file: "drillster-token.json"
+  username: "you@example.com"
+  password: "password"
 
 port: ":8082"

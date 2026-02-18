@@ -11,7 +11,8 @@ import (
 
 func TestDrillster_Register(t *testing.T) {
 	config := Config{
-		TokenFile: "test-token.json",
+		Username: "test-user",
+		Password: "test-password",
 	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	d := New(config, logger)
@@ -25,40 +26,4 @@ func TestDrillster_Register(t *testing.T) {
 
 	err := d.Register(server)
 	assert.NoError(t, err)
-}
-
-func TestDrillster_readToken(t *testing.T) {
-	// Create a temporary token file
-	file, err := os.CreateTemp("", "token-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(file.Name())
-
-	tokenData := `{"access_token": "test-token"}`
-	if _, err := file.WriteString(tokenData); err != nil {
-		t.Fatal(err)
-	}
-	file.Close()
-
-	config := Config{
-		TokenFile: file.Name(),
-	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	d := New(config, logger)
-
-	token, err := d.readToken()
-	assert.NoError(t, err)
-	assert.Equal(t, "test-token", token)
-}
-
-func TestDrillster_readToken_MissingFile(t *testing.T) {
-	config := Config{
-		TokenFile: "non-existent-file.json",
-	}
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	d := New(config, logger)
-
-	_, err := d.readToken()
-	assert.Error(t, err)
 }

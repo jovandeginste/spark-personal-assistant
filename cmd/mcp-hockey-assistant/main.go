@@ -9,12 +9,14 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/drillster"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/twizzit"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
 	Drillster drillster.Config `mapstructure:"drillster"`
+	Twizzit   twizzit.Config   `mapstructure:"twizzit"`
 	Port      string           `mapstructure:"port"`
 }
 
@@ -35,6 +37,7 @@ func main() {
 
 	modules := []mcp.Module{
 		drillster.New(config.Drillster, logger),
+		twizzit.New(config.Twizzit, logger),
 	}
 
 	for _, module := range modules {

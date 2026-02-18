@@ -22,7 +22,7 @@ build-spark:
 
 build-mcp:
 	go build -o data/spark-mcp-assistant ./cmd/spark-mcp-assistant
-	go build -o data/hockey-mcp-assistant ./cmd/hockey-mcp-assistant
+	go build -o data/hockey-mcp-assistant ./cmd/mcp-hockey-assistant
 
 run-all:
 	$(MAKE) run-mcp &
