@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -22,10 +23,10 @@ type Source struct {
 }
 
 type Event struct {
-	Date        time.Time `json:"Date"`
-	Summary     string    `json:"Summary"`
-	Description string    `json:"Description,omitempty"`
-	Source      string    `json:"-"` // Internal field to track source name
+	Date        humantime.HumanTime `json:"Date"`
+	Summary     string              `json:"Summary"`
+	Description string              `json:"Description,omitempty"`
+	Source      string              `json:"-"` // Internal field to track source name
 }
 
 // Custom UnmarshalJSON to handle various date formats if needed,

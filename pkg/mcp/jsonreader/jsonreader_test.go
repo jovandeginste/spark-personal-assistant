@@ -39,9 +39,9 @@ func TestFilterEventsByDate(t *testing.T) {
 	}
 
 	events := []Event{
-		{Date: time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC), Summary: "Event 1"},
-		{Date: time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC), Summary: "Event 2"},
-		{Date: time.Date(2026, 2, 1, 18, 0, 0, 0, time.UTC), Summary: "Event 3"},
+		{Date: sparkmcp.ToHumanTime(time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)), Summary: "Event 1"},
+		{Date: sparkmcp.ToHumanTime(time.Date(2026, 1, 15, 9, 0, 0, 0, time.UTC)), Summary: "Event 2"},
+		{Date: sparkmcp.ToHumanTime(time.Date(2026, 2, 1, 18, 0, 0, 0, time.UTC)), Summary: "Event 3"},
 	}
 
 	tests := []struct {
