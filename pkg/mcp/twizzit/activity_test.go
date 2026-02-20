@@ -28,9 +28,8 @@ var sampleActivityHTML = `
                 view: "info",
                 contact: {
                   id: 3889524,
-                  firstName: "Jo",
-                  name: "Vandeginste",
-                  image: "/public/photos/3889524/s/ee7ce1dfc7cb5d56ec1155b1111d88b2b8cc84ff.png",
+                  firstName: "John",
+                  name: "Doe",
                 },
                 activity: {
                   id: 35997689,
@@ -74,15 +73,15 @@ var sampleActivityHTML = `
                 attendanceContacts: {
                   "8503671": {
                     "id": "8503671",
-                    "name": "Holemans",
-                    "firstName": "Joppe",
-                    "fullName": "Holemans Joppe",
+                    "name": "Smith",
+                    "firstName": "Jane",
+                    "fullName": "Smith Jane",
                   },
                   "2445982": {
                     "id": "2445982",
-                    "name": "De Backer",
-                    "firstName": "Kurt",
-                    "fullName": "De Backer Kurt",
+                    "name": "Johnson",
+                    "firstName": "Bob",
+                    "fullName": "Johnson Bob",
                   }
                 }
               },
@@ -101,8 +100,8 @@ func TestParseActivityDetails(t *testing.T) {
 
 	// Check Contact
 	assert.Equal(t, 3889524, details.Contact.ID)
-	assert.Equal(t, "Jo", details.Contact.FirstName)
-	assert.Equal(t, "Vandeginste", details.Contact.Name)
+	assert.Equal(t, "John", details.Contact.FirstName)
+	assert.Equal(t, "Doe", details.Contact.Name)
 
 	// Check Activity
 	assert.Equal(t, 35997689, details.Activity.ID)
@@ -113,12 +112,12 @@ func TestParseActivityDetails(t *testing.T) {
 	assert.Len(t, details.Attendances, 2)
 
 	// Check Sort Order (Aanwezig comes before Niet beslist in our mocked attendanceTypes)
-	// Joppe is "Aanwezig" (order 0), Kurt is "Niet beslist" (order 1)
-	assert.Equal(t, "Joppe", details.Attendances[0].FirstName)
+	// Jane is "Aanwezig" (order 0), Bob is "Niet beslist" (order 1)
+	assert.Equal(t, "Jane", details.Attendances[0].FirstName)
 	assert.Equal(t, "Aanwezig", details.Attendances[0].AttendanceTypeName)
 	assert.Equal(t, "Some comment here", details.Attendances[0].Comment)
 
-	assert.Equal(t, "Kurt", details.Attendances[1].FirstName)
+	assert.Equal(t, "Bob", details.Attendances[1].FirstName)
 	assert.Equal(t, "Niet beslist", details.Attendances[1].AttendanceTypeName)
 	assert.Equal(t, "", details.Attendances[1].Comment)
 

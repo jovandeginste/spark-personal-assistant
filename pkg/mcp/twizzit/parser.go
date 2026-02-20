@@ -22,7 +22,6 @@ type Contact struct {
 	ID        int    `json:"id"`
 	FirstName string `json:"firstName"`
 	Name      string `json:"name"`
-	Image     string `json:"image"`
 }
 
 type Activity struct {
@@ -32,14 +31,16 @@ type Activity struct {
 	StartDateTime string `json:"startDateTime"`
 	MeetingTime   string `json:"meetingTime"`
 	Description   string `json:"description"`
+	URL           string `json:"url"`
 }
 
 type Attendance struct {
-	AttendanceTypeName string `json:"attendanceTypeName"`
-	FirstName          string `json:"firstName,omitempty"`
-	Name               string `json:"name,omitempty"`
-	Comment            string `json:"comment,omitempty"`
-	Order              int    `json:"-"`
+	AttendanceTypeName string   `json:"attendanceTypeName"`
+	FirstName          string   `json:"firstName,omitempty"`
+	Name               string   `json:"name,omitempty"`
+	Comment            string   `json:"comment,omitempty"`
+	ContactFunctions   []string `json:"contactFunctions,omitempty"`
+	Order              int      `json:"-"`
 }
 
 func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
@@ -101,7 +102,6 @@ func populateContact(details *ActivityDetails, rawData map[string]any) {
 		details.Contact.ID = int(getInt(contactMap["id"]))
 		details.Contact.FirstName, _ = contactMap["firstName"].(string)
 		details.Contact.Name, _ = contactMap["name"].(string)
-		details.Contact.Image, _ = contactMap["image"].(string)
 	}
 }
 
@@ -113,6 +113,7 @@ func populateActivity(details *ActivityDetails, rawData map[string]any) {
 		details.Activity.StartDateTime, _ = activityMap["startDateTime"].(string)
 		details.Activity.MeetingTime, _ = activityMap["meetingTime"].(string)
 		details.Activity.Description, _ = activityMap["description"].(string)
+		details.Activity.URL = fmt.Sprintf("https://app.twizzit.com/v2/feed/activity/%d", details.Activity.ID)
 	}
 }
 
@@ -162,6 +163,12 @@ func populateAttendances(details *ActivityDetails, rawData map[string]any, atten
 		if contactData, ok := attendanceContactsMap[id].(map[string]any); ok {
 			attendance.FirstName = getString(contactData["firstName"])
 			attendance.Name = getString(contactData["name"])
+
+			if funcs, ok := contactData["contactFunctions"].([]any); ok {
+				for _, f := range funcs {
+					attendance.ContactFunctions = append(attendance.ContactFunctions, getString(f))
+				}
+			}
 		}
 
 		details.Attendances = append(details.Attendances, attendance)

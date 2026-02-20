@@ -12,6 +12,7 @@ type FeedEvent struct {
 	ActivityID int    `json:"ActivityID"`
 	Time       string `json:"Time"`
 	Title      string `json:"Title"`
+	URL        string `json:"URL"`
 }
 
 func parseEventsFeed(htmlContent string) ([]FeedEvent, error) {
@@ -47,6 +48,7 @@ func parseEventsFeed(htmlContent string) ([]FeedEvent, error) {
 					event := FeedEvent{
 						ActivityID: id,
 						Time:       dateStr,
+						URL:        fmt.Sprintf("https://app.twizzit.com/v2/feed/activity/%d", id),
 					}
 
 					// Now extract the title.
