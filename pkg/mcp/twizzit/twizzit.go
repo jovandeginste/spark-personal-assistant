@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -56,43 +57,50 @@ func (t *Twizzit) Register(server *sdk.Server) error {
 	t.registerGetNotifications(server)
 	t.registerGetSubscriptionForms(server)
 	t.registerGetSubscriptionByFormId(server)
-	t.registerGetActivityInfo(server)
+	t.registerGetActivitiesInfo(server)
+	t.registerGetContactsInfo(server)
 	t.registerGetEvents(server)
 	return nil
 }
 
-type GetActivityInfoParams struct {
-	ActivityID int `json:"activity_id" jsonschema:"The ID of the activity"`
+type GetActivitiesInfoParams struct {
+	ActivityIDs []int `json:"activity_ids" jsonschema:"The IDs of the activities"`
 }
 
-func (t *Twizzit) registerGetActivityInfo(server *sdk.Server) {
+func (t *Twizzit) registerGetActivitiesInfo(server *sdk.Server) {
 	tool := &sdk.Tool{
-		Name:        "twizzit_get_activity_info",
-		Description: "Get details for a specific activity, including attendance",
+		Name:        "twizzit_get_activities_info",
+		Description: "Get details for specific activities, including attendance",
 	}
 
-	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetActivityInfoParams) (*sdk.CallToolResult, any, error) {
-		u := fmt.Sprintf("https://app.twizzit.com/v2/activity/details?activity=%d&view=info", params.ActivityID)
-		result, _, err := t.makeRequest("GET", u)
-		if err != nil {
-			return nil, nil, err
+	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetActivitiesInfoParams) (*sdk.CallToolResult, any, error) {
+		var allDetails []any
+
+		for _, id := range params.ActivityIDs {
+			u := fmt.Sprintf("https://app.twizzit.com/v2/activity/details?activity=%d&view=info", id)
+			result, _, err := t.makeRequest("GET", u)
+			if err != nil {
+				// We skip errors for individual activities to allow partial success
+				continue
+			}
+
+			if len(result.Content) == 0 {
+				continue
+			}
+
+			textContent, ok := result.Content[0].(*sdk.TextContent)
+			if !ok {
+				continue
+			}
+
+			details, err := parseActivityDetails(textContent.Text)
+			if err != nil {
+				continue
+			}
+			allDetails = append(allDetails, details)
 		}
 
-		if len(result.Content) == 0 {
-			return nil, nil, errors.New("empty response from Twizzit")
-		}
-
-		textContent, ok := result.Content[0].(*sdk.TextContent)
-		if !ok {
-			return nil, nil, errors.New("unexpected content type from Twizzit")
-		}
-
-		details, err := parseActivityDetails(textContent.Text)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse activity details: %w", err)
-		}
-
-		detailsJSON, err := json.Marshal(details)
+		detailsJSON, err := json.Marshal(allDetails)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to marshal activity details: %w", err)
 		}
@@ -359,6 +367,74 @@ func (t *Twizzit) registerGetEvents(server *sdk.Server) {
 			Content: []sdk.Content{
 				&sdk.TextContent{
 					Text: string(eventsJSON),
+				},
+			},
+		}, nil, nil
+	}
+
+	sdk.AddTool(server, tool, handler)
+}
+
+type GetContactsInfoParams struct {
+	ContactIDs []int `json:"contact_ids" jsonschema:"The IDs of the contacts to retrieve"`
+}
+
+type ContactInfo struct {
+	ID   int    `json:"id"`
+	Info string `json:"info"`
+}
+
+func (t *Twizzit) registerGetContactsInfo(server *sdk.Server) {
+	tool := &sdk.Tool{
+		Name:        "twizzit_get_contacts_info",
+		Description: "Get details for specific contacts",
+	}
+
+	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetContactsInfoParams) (*sdk.CallToolResult, any, error) {
+		var allContacts []ContactInfo
+
+		for _, id := range params.ContactIDs {
+			u := fmt.Sprintf("https://app.twizzit.com/v2/ajax/clubmanager/profile/contact/modal?contactId=%d", id)
+			result, _, err := t.makeRequest("GET", u)
+			if err != nil {
+				continue
+			}
+
+			if len(result.Content) == 0 {
+				continue
+			}
+
+			textContent, ok := result.Content[0].(*sdk.TextContent)
+			if !ok {
+				continue
+			}
+
+			// Clean the content: strip HTML and collapse whitespaces
+			cleaned := stripHTML(textContent.Text)
+			// Collapse multiple whitespaces/newlines into single space or sensible format?
+			// The requirement says "collapses newlines and whitespaces".
+			// stripHTML already does some cleaning, let's refine it.
+			// Let's replace all whitespace sequences with a single space to be safe,
+			// or keep newlines if they are meaningful.
+			// The prompt says "collapses newlines and whitespaces", usually meaning `\s+` -> ` `.
+			fields := strings.Fields(cleaned)
+			finalContent := strings.Join(fields, " ")
+
+			allContacts = append(allContacts, ContactInfo{
+				ID:   id,
+				Info: finalContent,
+			})
+		}
+
+		contactsJSON, err := json.Marshal(allContacts)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal contacts: %w", err)
+		}
+
+		return &sdk.CallToolResult{
+			Content: []sdk.Content{
+				&sdk.TextContent{
+					Text: string(contactsJSON),
 				},
 			},
 		}, nil, nil

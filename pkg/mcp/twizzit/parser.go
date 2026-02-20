@@ -22,6 +22,7 @@ type Contact struct {
 	ID        int    `json:"id"`
 	FirstName string `json:"firstName"`
 	Name      string `json:"name"`
+	URL       string `json:"url"`
 }
 
 type Activity struct {
@@ -41,6 +42,7 @@ type Attendance struct {
 	Comment            string   `json:"comment,omitempty"`
 	ContactFunctions   []string `json:"contactFunctions,omitempty"`
 	Order              int      `json:"-"`
+	URL                string   `json:"url,omitempty"`
 }
 
 func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
@@ -102,6 +104,7 @@ func populateContact(details *ActivityDetails, rawData map[string]any) {
 		details.Contact.ID = int(getInt(contactMap["id"]))
 		details.Contact.FirstName, _ = contactMap["firstName"].(string)
 		details.Contact.Name, _ = contactMap["name"].(string)
+		details.Contact.URL = fmt.Sprintf("https://app.twizzit.com/v2/ajax/clubmanager/profile/contact/modal?contactId=%d", details.Contact.ID)
 	}
 }
 
@@ -163,6 +166,11 @@ func populateAttendances(details *ActivityDetails, rawData map[string]any, atten
 		if contactData, ok := attendanceContactsMap[id].(map[string]any); ok {
 			attendance.FirstName = getString(contactData["firstName"])
 			attendance.Name = getString(contactData["name"])
+
+			contactID := getInt(contactData["id"])
+			if contactID != 0 {
+				attendance.URL = fmt.Sprintf("https://app.twizzit.com/v2/ajax/clubmanager/profile/contact/modal?contactId=%d", contactID)
+			}
 
 			if funcs, ok := contactData["contactFunctions"].([]any); ok {
 				for _, f := range funcs {
