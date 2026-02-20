@@ -56,7 +56,56 @@ func (t *Twizzit) Register(server *sdk.Server) error {
 	t.registerGetNotifications(server)
 	t.registerGetSubscriptionForms(server)
 	t.registerGetSubscriptionByFormId(server)
+	t.registerGetActivityInfo(server)
 	return nil
+}
+
+type GetActivityInfoParams struct {
+	ActivityID int `json:"activity_id" jsonschema:"The ID of the activity"`
+}
+
+func (t *Twizzit) registerGetActivityInfo(server *sdk.Server) {
+	tool := &sdk.Tool{
+		Name:        "twizzit_get_activity_info",
+		Description: "Get details for a specific activity, including attendance",
+	}
+
+	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetActivityInfoParams) (*sdk.CallToolResult, any, error) {
+		u := fmt.Sprintf("https://app.twizzit.com/v2/activity/details?activity=%d&view=info", params.ActivityID)
+		result, _, err := t.makeRequest("GET", u)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if len(result.Content) == 0 {
+			return nil, nil, errors.New("empty response from Twizzit")
+		}
+
+		textContent, ok := result.Content[0].(*sdk.TextContent)
+		if !ok {
+			return nil, nil, errors.New("unexpected content type from Twizzit")
+		}
+
+		details, err := parseActivityDetails(textContent.Text)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse activity details: %w", err)
+		}
+
+		detailsJSON, err := json.Marshal(details)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal activity details: %w", err)
+		}
+
+		return &sdk.CallToolResult{
+			Content: []sdk.Content{
+				&sdk.TextContent{
+					Text: string(detailsJSON),
+				},
+			},
+		}, nil, nil
+	}
+
+	sdk.AddTool(server, tool, handler)
 }
 
 type GetNotificationsParams struct {
