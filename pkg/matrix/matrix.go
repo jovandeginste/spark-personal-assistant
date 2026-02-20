@@ -47,10 +47,11 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 }
 
 func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
-	mc.AIData.CleanHistory()
+	mc.AIData.CleanHistory(evt.RoomID.String())
 
 	body := evt.Content.AsMessage().Body
 
+	history, _ := mc.AIData.ChatHistory[evt.RoomID.String()]
 	mc.App.Logger().Info(
 		"Received message",
 		"sender", evt.Sender.String(),
@@ -59,7 +60,7 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		"id", evt.ID.String(),
 		"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
 		"body", body,
-		"history", len(mc.AIData.ChatHistory),
+		"history", len(history),
 	)
 
 	if err := mc.Client.MarkRead(context.Background(), evt.RoomID, evt.ID); err != nil {
@@ -169,7 +170,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 		return nil
 	}
 
-	result, err := mc.parseInput(input)
+	result, err := mc.parseInput(input, roomID.String())
 	if err != nil {
 		return err
 	}
@@ -195,7 +196,20 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	mc.sendNotice(roomID, "Calculating response...")
 
-	tools, err := mc.App.GetMCPTools(context.Background())
+	var allowedTools []string
+	if roomConfig, ok := mc.App.Config.Matrix.Rooms[roomID.String()]; ok {
+		allowedTools = roomConfig.AllowedMCPServers
+		// If specific room config exists but list is empty, we must ensure
+		// GetMCPTools receives a non-nil slice to enforce "no tools"
+		if allowedTools == nil {
+			allowedTools = []string{}
+		}
+	} else {
+		// Default room allows NO tools if not specified
+		allowedTools = []string{}
+	}
+
+	tools, err := mc.App.GetMCPTools(context.Background(), allowedTools)
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -209,8 +223,8 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 		return "", fmt.Errorf("could not calculate response: %w", err)
 	}
 
-	mc.AIData.AddChatHistory("user", input)
-	mc.AIData.AddChatHistory("assistant", md)
+	mc.AIData.AddChatHistory(roomID.String(), "user", input)
+	mc.AIData.AddChatHistory(roomID.String(), "assistant", md)
 
 	// Clean up file URIs after they've been used
 	mc.AIData.FileURIs = nil

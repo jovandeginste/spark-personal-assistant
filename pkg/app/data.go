@@ -12,23 +12,35 @@ type ChatHistory struct {
 
 type AIData struct {
 	Context          string
-	ChatHistory      []ChatHistory `json:",omitempty"`
-	EmployerQuestion []string      `json:",omitempty"`
+	ChatHistory      map[string][]ChatHistory `json:",omitempty"`
+	EmployerQuestion []string                 `json:",omitempty"`
 	UserData         UserData
 	FileURIs         []string `json:",omitempty"`
 }
 
-func (aiData *AIData) ResetHistory() {
-	aiData.ChatHistory = []ChatHistory{}
+func (aiData *AIData) ResetHistory(roomID string) {
+	if aiData.ChatHistory == nil {
+		aiData.ChatHistory = make(map[string][]ChatHistory)
+	}
+	aiData.ChatHistory[roomID] = []ChatHistory{}
 }
 
-// CleanHistory: keep last 10 elements in aiData.ChatHistory:
-func (aiData *AIData) CleanHistory() {
+// CleanHistory: keep last 10 elements in aiData.ChatHistory[roomID]:
+func (aiData *AIData) CleanHistory(roomID string) {
+	if aiData.ChatHistory == nil {
+		return
+	}
+
+	history, ok := aiData.ChatHistory[roomID]
+	if !ok {
+		return
+	}
+
 	h := []ChatHistory{}
 	f := time.Now().Add(-1 * time.Hour)
 
-	for i, e := range aiData.ChatHistory {
-		if i < len(aiData.ChatHistory)-100 {
+	for i, e := range history {
+		if i < len(history)-100 {
 			continue
 		}
 
@@ -39,20 +51,24 @@ func (aiData *AIData) CleanHistory() {
 		h = append(h, e)
 	}
 
-	aiData.ChatHistory = h
+	aiData.ChatHistory[roomID] = h
 }
 
-func (aiData *AIData) AddChatHistory(role string, input string) {
-	aiData.ChatHistory = append(
-		aiData.ChatHistory,
+func (aiData *AIData) AddChatHistory(roomID string, role string, input string) {
+	if aiData.ChatHistory == nil {
+		aiData.ChatHistory = make(map[string][]ChatHistory)
+	}
+	aiData.ChatHistory[roomID] = append(
+		aiData.ChatHistory[roomID],
 		ChatHistory{time: time.Now(), Role: role, Content: input},
 	)
 }
 
 func (a *App) BuildData() (*AIData, error) {
 	aiData := &AIData{
-		Context:  a.Config.Context,
-		UserData: a.Config.UserData,
+		Context:     a.Config.Context,
+		UserData:    a.Config.UserData,
+		ChatHistory: make(map[string][]ChatHistory),
 	}
 
 	return aiData, nil

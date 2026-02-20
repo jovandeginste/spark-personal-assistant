@@ -52,8 +52,8 @@ func (mc *MatrixConfig) performCommandResetRecovery() (string, error) {
 	return fmt.Sprintf("New recovery key generated:\n\n`%s`\n\nPlease save this key securely.", recoveryKey), nil
 }
 
-func (mc *MatrixConfig) performCommandReset() (string, error) {
-	mc.AIData.ResetHistory()
+func (mc *MatrixConfig) performCommandReset(roomID string) (string, error) {
+	mc.AIData.ResetHistory(roomID)
 	return "History is clear", nil
 }
 
@@ -92,8 +92,8 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 	return "Switched to persona: " + mc.App.Config.Assistant.Name, nil
 }
 
-func (mc *MatrixConfig) performCommandSummarize(name string) (string, error) {
-	mc.AIData.ResetHistory()
+func (mc *MatrixConfig) performCommandSummarize(name, roomID string) (string, error) {
+	mc.AIData.ResetHistory(roomID)
 
 	var p ai.Prompt
 
@@ -110,7 +110,18 @@ func (mc *MatrixConfig) performCommandSummarize(name string) (string, error) {
 		p = ai.PromptCustom
 	}
 
-	tools, err := mc.App.GetMCPTools(context.Background())
+	// For summarize command, we probably want ALL tools or default tools
+	// Since this command is likely run by an admin/user, maybe default to nil (all) is fine?
+	// Or we should respect the room config?
+	// Let's check room config.
+	var allowedTools []string
+	if roomConfig, ok := mc.App.Config.Matrix.Rooms[roomID]; ok {
+		allowedTools = roomConfig.AllowedMCPServers
+	} else if mc.App.Config.Matrix.RoomID == roomID {
+		allowedTools = nil
+	}
+
+	tools, err := mc.App.GetMCPTools(context.Background(), allowedTools)
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -138,7 +149,7 @@ func (mc *MatrixConfig) performCommandPing() (string, error) {
 	return "*pong back*", nil
 }
 
-func (mc *MatrixConfig) parseInput(input string) (string, error) {
+func (mc *MatrixConfig) parseInput(input, roomID string) (string, error) {
 	if !strings.HasPrefix(input, "!") {
 		return "", nil
 	}
@@ -148,7 +159,7 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 
 	switch cmd[0] {
 	case "reset":
-		return mc.performCommandReset()
+		return mc.performCommandReset(roomID)
 	case "shutdown":
 		return mc.performCommandShutdown()
 	case "switch":
@@ -162,7 +173,7 @@ func (mc *MatrixConfig) parseInput(input string) (string, error) {
 			return "", nil
 		}
 
-		return mc.performCommandSummarize(cmd[1])
+		return mc.performCommandSummarize(cmd[1], roomID)
 	case "update":
 		return mc.performCommandUpdate()
 	case "ping":

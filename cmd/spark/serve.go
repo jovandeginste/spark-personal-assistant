@@ -174,9 +174,8 @@ func (c *cli) chatCmd() *cobra.Command {
 
 				spinner.Stop("Ready!")
 				fmt.Println(md)
-
-				aiData.AddChatHistory("user", input)
-				aiData.AddChatHistory("assistant", md)
+				aiData.AddChatHistory("cli", "user", input)
+				aiData.AddChatHistory("cli", "assistant", md)
 			}
 
 			return nil

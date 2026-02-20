@@ -129,11 +129,33 @@ func (a *App) forceReconnect(name string) {
 	}
 }
 
-func (a *App) GetMCPTools(ctx context.Context) ([]ai.Tool, error) {
+func (a *App) GetMCPTools(ctx context.Context, allowedServers []string) ([]ai.Tool, error) {
 	var tools []ai.Tool
+	serverFilter := make(map[string]bool)
+
+	// If allowedServers is provided, use it to filter
+	if len(allowedServers) > 0 {
+		for _, s := range allowedServers {
+			if s == "*" {
+				serverFilter = nil // Allow all
+				break
+			}
+			serverFilter[s] = true
+		}
+	} else {
+		// If empty/nil, assume ALL allowed (default behavior) or NONE?
+		// Given the context of "limiting", nil usually means "no limits" or "all".
+		// But in a strict security context, maybe it means "none"?
+		// Let's assume "nil" means "all allowed" for backward compatibility if not specified.
+		serverFilter = nil
+	}
 
 	// Iterate over configured servers instead of active clients to ensure we try to connect to all
 	for name := range a.Config.MCPServers {
+		if serverFilter != nil && !serverFilter[name] {
+			continue
+		}
+
 		client, err := a.getMCPClient(ctx, name)
 		if err != nil {
 			a.Logger().Error("Failed to get MCP client", "client", name, "error", err)
