@@ -27,12 +27,6 @@
           direnv
           golangci-lint
         ];
-
-        shellHook = ''
-          export GOCACHE="$PWD/.cache/go"
-          export GOPATH="$HOME/go"
-          export PATH="$GOPATH/bin:$PATH"
-        '';
       };
     });
 }
