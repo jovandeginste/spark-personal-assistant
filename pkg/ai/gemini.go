@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"google.golang.org/api/iterator"
@@ -129,6 +130,9 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any,
 	for i := range MaxToolCalls {
 		result, err := client.Models.GenerateContent(ctx, c.model, history, config)
 		if err != nil {
+			if strings.Contains(err.Error(), "Unsupported MIME type") {
+				return "", err
+			}
 			c.Logger().Warn("Error generating content", "error", err, "attempt", i)
 			time.Sleep(2 * time.Second)
 			continue
