@@ -1,6 +1,7 @@
 package twizzit
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"sort"
@@ -43,30 +44,35 @@ type Attendance struct {
 
 func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 	// 1. Extract the script content containing window.initActivityDetails
-	// We look for the script tag that contains "window.initActivityDetails"
 	scriptContent := findScriptContent(htmlContent, "window.initActivityDetails")
 	if scriptContent == "" {
-		return nil, fmt.Errorf("script containing window.initActivityDetails not found")
+		return nil, errors.New("script containing window.initActivityDetails not found")
 	}
 
-	// 2. Extract the object passed to initActivityDetails
-	// Format: window.initActivityDetails({...}, "activity-details-container");
-	// We want the {...} part.
-	// Since it's JS, we can use a simple regex to find the function call arguments,
-	// but using a JS parser is safer. However, we have goja.
-	// Let's wrap it in a function and return the object.
+	rawData, err := extractDataFromScript(scriptContent)
+	if err != nil {
+		return nil, err
+	}
+
+	details := &ActivityDetails{}
+	populateContact(details, rawData)
+	populateActivity(details, rawData)
+
+	attendanceOrder := extractAttendanceOrder(rawData)
+	populateAttendances(details, rawData, attendanceOrder)
+
+	return details, nil
+}
+
+func extractDataFromScript(scriptContent string) (map[string]any, error) {
 	vm := goja.New()
-	
-	// Mock window object
 	_, err := vm.RunString(`
 		var window = {
 			initActivityDetails: function(data, container) {
 				this.data = data;
 			},
 			addEventListener: function() {},
-			document: {
-				addEventListener: function() {}
-			}
+			document: { addEventListener: function() {} }
 		};
 		var document = window.document;
 	`)
@@ -74,38 +80,33 @@ func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 		return nil, fmt.Errorf("failed to setup JS VM: %w", err)
 	}
 
-	// Run the extracted script
-	_, err = vm.RunString(scriptContent)
-	if err != nil {
+	if _, err = vm.RunString(scriptContent); err != nil {
 		return nil, fmt.Errorf("failed to run script: %w", err)
 	}
 
-	// Get the data
 	val := vm.Get("window").ToObject(vm).Get("data")
 	if val == nil {
-		return nil, fmt.Errorf("failed to get data from window object")
+		return nil, errors.New("failed to get data from window object")
 	}
 
-	// Export to Go map/interface
-	var rawData map[string]interface{}
-	err = vm.ExportTo(val, &rawData)
-	if err != nil {
+	var rawData map[string]any
+	if err = vm.ExportTo(val, &rawData); err != nil {
 		return nil, fmt.Errorf("failed to export JS object: %w", err)
 	}
+	return rawData, nil
+}
 
-	// 3. Map to our struct
-	details := &ActivityDetails{}
-
-	// Contact
-	if contactMap, ok := rawData["contact"].(map[string]interface{}); ok {
+func populateContact(details *ActivityDetails, rawData map[string]any) {
+	if contactMap, ok := rawData["contact"].(map[string]any); ok {
 		details.Contact.ID = int(getInt(contactMap["id"]))
 		details.Contact.FirstName, _ = contactMap["firstName"].(string)
 		details.Contact.Name, _ = contactMap["name"].(string)
 		details.Contact.Image, _ = contactMap["image"].(string)
 	}
+}
 
-	// Activity
-	if activityMap, ok := rawData["activity"].(map[string]interface{}); ok {
+func populateActivity(details *ActivityDetails, rawData map[string]any) {
+	if activityMap, ok := rawData["activity"].(map[string]any); ok {
 		details.Activity.ID = int(getInt(activityMap["id"]))
 		details.Activity.Title, _ = activityMap["title"].(string)
 		details.Activity.DateString, _ = activityMap["dateString"].(string)
@@ -113,14 +114,15 @@ func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 		details.Activity.MeetingTime, _ = activityMap["meetingTime"].(string)
 		details.Activity.Description, _ = activityMap["description"].(string)
 	}
+}
 
-	// Attendance Types Order
+func extractAttendanceOrder(rawData map[string]any) map[string]int {
 	attendanceOrder := make(map[string]int)
-	if typesMap, ok := rawData["attendanceTypes"].(map[string]interface{}); ok {
+	if typesMap, ok := rawData["attendanceTypes"].(map[string]any); ok {
 		for _, v := range typesMap {
-			if typesList, ok := v.([]interface{}); ok {
+			if typesList, ok := v.([]any); ok {
 				for i, t := range typesList {
-					if typeMap, ok := t.(map[string]interface{}); ok {
+					if typeMap, ok := t.(map[string]any); ok {
 						idStr := getString(typeMap["id"])
 						if idStr == "" {
 							idStr = strconv.FormatInt(getInt(typeMap["id"]), 10)
@@ -131,15 +133,16 @@ func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 			}
 		}
 	}
+	return attendanceOrder
+}
 
-	// Attendances
+func populateAttendances(details *ActivityDetails, rawData map[string]any, attendanceOrder map[string]int) {
 	details.Attendances = []Attendance{}
-	
-	attendancesMap, _ := rawData["attendances"].(map[string]interface{})
-	attendanceContactsMap, _ := rawData["attendanceContacts"].(map[string]interface{})
+	attendancesMap, _ := rawData["attendances"].(map[string]any)
+	attendanceContactsMap, _ := rawData["attendanceContacts"].(map[string]any)
 
 	for id, attData := range attendancesMap {
-		att, ok := attData.(map[string]interface{})
+		att, ok := attData.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -156,8 +159,7 @@ func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 			Order:              order,
 		}
 
-		// Merge contact info
-		if contactData, ok := attendanceContactsMap[id].(map[string]interface{}); ok {
+		if contactData, ok := attendanceContactsMap[id].(map[string]any); ok {
 			attendance.FirstName = getString(contactData["firstName"])
 			attendance.Name = getString(contactData["name"])
 		}
@@ -165,15 +167,12 @@ func parseActivityDetails(htmlContent string) (*ActivityDetails, error) {
 		details.Attendances = append(details.Attendances, attendance)
 	}
 
-	// Sort Attendances
 	sort.Slice(details.Attendances, func(i, j int) bool {
 		if details.Attendances[i].Order != details.Attendances[j].Order {
 			return details.Attendances[i].Order < details.Attendances[j].Order
 		}
 		return details.Attendances[i].Name < details.Attendances[j].Name
 	})
-
-	return details, nil
 }
 
 func findScriptContent(htmlContent, search string) string {
@@ -206,7 +205,7 @@ func findScriptContent(htmlContent, search string) string {
 	return content
 }
 
-func getInt(v interface{}) int64 {
+func getInt(v any) int64 {
 	switch val := v.(type) {
 	case int:
 		return int64(val)
@@ -221,7 +220,7 @@ func getInt(v interface{}) int64 {
 	return 0
 }
 
-func getString(v interface{}) string {
+func getString(v any) string {
 	if s, ok := v.(string); ok {
 		return s
 	}

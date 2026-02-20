@@ -122,7 +122,8 @@ func TestParseActivityDetails(t *testing.T) {
 	assert.Equal(t, "Niet beslist", details.Attendances[1].AttendanceTypeName)
 	assert.Equal(t, "", details.Attendances[1].Comment)
 
-    // Optional: Print JSON for verification
-    b, _ := json.MarshalIndent(details, "", "  ")
-    t.Log(string(b))
+	// Optional: Print JSON for verification
+	b, err := json.MarshalIndent(details, "", "  ")
+	assert.NoError(t, err)
+	t.Log(string(b))
 }

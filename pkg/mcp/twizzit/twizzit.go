@@ -57,6 +57,7 @@ func (t *Twizzit) Register(server *sdk.Server) error {
 	t.registerGetSubscriptionForms(server)
 	t.registerGetSubscriptionByFormId(server)
 	t.registerGetActivityInfo(server)
+	t.registerGetEvents(server)
 	return nil
 }
 
@@ -302,6 +303,62 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 			Content: []sdk.Content{
 				&sdk.TextContent{
 					Text: string(entriesJSON),
+				},
+			},
+		}, nil, nil
+	}
+
+	sdk.AddTool(server, tool, handler)
+}
+
+type GetEventsParams struct {
+	Limit int `json:"limit" jsonschema:"The number of events to retrieve (0..50). Default is 50."`
+}
+
+func (t *Twizzit) registerGetEvents(server *sdk.Server) {
+	tool := &sdk.Tool{
+		Name:        "twizzit_get_events",
+		Description: "Get planned or past events (activities) from Twizzit feed",
+	}
+
+	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetEventsParams) (*sdk.CallToolResult, any, error) {
+		limit := params.Limit
+		switch {
+		case limit <= 0:
+			limit = 50
+		case limit > 50:
+			limit = 50
+		}
+
+		u := fmt.Sprintf("https://app.twizzit.com/v2/ajax/feed?limit=%d", limit)
+		result, _, err := t.makeRequest("GET", u)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if len(result.Content) == 0 {
+			return nil, nil, errors.New("empty response from Twizzit")
+		}
+
+		textContent, ok := result.Content[0].(*sdk.TextContent)
+		if !ok {
+			return nil, nil, errors.New("unexpected content type from Twizzit")
+		}
+
+		events, err := parseEventsFeed(textContent.Text)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to parse events feed: %w", err)
+		}
+
+		eventsJSON, err := json.Marshal(events)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
+		}
+
+		return &sdk.CallToolResult{
+			Content: []sdk.Content{
+				&sdk.TextContent{
+					Text: string(eventsJSON),
 				},
 			},
 		}, nil, nil
