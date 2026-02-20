@@ -27,25 +27,21 @@ type Config struct {
 }
 
 type MCPServerConfig struct {
-	Command   string   `mapstructure:"command"`
-	Args      []string `mapstructure:"args"`
-	Env       []string `mapstructure:"env"`
-	URL       string   `mapstructure:"url"`
-	Transport string   `mapstructure:"transport"`
+	Command      string   `mapstructure:"command"`
+	Args         []string `mapstructure:"args"`
+	Env          []string `mapstructure:"env"`
+	URL          string   `mapstructure:"url"`
+	Transport    string   `mapstructure:"transport"`
+	AllowedRooms []string `mapstructure:"allowed_rooms"`
 }
 
 type MatrixConfig struct {
-	Homeserver  string                `mapstructure:"homeserver"`
-	Username    string                `mapstructure:"username"`
-	Password    string                `mapstructure:"password"`
-	RoomID      string                `mapstructure:"room_id"`
-	CryptoStore string                `mapstructure:"database"`
-	Users       []string              `mapstructure:"users"`
-	Rooms       map[string]RoomConfig `mapstructure:"rooms"`
-}
-
-type RoomConfig struct {
-	AllowedMCPServers []string `mapstructure:"allowed_mcp_servers"`
+	Homeserver  string   `mapstructure:"homeserver"`
+	Username    string   `mapstructure:"username"`
+	Password    string   `mapstructure:"password"`
+	RoomID      string   `mapstructure:"room_id"`
+	CryptoStore string   `mapstructure:"database"`
+	Users       []string `mapstructure:"users"`
 }
 
 type WebserverConfig struct {

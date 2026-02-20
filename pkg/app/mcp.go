@@ -129,30 +129,29 @@ func (a *App) forceReconnect(name string) {
 	}
 }
 
-func (a *App) GetMCPTools(ctx context.Context, allowedServers []string) ([]ai.Tool, error) {
+func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error) {
 	var tools []ai.Tool
-	serverFilter := make(map[string]bool)
-
-	// If allowedServers is provided, use it to filter
-	if len(allowedServers) > 0 {
-		for _, s := range allowedServers {
-			if s == "*" {
-				serverFilter = nil // Allow all
-				break
-			}
-			serverFilter[s] = true
-		}
-	} else {
-		// If empty/nil, assume ALL allowed (default behavior) or NONE?
-		// Given the context of "limiting", nil usually means "no limits" or "all".
-		// But in a strict security context, maybe it means "none"?
-		// Let's assume "nil" means "all allowed" for backward compatibility if not specified.
-		serverFilter = nil
-	}
 
 	// Iterate over configured servers instead of active clients to ensure we try to connect to all
-	for name := range a.Config.MCPServers {
-		if serverFilter != nil && !serverFilter[name] {
+	for name, config := range a.Config.MCPServers {
+		allowed := false
+		if len(config.AllowedRooms) == 0 {
+			// No rooms allowed
+			allowed = false
+		} else {
+			for _, r := range config.AllowedRooms {
+				if r == "*" {
+					allowed = true
+					break
+				}
+				if r == roomID {
+					allowed = true
+					break
+				}
+			}
+		}
+
+		if !allowed {
 			continue
 		}
 
@@ -194,7 +193,7 @@ func (a *App) GetMCPTools(ctx context.Context, allowedServers []string) ([]ai.To
 	return tools, nil
 }
 
-func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]any) (string, error) {
+func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]any, roomID string) (string, error) {
 	a.Logger().Info("executing mcp tool", "tool", name, "args", args)
 
 	parts := strings.SplitN(name, "__", 2)
@@ -203,6 +202,29 @@ func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]a
 	}
 
 	clientName, toolName := parts[0], parts[1]
+
+	config, ok := a.Config.MCPServers[clientName]
+	if !ok {
+		return "", fmt.Errorf("mcp server config not found: %s", clientName)
+	}
+
+	allowed := false
+	if len(config.AllowedRooms) > 0 {
+		for _, r := range config.AllowedRooms {
+			if r == "*" {
+				allowed = true
+				break
+			}
+			if r == roomID {
+				allowed = true
+				break
+			}
+		}
+	}
+
+	if !allowed {
+		return "", fmt.Errorf("mcp server %s not allowed in room %s", clientName, roomID)
+	}
 
 	// Helper to execute the call
 	execute := func() (*mcp.CallToolResult, error) {

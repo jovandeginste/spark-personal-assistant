@@ -196,20 +196,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	mc.sendNotice(roomID, "Calculating response...")
 
-	var allowedTools []string
-	if roomConfig, ok := mc.App.Config.Matrix.Rooms[roomID.String()]; ok {
-		allowedTools = roomConfig.AllowedMCPServers
-		// If specific room config exists but list is empty, we must ensure
-		// GetMCPTools receives a non-nil slice to enforce "no tools"
-		if allowedTools == nil {
-			allowedTools = []string{}
-		}
-	} else {
-		// Default room allows NO tools if not specified
-		allowedTools = []string{}
-	}
-
-	tools, err := mc.App.GetMCPTools(context.Background(), allowedTools)
+	tools, err := mc.App.GetMCPTools(context.Background(), roomID.String())
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -217,7 +204,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), ai.PromptCustom, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		return mc.App.ExecuteMCPTool(ctx, name, args)
+		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
 	}, mc.AIData.FileURIs)
 	if err != nil {
 		return "", fmt.Errorf("could not calculate response: %w", err)

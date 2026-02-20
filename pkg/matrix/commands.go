@@ -114,20 +114,13 @@ func (mc *MatrixConfig) performCommandSummarize(name, roomID string) (string, er
 	// Since this command is likely run by an admin/user, maybe default to nil (all) is fine?
 	// Or we should respect the room config?
 	// Let's check room config.
-	var allowedTools []string
-	if roomConfig, ok := mc.App.Config.Matrix.Rooms[roomID]; ok {
-		allowedTools = roomConfig.AllowedMCPServers
-	} else if mc.App.Config.Matrix.RoomID == roomID {
-		allowedTools = nil
-	}
-
-	tools, err := mc.App.GetMCPTools(context.Background(), allowedTools)
+	tools, err := mc.App.GetMCPTools(context.Background(), roomID)
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
 
 	return mc.AIClient.GenerateWithTools(context.Background(), p, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		return mc.App.ExecuteMCPTool(ctx, name, args)
+		return mc.App.ExecuteMCPTool(ctx, name, args, roomID)
 	}, mc.AIData.FileURIs)
 }
 
