@@ -56,7 +56,11 @@ func (t *Twizzit) registerSearchContacts(server *sdk.Server) {
 			SearchResultID string `json:"searchResultId"`
 		}
 		if err := json.Unmarshal([]byte(textContent.Text), &queryResponse); err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal contact query response: %w", err)
+			preview := textContent.Text
+			if len(preview) > 500 {
+				preview = preview[:500] + "..."
+			}
+			return nil, nil, fmt.Errorf("failed to unmarshal contact query response: %w (content preview: %s)", err, preview)
 		}
 
 		if queryResponse.SearchResultID == "" {
