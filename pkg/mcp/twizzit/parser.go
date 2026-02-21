@@ -361,13 +361,7 @@ func getText(n *html.Node) string {
 	var sb strings.Builder
 	var f func(*html.Node)
 	f = func(n *html.Node) {
-		// Skip style and script tags content
-		if n.Type == html.ElementNode && (n.Data == "style" || n.Data == "script") {
-			return
-		}
-
-		// Skip buttons
-		if n.Type == html.ElementNode && n.Data == "button" {
+		if shouldSkipNode(n) {
 			return
 		}
 
@@ -377,13 +371,16 @@ func getText(n *html.Node) string {
 			return
 		}
 
-		// Skip javascript:void links
-		if n.Type == html.ElementNode && n.Data == "a" {
-			for _, attr := range n.Attr {
-				if attr.Key == "href" && strings.Contains(attr.Val, "javascript:void") {
-					return
-				}
+		// Handle table rows with fa-hashtag: extract player number
+		if n.Type == html.ElementNode && n.Data == "tr" {
+			sb.WriteString("\n")
+			if processPlayerNumber(n, &sb) {
+				return
 			}
+		}
+
+		if n.Type == html.ElementNode && (n.Data == "br" || n.Data == "p" || n.Data == "div") {
+			sb.WriteString("\n")
 		}
 
 		if n.Type == html.TextNode {
@@ -395,6 +392,33 @@ func getText(n *html.Node) string {
 	}
 	f(n)
 	return strings.TrimSpace(sb.String())
+}
+
+func shouldSkipNode(n *html.Node) bool {
+	if n.Type != html.ElementNode {
+		return false
+	}
+
+	// Skip style and script tags content
+	if n.Data == "style" || n.Data == "script" {
+		return true
+	}
+
+	// Skip buttons
+	if n.Data == "button" {
+		return true
+	}
+
+	// Skip javascript:void links
+	if n.Data == "a" {
+		for _, attr := range n.Attr {
+			if attr.Key == "href" && strings.Contains(attr.Val, "javascript:void") {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func processSelect(n *html.Node, sb *strings.Builder) {
@@ -416,6 +440,61 @@ func processSelect(n *html.Node, sb *strings.Builder) {
 				}
 			}
 		}
+	}
+}
+
+func processPlayerNumber(n *html.Node, sb *strings.Builder) bool {
+	// Check if this tr contains a td with i.fa-hashtag
+	hasHashtag := false
+	var valueNode *html.Node
+
+	// Iterate over children (tds)
+	// We expect <td>...<i class="...fa-hashtag...">...</td> <td>VALUE</td>
+	tdCount := 0
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == "td" {
+			tdCount++
+			if tdCount == 1 {
+				if hasPlayerNumberIcon(c) {
+					hasHashtag = true
+				}
+			} else if tdCount == 2 {
+				valueNode = c
+			}
+		}
+	}
+
+	if hasHashtag && valueNode != nil {
+		sb.WriteString("player number: ")
+		extractTextFromNode(valueNode, sb)
+		return true
+	}
+
+	return false
+}
+
+func hasPlayerNumberIcon(n *html.Node) bool {
+	if n.Type == html.ElementNode && n.Data == "i" {
+		for _, attr := range n.Attr {
+			if attr.Key == "class" && strings.Contains(attr.Val, "fa-hashtag") {
+				return true
+			}
+		}
+	}
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		if hasPlayerNumberIcon(child) {
+			return true
+		}
+	}
+	return false
+}
+
+func extractTextFromNode(n *html.Node, sb *strings.Builder) {
+	if n.Type == html.TextNode {
+		sb.WriteString(n.Data)
+	}
+	for child := n.FirstChild; child != nil; child = child.NextSibling {
+		extractTextFromNode(child, sb)
 	}
 }
 

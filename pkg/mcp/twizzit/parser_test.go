@@ -3,6 +3,7 @@ package twizzit
 import (
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -177,14 +178,30 @@ func TestStripHTML(t *testing.T) {
 		t.Errorf("Expected:\n%q\nGot:\n%q", expected, result)
 	}
 
-	if contains(result, "display: none") {
+	if strings.Contains(result, "display: none") {
 		t.Error("Expected style content to be removed")
 	}
-	if contains(result, "console.log") {
+	if strings.Contains(result, "console.log") {
 		t.Error("Expected script content to be removed")
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(substr) == 0 || (len(s) > 0 && s[0:len(substr)] == substr) || contains(s[1:], substr))
+func TestStripHTMLWithPlayerNumber(t *testing.T) {
+	htmlContent := `
+<table>
+    <tr>
+        <td>
+            <i class="fal fa-hashtag"></i>
+        </td>
+        <td>15</td>
+    </tr>
+</table>
+`
+	expected := "player number: 15"
+
+	result := stripHTML(htmlContent)
+
+	if result != expected {
+		t.Errorf("Expected:\n%q\nGot:\n%q", expected, result)
+	}
 }
