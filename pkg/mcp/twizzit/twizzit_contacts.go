@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"strconv"
+	"strings"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -23,6 +24,9 @@ func (t *Twizzit) registerSearchContacts(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params SearchContactsParams) (*sdk.CallToolResult, any, error) {
+		// Clean up the query: trim spaces and squash consecutive spaces
+		params.Query = strings.Join(strings.Fields(params.Query), " ")
+
 		// Default offset to 1
 		offset := params.Offset
 		if offset <= 0 {
@@ -37,6 +41,8 @@ func (t *Twizzit) registerSearchContacts(server *sdk.Server) {
 		// searchFields needs to be a JSON string inside the form param
 		searchFields := fmt.Sprintf(`{"textSearch":"%s"}`, params.Query)
 		queryData.Set("searchFields", searchFields)
+
+		t.Logger().Info("querying contacts", "url", queryURL, "data", queryData.Encode())
 
 		result, _, err := t.makeRequest("POST", queryURL, queryData)
 		if err != nil {

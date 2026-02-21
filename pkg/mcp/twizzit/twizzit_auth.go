@@ -25,6 +25,9 @@ func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values)
 	}
 
 	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if len(formData) > 0 {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
 
 	resp, err := t.client.Do(req)
 	if err != nil {
@@ -152,7 +155,6 @@ func (t *Twizzit) login() error {
 				return fmt.Errorf("failed to call dashboard: %w", err)
 			}
 			defer dashResp.Body.Close()
-			// We don't need the body, just the session update via cookiejar
 		}
 	}
 
