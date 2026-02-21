@@ -142,12 +142,14 @@ func (t *Twizzit) login() error {
 				return fmt.Errorf("failed to create dashboard request: %w", err)
 			}
 
-			resp, err = t.client.Do(req)
+			// Reuse the outer resp variable to avoid shadowing
+			var dashResp *http.Response
+			dashResp, err = t.client.Do(req)
 			if err != nil {
 				t.Logger().Error("error calling dashboard url", "error", err)
 				return fmt.Errorf("failed to call dashboard: %w", err)
 			}
-			defer resp.Body.Close()
+			defer dashResp.Body.Close()
 			// We don't need the body, just the session update via cookiejar
 		}
 	}

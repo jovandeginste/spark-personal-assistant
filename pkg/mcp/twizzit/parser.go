@@ -365,6 +365,27 @@ func getText(n *html.Node) string {
 		if n.Type == html.ElementNode && (n.Data == "style" || n.Data == "script") {
 			return
 		}
+
+		// Skip buttons
+		if n.Type == html.ElementNode && n.Data == "button" {
+			return
+		}
+
+		// Handle select elements: only process selected options
+		if n.Type == html.ElementNode && n.Data == "select" {
+			processSelect(n, &sb)
+			return
+		}
+
+		// Skip javascript:void links
+		if n.Type == html.ElementNode && n.Data == "a" {
+			for _, attr := range n.Attr {
+				if attr.Key == "href" && strings.Contains(attr.Val, "javascript:void") {
+					return
+				}
+			}
+		}
+
 		if n.Type == html.TextNode {
 			sb.WriteString(n.Data)
 		}
@@ -374,6 +395,28 @@ func getText(n *html.Node) string {
 	}
 	f(n)
 	return strings.TrimSpace(sb.String())
+}
+
+func processSelect(n *html.Node, sb *strings.Builder) {
+	for c := n.FirstChild; c != nil; c = c.NextSibling {
+		if c.Type == html.ElementNode && c.Data == "option" {
+			isSelected := false
+			for _, attr := range c.Attr {
+				if attr.Key == "selected" {
+					isSelected = true
+					break
+				}
+			}
+			if isSelected {
+				// Only process text nodes inside the selected option
+				for child := c.FirstChild; child != nil; child = child.NextSibling {
+					if child.Type == html.TextNode {
+						sb.WriteString(child.Data)
+					}
+				}
+			}
+		}
+	}
 }
 
 // parseEntryIDs parses the HTML content and returns a list of entry IDs.
