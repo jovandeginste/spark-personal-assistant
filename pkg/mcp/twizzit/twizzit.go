@@ -17,8 +17,9 @@ import (
 )
 
 type Config struct {
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
+	Username       string `mapstructure:"username"`
+	Password       string `mapstructure:"password"`
+	OrganizationID int    `mapstructure:"organization_id"`
 }
 
 type Twizzit struct {

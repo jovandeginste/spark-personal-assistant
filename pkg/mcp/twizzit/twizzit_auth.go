@@ -129,6 +129,26 @@ func (t *Twizzit) login() error {
 			if strings.Contains(loc.String(), "login?error") {
 				return errors.New("login failed: invalid credentials or other error")
 			}
+
+			// Just hit the dashboard to finalize the session
+			dashboardURL := "https://app.twizzit.com/v2/dashboard"
+			if t.config.OrganizationID != 0 {
+				dashboardURL = fmt.Sprintf("%s?organization-id=%d", dashboardURL, t.config.OrganizationID)
+			}
+			t.Logger().Debug("calling dashboard to finalize login", "url", dashboardURL)
+			req, err = http.NewRequest(http.MethodGet, dashboardURL, nil)
+			if err != nil {
+				t.Logger().Error("error calling dashboard url", "error", err)
+				return fmt.Errorf("failed to create dashboard request: %w", err)
+			}
+
+			resp, err = t.client.Do(req)
+			if err != nil {
+				t.Logger().Error("error calling dashboard url", "error", err)
+				return fmt.Errorf("failed to call dashboard: %w", err)
+			}
+			defer resp.Body.Close()
+			// We don't need the body, just the session update via cookiejar
 		}
 	}
 
