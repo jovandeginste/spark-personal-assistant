@@ -31,10 +31,8 @@ func parseContactSearchResults(htmlContent string) ([]ContactSearchResult, error
 		if n.Type == html.ElementNode && n.Data == "li" {
 			for _, attr := range n.Attr {
 				if attr.Key == "class" && strings.Contains(attr.Val, "dl-row") {
-					contact, err := parseContactRow(n)
-					if err == nil {
-						results = append(results, contact)
-					}
+					contact := parseContactRow(n)
+					results = append(results, contact)
 					return
 				}
 			}
@@ -48,7 +46,7 @@ func parseContactSearchResults(htmlContent string) ([]ContactSearchResult, error
 	return results, nil
 }
 
-func parseContactRow(n *html.Node) (ContactSearchResult, error) {
+func parseContactRow(n *html.Node) ContactSearchResult {
 	var contact ContactSearchResult
 	var cells []string
 
@@ -137,5 +135,5 @@ func parseContactRow(n *html.Node) (ContactSearchResult, error) {
 		contact.Mobile = cells[8]
 	}
 
-	return contact, nil
+	return contact
 }

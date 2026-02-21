@@ -88,6 +88,7 @@ func TestParseContactSearchResults(t *testing.T) {
 	assert.Equal(t, expected, results[0])
 
 	// Print JSON for visual verification
-	jsonOutput, _ := json.MarshalIndent(results, "", "  ")
+	jsonOutput, err := json.MarshalIndent(results, "", "  ")
+	assert.NoError(t, err)
 	t.Logf("Parsed JSON: %s", string(jsonOutput))
 }
