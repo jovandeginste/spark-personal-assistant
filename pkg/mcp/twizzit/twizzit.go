@@ -55,6 +55,7 @@ func (t *Twizzit) Register(server *sdk.Server) error {
 	t.registerGetActivitiesInfo(server)
 	t.registerGetContactsInfo(server)
 	t.registerGetEvents(server)
+	t.registerSearchContacts(server)
 	return nil
 }
 

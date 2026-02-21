@@ -24,6 +24,8 @@ func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values)
 		return nil, nil, err
 	}
 
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+
 	resp, err := t.client.Do(req)
 	if err != nil {
 		return nil, nil, err
