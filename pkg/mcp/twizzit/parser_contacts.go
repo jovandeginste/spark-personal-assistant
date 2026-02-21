@@ -56,7 +56,7 @@ func parseContactRow(n *html.Node) ContactSearchResult {
 		if n.Type == html.ElementNode && n.Data == "div" {
 			for _, attr := range n.Attr {
 				if attr.Key == "class" && strings.Contains(attr.Val, "dl-cell-content") {
-					cells = append(cells, strings.TrimSpace(getText(n)))
+					cells = append(cells, strings.Join(strings.Fields(getText(n)), " "))
 					// Don't recurse into this cell's children for other cells
 					return
 				}
