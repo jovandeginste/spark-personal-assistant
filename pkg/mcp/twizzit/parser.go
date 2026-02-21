@@ -428,3 +428,44 @@ func stripHTML(htmlContent string) string {
 
 	return strings.Join(cleanedLines, "\n")
 }
+
+// extractLoginToken finds the input with name="token" and returns its value.
+func extractLoginToken(htmlContent string) (string, error) {
+	doc, err := html.Parse(strings.NewReader(htmlContent))
+	if err != nil {
+		return "", err
+	}
+
+	var token string
+	var f func(*html.Node)
+	f = func(n *html.Node) {
+		if n.Type == html.ElementNode && n.Data == "input" {
+			isToken := false
+			value := ""
+			for _, attr := range n.Attr {
+				if attr.Key == "name" && attr.Val == "token" {
+					isToken = true
+				}
+				if attr.Key == "value" {
+					value = attr.Val
+				}
+			}
+			if isToken {
+				token = value
+				return
+			}
+		}
+		for c := n.FirstChild; c != nil; c = c.NextSibling {
+			f(c)
+			if token != "" {
+				return
+			}
+		}
+	}
+	f(doc)
+
+	if token == "" {
+		return "", errors.New("login token not found in HTML")
+	}
+	return token, nil
+}

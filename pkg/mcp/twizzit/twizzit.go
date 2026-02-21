@@ -17,7 +17,8 @@ import (
 )
 
 type Config struct {
-	PHPSessionID string `mapstructure:"php_session_id"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
 }
 
 type Twizzit struct {
@@ -28,13 +29,6 @@ type Twizzit struct {
 
 func New(config Config, logger *slog.Logger) *Twizzit {
 	jar, _ := cookiejar.New(nil)
-	u, _ := url.Parse("https://app.twizzit.com")
-	jar.SetCookies(u, []*http.Cookie{
-		{
-			Name:  "PHPSESSID",
-			Value: config.PHPSessionID,
-		},
-	})
 
 	return &Twizzit{
 		BaseModule: mcp.NewBaseModule(config, logger),

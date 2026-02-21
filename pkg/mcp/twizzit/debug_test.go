@@ -13,7 +13,12 @@ func TestDebugGetSubscriptions(t *testing.T) {
 
 	// Config
 	config := Config{
-		PHPSessionID: "fake-session-id",
+		Username: os.Getenv("TWIZZIT_USERNAME"),
+		Password: os.Getenv("TWIZZIT_PASSWORD"),
+	}
+
+	if config.Username == "" || config.Password == "" {
+		t.Skip("skipping login test, TWIZZIT_USERNAME and TWIZZIT_PASSWORD not set")
 	}
 
 	// Create instance
@@ -28,8 +33,8 @@ func TestDebugGetSubscriptions(t *testing.T) {
 	// Call makeRequest directly
 	res, _, err := twizzit.makeRequest("POST", u, form)
 	if err != nil {
-		if err.Error() == "twizzit session expired" {
-			t.Skipf("skipping test, session expired")
+		if err.Error() == "twizzit session expired" || err.Error() == "twizzit unauthorized" {
+			t.Skipf("skipping test, session expired/unauthorized")
 		}
 		t.Fatalf("makeRequest failed: %v", err)
 	}
@@ -54,7 +59,12 @@ func TestDebugGetNotifications(t *testing.T) {
 
 	// Config
 	config := Config{
-		PHPSessionID: "fake-session-id",
+		Username: os.Getenv("TWIZZIT_USERNAME"),
+		Password: os.Getenv("TWIZZIT_PASSWORD"),
+	}
+
+	if config.Username == "" || config.Password == "" {
+		t.Skip("skipping login test, TWIZZIT_USERNAME and TWIZZIT_PASSWORD not set")
 	}
 
 	// Create instance
@@ -65,8 +75,8 @@ func TestDebugGetNotifications(t *testing.T) {
 
 	res, _, err := twizzit.makeRequest("GET", u)
 	if err != nil {
-		if err.Error() == "twizzit session expired" {
-			t.Skipf("skipping test, session expired")
+		if err.Error() == "twizzit session expired" || err.Error() == "twizzit unauthorized" {
+			t.Skipf("skipping test, session expired/unauthorized")
 		}
 		t.Fatalf("makeRequest failed: %v", err)
 	}
@@ -84,7 +94,12 @@ func TestDebugGetSubscriptionForms(t *testing.T) {
 
 	// Config
 	config := Config{
-		PHPSessionID: "fake-session-id",
+		Username: os.Getenv("TWIZZIT_USERNAME"),
+		Password: os.Getenv("TWIZZIT_PASSWORD"),
+	}
+
+	if config.Username == "" || config.Password == "" {
+		t.Skip("skipping login test, TWIZZIT_USERNAME and TWIZZIT_PASSWORD not set")
 	}
 
 	// Create instance
@@ -98,8 +113,8 @@ func TestDebugGetSubscriptionForms(t *testing.T) {
 
 	res, _, err := twizzit.makeRequest("POST", u, form)
 	if err != nil {
-		if err.Error() == "twizzit session expired" {
-			t.Skipf("skipping test, session expired")
+		if err.Error() == "twizzit session expired" || err.Error() == "twizzit unauthorized" {
+			t.Skipf("skipping test, session expired/unauthorized")
 		}
 		t.Fatalf("makeRequest failed: %v", err)
 	}
