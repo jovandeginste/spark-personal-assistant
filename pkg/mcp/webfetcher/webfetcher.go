@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"strings"
 
+	md "github.com/JohannesKaufmann/html-to-markdown"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -81,59 +83,29 @@ func (m *Module) fetchAndProcess(url string, keepTags, keepForms bool) (string, 
 		return string(body), nil
 	}
 
-	doc, err := html.Parse(bytes.NewReader(body))
+	converter := md.NewConverter("", true, nil)
+
+	if keepForms {
+		converter.AddRules(md.Rule{
+			Filter: []string{"form"},
+			Replacement: func(content string, selec *goquery.Selection, opt *md.Options) *string {
+				// Render the outer HTML of the form
+				var buf bytes.Buffer
+				if len(selec.Nodes) > 0 {
+					if err := html.Render(&buf, selec.Nodes[0]); err == nil {
+						s := buf.String()
+						return &s
+					}
+				}
+				return nil
+			},
+		})
+	}
+
+	markdown, err := converter.ConvertBytes(body)
 	if err != nil {
-		return "", fmt.Errorf("failed to parse HTML: %w", err)
+		return "", fmt.Errorf("failed to convert HTML to markdown: %w", err)
 	}
 
-	var sb strings.Builder
-	var f func(*html.Node)
-	f = func(n *html.Node) {
-		// If keepForms is true, and we encounter a form element, we want to keep it and its children as HTML
-		if keepForms && isFormElement(n) {
-			// Render this node and its children as HTML
-			var buf bytes.Buffer
-			if err := html.Render(&buf, n); err == nil {
-				sb.WriteString("\n")
-				sb.WriteString(buf.String())
-				sb.WriteString("\n")
-			}
-			return // Don't traverse children, we already rendered them
-		}
-
-		if n.Type == html.TextNode {
-			text := strings.TrimSpace(n.Data)
-			if text != "" {
-				sb.WriteString(text)
-				sb.WriteString(" ")
-			}
-		}
-
-		// Don't traverse into script or style tags if we are stripping tags
-		if n.Type == html.ElementNode && (n.Data == "script" || n.Data == "style") {
-			return
-		}
-
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			f(c)
-		}
-
-		// Add newlines for block elements to maintain readability
-		if n.Type == html.ElementNode {
-			switch n.Data {
-			case "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr":
-				sb.WriteString("\n")
-			}
-		}
-	}
-	f(doc)
-
-	return strings.TrimSpace(sb.String()), nil
-}
-
-func isFormElement(n *html.Node) bool {
-	if n.Type != html.ElementNode {
-		return false
-	}
-	return n.Data == "form"
+	return strings.TrimSpace(string(markdown)), nil
 }

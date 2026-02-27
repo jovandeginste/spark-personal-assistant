@@ -15,16 +15,16 @@ func TestProcess(t *testing.T) {
 		html      string
 		keepTags  bool
 		keepForms bool
-		expected  string // For keepForms, strict equality might fail due to rendering differences
+		expected  string
 	}{
 		{
-			name:     "Strip tags",
+			name:     "Convert to markdown (Strip tags)",
 			html:     "<html><body><h1>Title</h1><p>Some text</p></body></html>",
 			keepTags: false,
-			expected: "Title \nSome text",
+			expected: "# Title\n\nSome text",
 		},
 		{
-			name:     "Keep tags",
+			name:     "Keep tags (Raw HTML)",
 			html:     "<html><body><h1>Title</h1><p>Some text</p></body></html>",
 			keepTags: true,
 			expected: "<html><body><h1>Title</h1><p>Some text</p></body></html>",
@@ -34,14 +34,15 @@ func TestProcess(t *testing.T) {
 			html:      `<html><body><h1>Login</h1><form action="/login"><input name="user"></form></body></html>`,
 			keepTags:  false,
 			keepForms: true,
-			expected:  "Login \n\n<form action=\"/login\"><input name=\"user\"/></form>",
+			expected:  "# Login\n\n<form action=\"/login\"><input name=\"user\"/></form>",
 		},
 		{
 			name:      "Strip forms if keepForms is false",
 			html:      `<html><body><h1>Login</h1><form action="/login"><input name="user"></form></body></html>`,
 			keepTags:  false,
 			keepForms: false,
-			expected:  "Login",
+			expected:  "# Login", // Form content is stripped/converted. Inputs are usually void elements, might disappear or show up weirdly.
+			// html-to-markdown default for form is to process children. Input usually becomes empty string.
 		},
 	}
 
@@ -50,7 +51,7 @@ func TestProcess(t *testing.T) {
 			// Mock generic.GetBody
 			originalGetBody := generic.GetBody
 			defer func() { generic.GetBody = originalGetBody }()
-			
+
 			generic.GetBody = func(url string) ([]byte, error) {
 				return []byte(tt.html), nil
 			}
@@ -62,7 +63,7 @@ func TestProcess(t *testing.T) {
 			// Normalize whitespace for easier comparison
 			result = strings.TrimSpace(result)
 			tt.expected = strings.TrimSpace(tt.expected)
-			
+
 			assert.Equal(t, tt.expected, result)
 		})
 	}
