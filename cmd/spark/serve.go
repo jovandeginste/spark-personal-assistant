@@ -38,11 +38,6 @@ func (c *cli) printCmd() *cobra.Command {
 
 			aiData.EmployerQuestion = customPrompt
 
-			p, err := ai.PromptFor(format)
-			if err != nil {
-				return err
-			}
-
 			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
@@ -65,7 +60,7 @@ func (c *cli) printCmd() *cobra.Command {
 			cancel := spinner.Start(context.Background())
 			defer cancel()
 
-			md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
+			md, err := aiClient.GeneratePrompt(context.Background(), aiData)
 			if err != nil {
 				return err
 			}
@@ -97,11 +92,6 @@ func (c *cli) chatCmd() *cobra.Command {
 			}
 
 			aiData, err := c.app.BuildData()
-			if err != nil {
-				return err
-			}
-
-			p, err := ai.PromptFor("custom")
 			if err != nil {
 				return err
 			}
@@ -167,7 +157,7 @@ func (c *cli) chatCmd() *cobra.Command {
 				cancel := spinner.Start(context.Background())
 				defer cancel()
 
-				md, err := aiClient.GeneratePrompt(context.Background(), p, aiData)
+				md, err := aiClient.GeneratePrompt(context.Background(), aiData)
 				if err != nil {
 					return err
 				}

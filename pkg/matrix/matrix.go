@@ -203,7 +203,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
-	md, err := mc.AIClient.GenerateWithTools(context.Background(), ai.PromptCustom, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
 	}, mc.AIData.FileURIs)
 	if err != nil {

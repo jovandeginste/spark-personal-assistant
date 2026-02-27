@@ -50,10 +50,10 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 	return genai.NewContentFromParts(parts, genai.RoleUser), nil
 }
 
-func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
 	c.Logger().Info("Fetching result from AI...")
 
-	prompt, err := c.convertPrompt(p, data)
+	prompt, err := c.convertPrompt(PromptCustom, data)
 	if err != nil {
 		return "", err
 	}
@@ -101,10 +101,10 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	return "", nil
 }
 
-func (c geminiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
+func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
-	promptContent, err := c.convertPrompt(p, data)
+	promptContent, err := c.convertPrompt(PromptCustom, data)
 	if err != nil {
 		return "", err
 	}

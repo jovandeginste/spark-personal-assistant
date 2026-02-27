@@ -14,3 +14,8 @@ context: |
 llm:
   model: gemma3:1b
   base_url: http://localhost:11434/v1/
+prompts:
+  my_prompt: |
+    This is a custom prompt.
+    It can be multiline.
+    You can use it by typing !prompt my_prompt

@@ -24,6 +24,7 @@ type Config struct {
 	Matrix           MatrixConfig               `mapstructure:"matrix"`
 	Webserver        WebserverConfig            `mapstructure:"webserver"`
 	MCPServers       map[string]MCPServerConfig `mapstructure:"mcp_servers"`
+	Prompts          map[string]string          `mapstructure:"prompts"`
 }
 
 type MCPServerConfig struct {

@@ -27,8 +27,8 @@ type AssistantConfig struct {
 type Client interface {
 	APIKey() string
 	Model() string
-	GeneratePrompt(context.Context, Prompt, any) (string, error)
-	GenerateWithTools(context.Context, Prompt, any, []Tool, ToolExecutor, []string) (string, error)
+	GeneratePrompt(context.Context, any) (string, error)
+	GenerateWithTools(context.Context, any, []Tool, ToolExecutor, []string) (string, error)
 	Logger() *slog.Logger
 	UploadFile(context.Context, string, []byte, string) (string, error)
 	ListFiles(context.Context) ([]string, error)

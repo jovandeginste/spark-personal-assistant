@@ -9,9 +9,27 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/personas"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"maunium.net/go/mautrix"
 )
+
+func (mc *MatrixConfig) performCommandPrompt(name, roomID string) (string, error) {
+	promptBody, ok := mc.App.Config.Prompts[name]
+	if !ok {
+		return fmt.Sprintf("Prompt '%s' not found in configuration", name), nil
+	}
+
+	mc.AIData.ResetHistory(roomID)
+	mc.AIData.EmployerQuestion = []string{promptBody}
+
+	tools, err := mc.App.GetMCPTools(context.Background(), roomID)
+	if err != nil {
+		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
+	}
+
+	return mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		return mc.App.ExecuteMCPTool(ctx, name, args, roomID)
+	}, mc.AIData.FileURIs)
+}
 
 func (mc *MatrixConfig) performCommandResetRecovery() (string, error) {
 	if mc.CryptoHelper == nil {
@@ -92,38 +110,6 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 	return "Switched to persona: " + mc.App.Config.Assistant.Name, nil
 }
 
-func (mc *MatrixConfig) performCommandSummarize(name, roomID string) (string, error) {
-	mc.AIData.ResetHistory(roomID)
-
-	var p ai.Prompt
-
-	switch name {
-	case "full":
-		p = ai.PromptFull
-	case "week":
-		p = ai.PromptWeek
-	case "today":
-		p = ai.PromptToday
-	default:
-		// Assume it is a custom prompt
-		mc.AIData.EmployerQuestion = []string{"Summarize the events based on the prompt: " + name}
-		p = ai.PromptCustom
-	}
-
-	// For summarize command, we probably want ALL tools or default tools
-	// Since this command is likely run by an admin/user, maybe default to nil (all) is fine?
-	// Or we should respect the room config?
-	// Let's check room config.
-	tools, err := mc.App.GetMCPTools(context.Background(), roomID)
-	if err != nil {
-		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
-	}
-
-	return mc.AIClient.GenerateWithTools(context.Background(), p, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		return mc.App.ExecuteMCPTool(ctx, name, args, roomID)
-	}, mc.AIData.FileURIs)
-}
-
 func (mc *MatrixConfig) performCommandUpdate() (string, error) {
 	mc.sendNotice(mc.DefaultRoomID(), "Updating MCP servers...")
 
@@ -148,7 +134,7 @@ func (mc *MatrixConfig) parseInput(input, roomID string) (string, error) {
 	}
 
 	input = strings.TrimPrefix(input, "!")
-	cmd := strings.SplitN(input, " ", 3)
+	cmd := strings.SplitN(input, " ", 2)
 
 	switch cmd[0] {
 	case "reset":
@@ -161,16 +147,15 @@ func (mc *MatrixConfig) parseInput(input, roomID string) (string, error) {
 		}
 
 		return mc.performCommandSwitchPersona(cmd[1])
-	case "summarize":
-		if len(cmd) < 2 {
-			return "", nil
-		}
-
-		return mc.performCommandSummarize(cmd[1], roomID)
 	case "update":
 		return mc.performCommandUpdate()
 	case "ping":
 		return mc.performCommandPing()
+	case "prompt":
+		if len(cmd) < 2 {
+			return "Usage: !prompt <name>", nil
+		}
+		return mc.performCommandPrompt(cmd[1], roomID)
 	case "recovery":
 		return mc.performCommandResetRecovery()
 	default:

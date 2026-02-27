@@ -51,10 +51,10 @@ func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMe
 	return openai.UserMessage(parts), nil
 }
 
-func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (string, error) {
+func (c openaiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
 	c.Logger().Info("Fetching result from AI...")
 
-	prompt, err := c.convertPrompt(p, data)
+	prompt, err := c.convertPrompt(PromptCustom, data)
 	if err != nil {
 		return "", err
 	}
@@ -96,10 +96,10 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, p Prompt, data any) (s
 	return "", nil
 }
 
-func (c openaiClient) GenerateWithTools(ctx context.Context, p Prompt, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
+func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
-	promptMsg, err := c.convertPrompt(p, data)
+	promptMsg, err := c.convertPrompt(PromptCustom, data)
 	if err != nil {
 		return "", err
 	}
