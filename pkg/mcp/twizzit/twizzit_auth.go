@@ -35,33 +35,12 @@ func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusUnauthorized {
-		if t.config.Username != "" && t.config.Password != "" {
-			t.Logger().Info("twizzit returned 401 Unauthorized, attempting login")
-			if err := t.login(); err != nil {
-				return nil, nil, fmt.Errorf("login failed after 401: %w", err)
-			}
-			// Retry request once
-			return t.makeRequest(method, requestURL, formData...)
-		}
-		return nil, nil, errors.New("twizzit unauthorized")
+	shouldRetry, err := t.handleAuthError(resp)
+	if err != nil {
+		return nil, nil, err
 	}
-
-	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently {
-		location, err := resp.Location()
-		if err == nil {
-			if location.String() == "https://app.twizzit.com/v2/login?expired=1" {
-				if t.config.Username != "" && t.config.Password != "" {
-					t.Logger().Info("twizzit session expired, attempting login")
-					if err := t.login(); err != nil {
-						return nil, nil, fmt.Errorf("twizzit session expired and login failed: %w", err)
-					}
-					// Retry request once
-					return t.makeRequest(method, requestURL, formData...)
-				}
-				return nil, nil, errors.New("twizzit session expired")
-			}
-		}
+	if shouldRetry {
+		return t.retryRequest(method, requestURL, formData...)
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
@@ -73,6 +52,74 @@ func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values)
 			},
 		},
 	}, nil, err
+}
+
+func (t *Twizzit) retryRequest(method, requestURL string, formData ...url.Values) (*sdk.CallToolResult, any, error) {
+	var body io.Reader
+	if len(formData) > 0 {
+		body = strings.NewReader(formData[0].Encode())
+	}
+
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if len(formData) > 0 {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	resp, err := t.client.Do(req)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		return nil, nil, fmt.Errorf("twizzit request failed after retry with status %d", resp.StatusCode)
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+
+	return &sdk.CallToolResult{
+		Content: []sdk.Content{
+			&sdk.TextContent{
+				Text: string(respBody),
+			},
+		},
+	}, nil, err
+}
+
+func (t *Twizzit) handleAuthError(resp *http.Response) (bool, error) {
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		if t.config.Username != "" && t.config.Password != "" {
+			t.Logger().Info("twizzit returned unauthorized/forbidden, attempting login", "status_code", resp.StatusCode)
+			if err := t.login(); err != nil {
+				return false, fmt.Errorf("login failed after unauthorized: %w", err)
+			}
+			return true, nil
+		}
+		return false, errors.New("twizzit unauthorized")
+	}
+
+	if resp.StatusCode == http.StatusFound || resp.StatusCode == http.StatusMovedPermanently || resp.StatusCode == http.StatusSeeOther {
+		location, err := resp.Location()
+		if err == nil {
+			if strings.Contains(location.String(), "login") || strings.Contains(location.String(), "expired") {
+				if t.config.Username != "" && t.config.Password != "" {
+					t.Logger().Info("twizzit session expired or redirected to login, attempting login")
+					if err := t.login(); err != nil {
+						return false, fmt.Errorf("twizzit session expired and login failed: %w", err)
+					}
+					return true, nil
+				}
+				return false, errors.New("twizzit session expired")
+			}
+		}
+	}
+
+	return false, nil
 }
 
 func (t *Twizzit) login() error {
