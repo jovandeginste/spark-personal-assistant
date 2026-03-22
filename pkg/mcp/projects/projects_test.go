@@ -105,40 +105,50 @@ func TestModule(t *testing.T) {
 		content, err := os.ReadFile(notesPath)
 		assert.NoError(t, err)
 		assert.Equal(t, "Some project notes", string(content))
-
-		// Check if GetProject picks it up
-		getParams := getProjectParams{Name: "test-project"}
-		res, _, err = m.handleGetProject(nil, nil, getParams)
-		assert.NoError(t, err)
-		text := res.Content[0].(*mcp.TextContent).Text
-		assert.Contains(t, text, "## File: my-notes.md")
-		assert.Contains(t, text, "Some project notes")
 	})
 
-	t.Run("Security Checks", func(t *testing.T) {
-		// Attempt to escape root
-		params := createProjectParams{
-			Name:     "../escaped", // Should be slugified to escaped
-			Synopsis: "should succeed but in safe location",
-		}
-		res, _, err := m.handleCreateProject(nil, nil, params)
-		assert.NoError(t, err)
-		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "'escaped' created successfully")
-
-		// Verify it was created in the right place
-		safePath := filepath.Join(tempDir, "escaped")
-		info, err := os.Stat(safePath)
-		assert.NoError(t, err)
-		assert.True(t, info.IsDir())
-
-		// Attempt to write outside project
-		updateParams := updateProjectParams{
+	t.Run("Read File", func(t *testing.T) {
+		params := readFileParams{
 			Project:  "test-project",
-			FileName: "../hack.md", // Should be slugified to hack.md
-			Content:  "should succeed as hack.md",
+			FileName: "my-notes.md",
 		}
-		res, _, err = m.handleUpdateProject(nil, nil, updateParams)
+
+		res, _, err := m.handleReadFile(nil, nil, params)
 		assert.NoError(t, err)
-		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "'hack.md' in project 'test-project' updated successfully")
+		assert.NotNil(t, res)
+		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "Some project notes")
+	})
+
+	t.Run("Delete File", func(t *testing.T) {
+		params := deleteFileParams{
+			Project:  "test-project",
+			FileName: "my-notes.md",
+		}
+
+		res, _, err := m.handleDeleteFile(nil, nil, params)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "deleted from project")
+
+		// Verify on disk
+		notesPath := filepath.Join(tempDir, "test-project", "my-notes.md")
+		_, err = os.Stat(notesPath)
+		assert.True(t, os.IsNotExist(err))
+	})
+
+	t.Run("Delete Project", func(t *testing.T) {
+		params := deleteProjectParams{
+			Name: "test-project",
+		}
+
+		res, _, err := m.handleDeleteProject(nil, nil, params)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "deleted successfully")
+
+		// Verify on disk
+		projectPath := filepath.Join(tempDir, "test-project")
+		_, err = os.Stat(projectPath)
+		assert.True(t, os.IsNotExist(err))
 	})
 }

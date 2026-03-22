@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/gosimple/slug"
 	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
@@ -21,6 +22,8 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
+	// Mutex for basic concurrency safety on file writes. For a larger app, a file-specific lock might be better.
+	mu sync.RWMutex
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -48,10 +51,8 @@ func (m *Module) Register(server *mcp.Server) error {
 		Name:        "projects_list",
 		Description: "List all existing projects",
 		InputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"_dummy": map[string]any{"type": "string"},
-			},
+			"type":       "object",
+			"properties": map[string]any{},
 		},
 	}, m.handleListProjects)
 
@@ -59,10 +60,8 @@ func (m *Module) Register(server *mcp.Server) error {
 		Name:        "projects_summaries",
 		Description: "Retrieve summaries (index.md) of all projects",
 		InputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"_dummy": map[string]any{"type": "string"},
-			},
+			"type":       "object",
+			"properties": map[string]any{},
 		},
 	}, m.handleProjectSummaries)
 
@@ -77,9 +76,24 @@ func (m *Module) Register(server *mcp.Server) error {
 	}, m.handleGetProject)
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_read_file",
+		Description: "Read the content of a specific file within a project",
+	}, m.handleReadFile)
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "project_update",
 		Description: "Add or update a file in a project",
 	}, m.handleUpdateProject)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_delete_file",
+		Description: "Delete a file from a project",
+	}, m.handleDeleteFile)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_delete",
+		Description: "Delete an entire project",
+	}, m.handleDeleteProject)
 
 	return nil
 }
@@ -95,10 +109,24 @@ type getProjectParams struct {
 	Name string `json:"name" jsonschema:"Name of the project to retrieve"`
 }
 
+type readFileParams struct {
+	Project  string `json:"project" jsonschema:"Name of the project"`
+	FileName string `json:"file_name" jsonschema:"Name of the file to read (e.g., notes.md, index.md)"`
+}
+
 type updateProjectParams struct {
 	Project  string `json:"project" jsonschema:"Name of the project"`
 	FileName string `json:"file_name" jsonschema:"Name of the file to add/update (e.g., notes.md, index.md)"`
 	Content  string `json:"content" jsonschema:"Content to write to the file"`
+}
+
+type deleteFileParams struct {
+	Project  string `json:"project" jsonschema:"Name of the project"`
+	FileName string `json:"file_name" jsonschema:"Name of the file to delete"`
+}
+
+type deleteProjectParams struct {
+	Name string `json:"name" jsonschema:"Name of the project to delete"`
 }
 
 // Handlers
@@ -107,6 +135,9 @@ func (m *Module) handleListProjects(ctx context.Context, request *mcp.CallToolRe
 	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "listProjects")
 	logger.Debug("Listing projects")
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	entries, err := os.ReadDir(filepath.Clean(config.Path))
 	if err != nil {
@@ -118,6 +149,16 @@ func (m *Module) handleListProjects(ctx context.Context, request *mcp.CallToolRe
 		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
 			projects = append(projects, entry.Name())
 		}
+	}
+
+	if len(projects) == 0 {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "No projects found.",
+				},
+			},
+		}, nil, nil
 	}
 
 	return &mcp.CallToolResult{
@@ -133,6 +174,9 @@ func (m *Module) handleProjectSummaries(ctx context.Context, request *mcp.CallTo
 	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "projectSummaries")
 	logger.Debug("Listing project summaries")
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	entries, err := os.ReadDir(filepath.Clean(config.Path))
 	if err != nil {
@@ -155,6 +199,16 @@ func (m *Module) handleProjectSummaries(ctx context.Context, request *mcp.CallTo
 				summaries.WriteString(fmt.Sprintf("Project: %s\n(No index.md found)\n---\n", entry.Name()))
 			}
 		}
+	}
+
+	if summaries.Len() == 0 {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{
+					Text: "No project summaries found.",
+				},
+			},
+		}, nil, nil
 	}
 
 	return &mcp.CallToolResult{
@@ -184,6 +238,9 @@ func (m *Module) handleCreateProject(ctx context.Context, request *mcp.CallToolR
 	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
 		return nil, nil, errors.New("invalid project path")
 	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if _, err := os.Stat(projectPath); !os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("project '%s' already exists", safeName)
@@ -218,10 +275,12 @@ func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequ
 	safeName := slug.Make(params.Name)
 	projectPath := filepath.Clean(filepath.Join(config.Path, safeName))
 
-	// Security check to ensure we stay within config.Path
 	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
 		return nil, nil, errors.New("invalid project path")
 	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	entries, err := os.ReadDir(projectPath)
 	if err != nil {
@@ -234,22 +293,86 @@ func (m *Module) handleGetProject(ctx context.Context, request *mcp.CallToolRequ
 	var contentBuilder strings.Builder
 	contentBuilder.WriteString(fmt.Sprintf("# Project: %s\n\n", safeName))
 
+	fileFound := false
 	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".md") {
+		// Read text based files or commonly used formats
+		if !entry.IsDir() && (strings.HasSuffix(entry.Name(), ".md") || strings.HasSuffix(entry.Name(), ".txt") || strings.HasSuffix(entry.Name(), ".json") || strings.HasSuffix(entry.Name(), ".csv")) {
 			filePath := filepath.Clean(filepath.Join(projectPath, entry.Name()))
 			fileContent, err := os.ReadFile(filePath)
 			if err != nil {
 				logger.Error("Failed to read file", "file", filePath, "error", err)
+				contentBuilder.WriteString(fmt.Sprintf("## File: %s\n\n[Error reading file]\n\n---\n\n", entry.Name()))
 				continue
 			}
 			contentBuilder.WriteString(fmt.Sprintf("## File: %s\n\n%s\n\n---\n\n", entry.Name(), string(fileContent)))
+			fileFound = true
+		} else if !entry.IsDir() {
+			// Mention other files exist but don't output content
+			contentBuilder.WriteString(fmt.Sprintf("## File: %s\n\n[Content hidden for non-text file]\n\n---\n\n", entry.Name()))
 		}
+	}
+
+	if !fileFound && contentBuilder.Len() == len(fmt.Sprintf("# Project: %s\n\n", safeName)) {
+		contentBuilder.WriteString("No readable text files found in this project.")
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
 				Text: contentBuilder.String(),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleReadFile(ctx context.Context, request *mcp.CallToolRequest, params readFileParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "readFile")
+
+	if params.Project == "" || params.FileName == "" {
+		return nil, nil, errors.New("project and file_name are required")
+	}
+
+	safeProject := slug.Make(params.Project)
+
+	ext := filepath.Ext(params.FileName)
+	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
+	safeFile := slug.Make(nameWithoutExt) + ext
+
+	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
+		return nil, nil, errors.New("invalid file name")
+	}
+
+	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
+	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
+		return nil, nil, errors.New("invalid project path")
+	}
+
+	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
+	if err := safe.IsSubPath(projectPath, filePath); err != nil {
+		return nil, nil, errors.New("invalid file path")
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
+	}
+
+	fileContent, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, fmt.Errorf("file '%s' does not exist in project '%s'", safeFile, safeProject)
+		}
+		logger.Error("Failed to read file", "file", filePath, "error", err)
+		return nil, nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: string(fileContent),
 			},
 		},
 	}, nil, nil
@@ -266,12 +389,10 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 
 	safeProject := slug.Make(params.Project)
 
-	// We want to keep the extension, so we split, slugify the name, and rejoin
 	ext := filepath.Ext(params.FileName)
 	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
 	safeFile := slug.Make(nameWithoutExt) + ext
 
-	// Additional check to prevent directory traversal via extension manipulation or empty names
 	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
 		return nil, nil, errors.New("invalid file name")
 	}
@@ -281,8 +402,61 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 		return nil, nil, errors.New("invalid project path")
 	}
 
+	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
+	if err := safe.IsSubPath(projectPath, filePath); err != nil {
+		return nil, nil, errors.New("invalid file path")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
+	}
+
+	// Write to a temporary file first, then rename for atomicity
+	tmpFile := filePath + ".tmp"
+	if err := os.WriteFile(tmpFile, []byte(params.Content), 0o600); err != nil {
+		return nil, nil, fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		// Clean up the temp file if rename fails
+		os.Remove(tmpFile)
+		return nil, nil, fmt.Errorf("failed to save file atomically: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("File '%s' in project '%s' updated successfully", safeFile, safeProject),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleDeleteFile(ctx context.Context, request *mcp.CallToolRequest, params deleteFileParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "deleteFile")
+	logger.Debug("Deleting file", "project", params.Project, "file", params.FileName)
+
+	if params.Project == "" || params.FileName == "" {
+		return nil, nil, errors.New("project and file_name are required")
+	}
+
+	safeProject := slug.Make(params.Project)
+
+	ext := filepath.Ext(params.FileName)
+	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
+	safeFile := slug.Make(nameWithoutExt) + ext
+
+	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
+		return nil, nil, errors.New("invalid file name")
+	}
+
+	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
+	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
+		return nil, nil, errors.New("invalid project path")
 	}
 
 	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
@@ -290,14 +464,56 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 		return nil, nil, errors.New("invalid file path")
 	}
 
-	if err := os.WriteFile(filePath, []byte(params.Content), 0o600); err != nil {
-		return nil, nil, fmt.Errorf("failed to write file: %w", err)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if err := os.Remove(filePath); err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, fmt.Errorf("file '%s' does not exist in project '%s'", safeFile, safeProject)
+		}
+		return nil, nil, fmt.Errorf("failed to delete file: %w", err)
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
-				Text: fmt.Sprintf("File '%s' in project '%s' updated successfully", safeFile, safeProject),
+				Text: fmt.Sprintf("File '%s' deleted from project '%s'", safeFile, safeProject),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleDeleteProject(ctx context.Context, request *mcp.CallToolRequest, params deleteProjectParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "deleteProject")
+	logger.Debug("Deleting project", "name", params.Name)
+
+	if params.Name == "" {
+		return nil, nil, errors.New("project name is required")
+	}
+
+	safeName := slug.Make(params.Name)
+	projectPath := filepath.Clean(filepath.Join(config.Path, safeName))
+
+	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
+		return nil, nil, errors.New("invalid project path")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("project '%s' does not exist", safeName)
+	}
+
+	if err := os.RemoveAll(projectPath); err != nil {
+		return nil, nil, fmt.Errorf("failed to delete project: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("Project '%s' deleted successfully", safeName),
 			},
 		},
 	}, nil, nil
