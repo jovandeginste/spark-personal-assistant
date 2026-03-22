@@ -73,15 +73,25 @@ func (r *Live) Connect(context context.Context, model string, config *LiveConnec
 	var u url.URL
 	var header http.Header = mergeHeaders(&httpOptions, nil)
 	if r.apiClient.clientConfig.Backend == BackendVertexAI {
-		token, err := r.apiClient.clientConfig.Credentials.Token(context)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get token: %w", err)
+		hasStandardAuth := r.apiClient.clientConfig.Project != "" && r.apiClient.clientConfig.Location != ""
+		if r.apiClient.clientConfig.Credentials != nil {
+			token, err := r.apiClient.clientConfig.Credentials.Token(context)
+			if err != nil {
+				return nil, fmt.Errorf("failed to get token: %w", err)
+			}
+			header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Value))
 		}
-		header.Set("Authorization", fmt.Sprintf("Bearer %s", token.Value))
+
+		wsPath := path.Join(baseURL.Path, fmt.Sprintf("ws/google.cloud.aiplatform.%s.LlmBidiService/BidiGenerateContent", httpOptions.APIVersion))
+		// If custom base URL is used but no standard auth exists, assume proxy uses its own path.
+		if baseURL.String() != "" && !hasStandardAuth {
+			wsPath = baseURL.Path
+		}
+
 		u = url.URL{
 			Scheme: scheme,
 			Host:   baseURL.Host,
-			Path:   path.Join(baseURL.Path, fmt.Sprintf("ws/google.cloud.aiplatform.%s.LlmBidiService/BidiGenerateContent", httpOptions.APIVersion)),
+			Path:   wsPath,
 		}
 	} else {
 		apiKey := r.apiClient.clientConfig.APIKey

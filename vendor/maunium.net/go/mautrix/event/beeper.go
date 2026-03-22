@@ -94,6 +94,8 @@ type BeeperChatDeleteEventContent struct {
 }
 
 type BeeperAcceptMessageRequestEventContent struct {
+	// Whether this was triggered by a message rather than an explicit event
+	IsImplicit bool `json:"-"`
 }
 
 type BeeperSendStateEventContent struct {
@@ -144,7 +146,7 @@ type BeeperLinkPreview struct {
 
 	MatchedURL      string             `json:"matched_url,omitempty"`
 	ImageEncryption *EncryptedFileInfo `json:"beeper:image:encryption,omitempty"`
-	ImageBlurhash   string             `json:"beeper:image:blurhash,omitempty"`
+	ImageBlurhash   string             `json:"matrix:image:blurhash,omitempty"`
 }
 
 type BeeperProfileExtra struct {
@@ -162,6 +164,24 @@ type BeeperPerMessageProfile struct {
 	AvatarURL   *id.ContentURIString `json:"avatar_url,omitempty"`
 	AvatarFile  *EncryptedFileInfo   `json:"avatar_file,omitempty"`
 	HasFallback bool                 `json:"has_fallback,omitempty"`
+}
+
+type BeeperActionMessageType string
+
+const (
+	BeeperActionMessageCall BeeperActionMessageType = "call"
+)
+
+type BeeperActionMessageCallType string
+
+const (
+	BeeperActionMessageCallTypeVoice BeeperActionMessageCallType = "voice"
+	BeeperActionMessageCallTypeVideo BeeperActionMessageCallType = "video"
+)
+
+type BeeperActionMessage struct {
+	Type     BeeperActionMessageType     `json:"type"`
+	CallType BeeperActionMessageCallType `json:"call_type,omitempty"`
 }
 
 func (content *MessageEventContent) AddPerMessageProfileFallback() {
@@ -192,6 +212,15 @@ func (content *MessageEventContent) RemovePerMessageProfileFallback() {
 	if content.Format == FormatHTML {
 		content.FormattedBody = HTMLProfileFallbackRegex.ReplaceAllLiteralString(content.FormattedBody, "")
 	}
+}
+
+type BeeperAIStreamEventContent struct {
+	TurnID      string         `json:"turn_id"`
+	Seq         int            `json:"seq"`
+	Part        map[string]any `json:"part"`
+	TargetEvent id.EventID     `json:"target_event,omitempty"`
+	AgentID     string         `json:"agent_id,omitempty"`
+	RelatesTo   *RelatesTo     `json:"m.relates_to,omitempty"`
 }
 
 type BeeperEncodedOrder struct {

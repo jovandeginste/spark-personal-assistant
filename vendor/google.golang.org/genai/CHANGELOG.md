@@ -1,5 +1,44 @@
 # Changelog
 
+## [1.51.0](https://github.com/googleapis/go-genai/compare/v1.50.0...v1.51.0) (2026-03-17)
+
+
+### Features
+
+* Support include_server_side_tool_invocations for genai. ([cec4bfd](https://github.com/googleapis/go-genai/commit/cec4bfd51223b19740526a44a610a8c06de737d4))
+
+## [1.50.0](https://github.com/googleapis/go-genai/compare/v1.49.0...v1.50.0) (2026-03-12)
+
+
+### Features
+
+* Add inference_generation_config to EvaluationConfig for Tuning ([21b360f](https://github.com/googleapis/go-genai/commit/21b360fd8db6e14185262b5ed2b693c609fd10a0))
+* Add register_files ([43a12bf](https://github.com/googleapis/go-genai/commit/43a12bf26fa5a3ea30f5da6e5cf0c3b84bb47aa2))
+* Allow custom endpoints for authentication with Vertex AI in Go ([0ebf016](https://github.com/googleapis/go-genai/commit/0ebf016d9458ce9d93b68bc4ec6ba0e549dc7d79))
+* enable language code for audio transcription config in Live API for Vertex AI ([59610d4](https://github.com/googleapis/go-genai/commit/59610d4dfb093df13ac8de1cdbad925edb623a89))
+
+## [1.49.0](https://github.com/googleapis/go-genai/compare/v1.48.0...v1.49.0) (2026-02-28)
+
+
+### Features
+
+* Update data types from discovery doc. ([37134ea](https://github.com/googleapis/go-genai/commit/37134ea8c0c17d262c26ed46e31ada75406dff02))
+
+## [1.48.0](https://github.com/googleapis/go-genai/compare/v1.47.0...v1.48.0) (2026-02-25)
+
+
+### Features
+
+* Add Image Grounding support to GoogleSearch tool ([ba34adf](https://github.com/googleapis/go-genai/commit/ba34adf470dbb213383df5951ee641cd899958ef))
+* enable server side MCP and disable all other AFC when server side MCP is configured. ([a550b3c](https://github.com/googleapis/go-genai/commit/a550b3c7f84e0fe2fd5e5221ac3aa7d20ce4cbf2))
+
+## [1.47.0](https://github.com/googleapis/go-genai/compare/v1.46.0...v1.47.0) (2026-02-18)
+
+
+### Features
+
+* Support multimodal embedding for Gemini Embedding 2.0 and support MaaS models in Models.embed_content() (Vertex AI API) ([ef61dd1](https://github.com/googleapis/go-genai/commit/ef61dd1f3c65e185c594d07a2cf928e14f3b04ec))
+
 ## [1.46.0](https://github.com/googleapis/go-genai/compare/v1.45.0...v1.46.0) (2026-02-09)
 
 

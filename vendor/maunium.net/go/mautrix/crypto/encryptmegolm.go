@@ -91,11 +91,16 @@ func IsShareError(err error) bool {
 }
 
 func ParseMegolmMessageIndex(ciphertext []byte) (uint, error) {
+	if len(ciphertext) == 0 {
+		return 0, fmt.Errorf("empty ciphertext")
+	}
 	decoded := make([]byte, base64.RawStdEncoding.DecodedLen(len(ciphertext)))
 	var err error
 	_, err = base64.RawStdEncoding.Decode(decoded, ciphertext)
 	if err != nil {
 		return 0, err
+	} else if len(decoded) < 2+binary.MaxVarintLen64 {
+		return 0, fmt.Errorf("decoded ciphertext too short: %d bytes", len(decoded))
 	} else if decoded[0] != 3 || decoded[1] != 8 {
 		return 0, fmt.Errorf("unexpected initial bytes %d and %d", decoded[0], decoded[1])
 	}
@@ -365,26 +370,19 @@ func (mach *OlmMachine) encryptAndSendGroupSession(ctx context.Context, session 
 	log.Trace().Msg("Encrypting group session for all found devices")
 	deviceCount := 0
 	toDevice := &mautrix.ReqSendToDevice{Messages: make(map[id.UserID]map[id.DeviceID]*event.Content)}
+	logUsers := zerolog.Dict()
 	for userID, sessions := range olmSessions {
 		if len(sessions) == 0 {
 			continue
 		}
+		logDevices := zerolog.Dict()
 		output := make(map[id.DeviceID]*event.Content)
 		toDevice.Messages[userID] = output
 		for deviceID, device := range sessions {
-			log.Trace().
-				Stringer("target_user_id", userID).
-				Stringer("target_device_id", deviceID).
-				Stringer("target_identity_key", device.identity.IdentityKey).
-				Msg("Encrypting group session for device")
 			content := mach.encryptOlmEvent(ctx, device.session, device.identity, event.ToDeviceRoomKey, session.ShareContent())
 			output[deviceID] = &event.Content{Parsed: content}
+			logDevices.Str(string(deviceID), string(device.identity.IdentityKey))
 			deviceCount++
-			log.Debug().
-				Stringer("target_user_id", userID).
-				Stringer("target_device_id", deviceID).
-				Stringer("target_identity_key", device.identity.IdentityKey).
-				Msg("Encrypted group session for device")
 			if !mach.DisableSharedGroupSessionTracking {
 				err := mach.CryptoStore.MarkOutboundGroupSessionShared(ctx, userID, device.identity.IdentityKey, session.id)
 				if err != nil {
@@ -398,11 +396,13 @@ func (mach *OlmMachine) encryptAndSendGroupSession(ctx context.Context, session 
 				}
 			}
 		}
+		logUsers.Dict(string(userID), logDevices)
 	}
 
 	log.Debug().
 		Int("device_count", deviceCount).
 		Int("user_count", len(toDevice.Messages)).
+		Dict("destination_map", logUsers).
 		Msg("Sending to-device messages to share group session")
 	_, err := mach.Client.SendToDevice(ctx, event.ToDeviceEncrypted, toDevice)
 	return err

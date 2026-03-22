@@ -1,3 +1,54 @@
+## v0.26.4 (2026-03-16)
+
+* **Breaking change *(client)*** Changed request structs that include UIA
+  (register, upload cross-signing keys, delete devices) to take the auth data
+  as a type parameter.
+* *(crypto)* Changed device key mismatches in Megolm decryption to mark the
+  message as untrusted instead of failing entirely.
+* *(crypto)* Added new column to save origin of received Megolm sessions.
+* *(bridgev2)* Added support for setting custom profile fields (e.g. `m.tz`)
+  for ghosts.
+* *(bridgev2/commands)* Added `delete-chat` command to delete chats on the
+  remote network.
+* *(client)* Updated MSC2666 implementation to use stable endpoint.
+* *(client)* Stopped logging large (>32 KiB) request bodies.
+* *(bridgev2/portal)* Fixed potential deadlock when a portal ID change races
+  with room creation.
+* *(bridgev2/portal)* Fixed the third reaction from Matrix being handled
+  incorrectly on networks that only allow one reaction per message.
+* *(bridgev2/database)* Fixed finding first message in thread in case the thread
+  contains messages with a lower timestamp than the root message.
+* *(bridgev2/commands)* Fixed login QR codes not having appropriate file info.
+* *(bridgev2/commands)* Fixed user input steps not working correctly after a
+  display step.
+* *(format/htmlparser)* Fixed generating markdown for code blocks containing
+  backticks.
+* *(federation/eventauth)* Fixed inverted check in ban membership authorization
+  (thanks to [@nexy7574] in [#464]).
+
+[#464]: https://github.com/mautrix/go/pull/464
+
+## v0.26.3 (2026-02-16)
+
+* Bumped minimum Go version to 1.25.
+* *(client)* Added fields for sending [MSC4354] sticky events.
+* *(bridgev2)* Added automatic message request accepting when sending message.
+* *(mediaproxy)* Added support for federation thumbnail endpoint.
+* *(crypto/ssss)* Improved support for recovery keys with slightly broken
+  metadata.
+* *(crypto)* Changed key import to call session received callback even for
+  sessions that already exist in the database.
+* *(appservice)* Fixed building websocket URL accidentally using file path
+  separators instead of always `/`.
+* *(crypto)* Fixed key exports not including the `sender_claimed_keys` field.
+* *(client)* Fixed incorrect context usage in async uploads.
+* *(crypto)* Fixed panic when passing invalid input to megolm message index
+  parser used for debugging.
+* *(bridgev2/provisioning)* Fixed completed or failed logins not being cleaned
+  up properly.
+
+[MSC4354]: https://github.com/matrix-org/matrix-spec-proposals/pull/4354
+
 ## v0.26.2 (2026-01-16)
 
 * *(bridgev2)* Added chunked portal deletion to avoid database locks when

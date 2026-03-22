@@ -1,4 +1,4 @@
-// Copyright 2025 Google LLC
+// Copyright 2026 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -27,9 +27,9 @@ import (
 func deleteDocumentConfigToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromForce := getValueByPath(fromObject, []string{"force"})
+	fromForce := InternalGetValueByPath(fromObject, []string{"force"})
 	if fromForce != nil {
-		setValueByPath(parentObject, []string{"_query", "force"}, fromForce)
+		InternalSetValueByPath(parentObject, []string{"_query", "force"}, fromForce)
 	}
 
 	return toObject, nil
@@ -38,12 +38,12 @@ func deleteDocumentConfigToMldev(fromObject map[string]any, parentObject map[str
 func deleteDocumentParametersToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromName := getValueByPath(fromObject, []string{"name"})
+	fromName := InternalGetValueByPath(fromObject, []string{"name"})
 	if fromName != nil {
-		setValueByPath(toObject, []string{"_url", "name"}, fromName)
+		InternalSetValueByPath(toObject, []string{"_url", "name"}, fromName)
 	}
 
-	fromConfig := getValueByPath(fromObject, []string{"config"})
+	fromConfig := InternalGetValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
 		_, err = deleteDocumentConfigToMldev(fromConfig.(map[string]any), toObject, rootObject)
 		if err != nil {
@@ -57,9 +57,9 @@ func deleteDocumentParametersToMldev(fromObject map[string]any, parentObject map
 func getDocumentParametersToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromName := getValueByPath(fromObject, []string{"name"})
+	fromName := InternalGetValueByPath(fromObject, []string{"name"})
 	if fromName != nil {
-		setValueByPath(toObject, []string{"_url", "name"}, fromName)
+		InternalSetValueByPath(toObject, []string{"_url", "name"}, fromName)
 	}
 
 	return toObject, nil
@@ -68,14 +68,14 @@ func getDocumentParametersToMldev(fromObject map[string]any, parentObject map[st
 func listDocumentsConfigToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromPageSize := getValueByPath(fromObject, []string{"pageSize"})
+	fromPageSize := InternalGetValueByPath(fromObject, []string{"pageSize"})
 	if fromPageSize != nil {
-		setValueByPath(parentObject, []string{"_query", "pageSize"}, fromPageSize)
+		InternalSetValueByPath(parentObject, []string{"_query", "pageSize"}, fromPageSize)
 	}
 
-	fromPageToken := getValueByPath(fromObject, []string{"pageToken"})
+	fromPageToken := InternalGetValueByPath(fromObject, []string{"pageToken"})
 	if fromPageToken != nil {
-		setValueByPath(parentObject, []string{"_query", "pageToken"}, fromPageToken)
+		InternalSetValueByPath(parentObject, []string{"_query", "pageToken"}, fromPageToken)
 	}
 
 	return toObject, nil
@@ -84,12 +84,12 @@ func listDocumentsConfigToMldev(fromObject map[string]any, parentObject map[stri
 func listDocumentsParametersToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromParent := getValueByPath(fromObject, []string{"parent"})
+	fromParent := InternalGetValueByPath(fromObject, []string{"parent"})
 	if fromParent != nil {
-		setValueByPath(toObject, []string{"_url", "parent"}, fromParent)
+		InternalSetValueByPath(toObject, []string{"_url", "parent"}, fromParent)
 	}
 
-	fromConfig := getValueByPath(fromObject, []string{"config"})
+	fromConfig := InternalGetValueByPath(fromObject, []string{"config"})
 	if fromConfig != nil {
 		_, err = listDocumentsConfigToMldev(fromConfig.(map[string]any), toObject, rootObject)
 		if err != nil {
@@ -103,33 +103,33 @@ func listDocumentsParametersToMldev(fromObject map[string]any, parentObject map[
 func listDocumentsResponseFromMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
-	fromSdkHttpResponse := getValueByPath(fromObject, []string{"sdkHttpResponse"})
+	fromSdkHttpResponse := InternalGetValueByPath(fromObject, []string{"sdkHttpResponse"})
 	if fromSdkHttpResponse != nil {
-		setValueByPath(toObject, []string{"sdkHttpResponse"}, fromSdkHttpResponse)
+		InternalSetValueByPath(toObject, []string{"sdkHttpResponse"}, fromSdkHttpResponse)
 	}
 
-	fromNextPageToken := getValueByPath(fromObject, []string{"nextPageToken"})
+	fromNextPageToken := InternalGetValueByPath(fromObject, []string{"nextPageToken"})
 	if fromNextPageToken != nil {
-		setValueByPath(toObject, []string{"nextPageToken"}, fromNextPageToken)
+		InternalSetValueByPath(toObject, []string{"nextPageToken"}, fromNextPageToken)
 	}
 
-	fromDocuments := getValueByPath(fromObject, []string{"documents"})
+	fromDocuments := InternalGetValueByPath(fromObject, []string{"documents"})
 	if fromDocuments != nil {
-		setValueByPath(toObject, []string{"documents"}, fromDocuments)
+		InternalSetValueByPath(toObject, []string{"documents"}, fromDocuments)
 	}
 
 	return toObject, nil
 }
 
 type Documents struct {
-	apiClient *apiClient
+	apiClient *InternalAPIClient
 }
 
 func (m Documents) Get(ctx context.Context, name string, config *GetDocumentConfig) (*Document, error) {
 	parameterMap := make(map[string]any)
 
 	kwargs := map[string]any{"name": name, "config": config}
-	deepMarshal(kwargs, &parameterMap)
+	InternalDeepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
 	if config == nil || config.HTTPOptions == nil {
@@ -143,7 +143,7 @@ func (m Documents) Get(ctx context.Context, name string, config *GetDocumentConf
 	var response = new(Document)
 	var responseMap map[string]any
 	var toConverter func(map[string]any, map[string]any, map[string]any) (map[string]any, error)
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method Get is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
 
@@ -156,22 +156,23 @@ func (m Documents) Get(ctx context.Context, name string, config *GetDocumentConf
 	if err != nil {
 		return nil, err
 	}
+
 	var path string
 	var urlParams map[string]any
 	if _, ok := body["_url"]; ok {
 		urlParams = body["_url"].(map[string]any)
 		delete(body, "_url")
 	}
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
-		path, err = formatMap("None", urlParams)
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
+		path, err = InternalFormatMap("None", urlParams)
 	} else {
-		path, err = formatMap("{name}", urlParams)
+		path, err = InternalFormatMap("{name}", urlParams)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
 	}
 	if _, ok := body["_query"]; ok {
-		query, err := createURLQuery(body["_query"].(map[string]any))
+		query, err := InternalCreateURLQuery(body["_query"].(map[string]any))
 		if err != nil {
 			return nil, err
 		}
@@ -182,7 +183,7 @@ func (m Documents) Get(ctx context.Context, name string, config *GetDocumentConf
 	if err != nil {
 		return nil, err
 	}
-	err = mapToStruct(responseMap, response)
+	err = InternalMapToStruct(responseMap, response)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +205,7 @@ func (m Documents) Delete(ctx context.Context, name string, config *DeleteDocume
 	parameterMap := make(map[string]any)
 
 	kwargs := map[string]any{"name": name, "config": config}
-	deepMarshal(kwargs, &parameterMap)
+	InternalDeepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
 	if config == nil || config.HTTPOptions == nil {
@@ -216,7 +217,7 @@ func (m Documents) Delete(ctx context.Context, name string, config *DeleteDocume
 		httpOptions.Headers = http.Header{}
 	}
 	var toConverter func(map[string]any, map[string]any, map[string]any) (map[string]any, error)
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
 
 		return fmt.Errorf("method Delete is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
 
@@ -229,22 +230,23 @@ func (m Documents) Delete(ctx context.Context, name string, config *DeleteDocume
 	if err != nil {
 		return err
 	}
+
 	var path string
 	var urlParams map[string]any
 	if _, ok := body["_url"]; ok {
 		urlParams = body["_url"].(map[string]any)
 		delete(body, "_url")
 	}
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
-		path, err = formatMap("None", urlParams)
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
+		path, err = InternalFormatMap("None", urlParams)
 	} else {
-		path, err = formatMap("{name}", urlParams)
+		path, err = InternalFormatMap("{name}", urlParams)
 	}
 	if err != nil {
 		return fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
 	}
 	if _, ok := body["_query"]; ok {
-		query, err := createURLQuery(body["_query"].(map[string]any))
+		query, err := InternalCreateURLQuery(body["_query"].(map[string]any))
 		if err != nil {
 			return err
 		}
@@ -263,7 +265,7 @@ func (m Documents) list(ctx context.Context, parent string, config *ListDocument
 	parameterMap := make(map[string]any)
 
 	kwargs := map[string]any{"parent": parent, "config": config}
-	deepMarshal(kwargs, &parameterMap)
+	InternalDeepMarshal(kwargs, &parameterMap)
 
 	var httpOptions *HTTPOptions
 	if config == nil || config.HTTPOptions == nil {
@@ -278,7 +280,7 @@ func (m Documents) list(ctx context.Context, parent string, config *ListDocument
 	var responseMap map[string]any
 	var fromConverter func(map[string]any, map[string]any, map[string]any) (map[string]any, error)
 	var toConverter func(map[string]any, map[string]any, map[string]any) (map[string]any, error)
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
 
 		return nil, fmt.Errorf("method List is only supported in the Gemini Developer client. You can choose to use Gemini Developer client by setting ClientConfig.Backend to BackendGeminiAPI.")
 
@@ -291,22 +293,23 @@ func (m Documents) list(ctx context.Context, parent string, config *ListDocument
 	if err != nil {
 		return nil, err
 	}
+
 	var path string
 	var urlParams map[string]any
 	if _, ok := body["_url"]; ok {
 		urlParams = body["_url"].(map[string]any)
 		delete(body, "_url")
 	}
-	if m.apiClient.clientConfig.Backend == BackendVertexAI {
-		path, err = formatMap("None", urlParams)
+	if m.apiClient.ClientConfig().Backend == BackendVertexAI {
+		path, err = InternalFormatMap("None", urlParams)
 	} else {
-		path, err = formatMap("{parent}/documents", urlParams)
+		path, err = InternalFormatMap("{parent}/documents", urlParams)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("invalid url params: %#v.\n%w", urlParams, err)
 	}
 	if _, ok := body["_query"]; ok {
-		query, err := createURLQuery(body["_query"].(map[string]any))
+		query, err := InternalCreateURLQuery(body["_query"].(map[string]any))
 		if err != nil {
 			return nil, err
 		}
@@ -323,7 +326,7 @@ func (m Documents) list(ctx context.Context, parent string, config *ListDocument
 	if err != nil {
 		return nil, err
 	}
-	err = mapToStruct(responseMap, response)
+	err = InternalMapToStruct(responseMap, response)
 	if err != nil {
 		return nil, err
 	}
@@ -345,7 +348,7 @@ func (m Documents) list(ctx context.Context, parent string, config *ListDocument
 func (m Documents) List(ctx context.Context, parent string, config *ListDocumentsConfig) (Page[Document], error) {
 	listFunc := func(ctx context.Context, config map[string]any) ([]*Document, string, *HTTPResponse, error) {
 		var c ListDocumentsConfig
-		if err := mapToStruct(config, &c); err != nil {
+		if err := InternalMapToStruct(config, &c); err != nil {
 			return nil, "", nil, err
 		}
 		resp, err := m.list(ctx, parent, &c)
@@ -355,7 +358,7 @@ func (m Documents) List(ctx context.Context, parent string, config *ListDocument
 		return resp.Documents, resp.NextPageToken, resp.SDKHTTPResponse, nil
 	}
 	c := make(map[string]any)
-	deepMarshal(config, &c)
+	InternalDeepMarshal(config, &c)
 	return newPage(ctx, "documents", c, listFunc)
 }
 
@@ -368,7 +371,7 @@ func (m Documents) List(ctx context.Context, parent string, config *ListDocument
 func (m Documents) All(ctx context.Context, parent string) iter.Seq2[*Document, error] {
 	listFunc := func(ctx context.Context, config map[string]any) ([]*Document, string, *HTTPResponse, error) {
 		var c ListDocumentsConfig
-		if err := mapToStruct(config, &c); err != nil {
+		if err := InternalMapToStruct(config, &c); err != nil {
 			return nil, "", nil, err
 		}
 		resp, err := m.list(ctx, parent, &c)

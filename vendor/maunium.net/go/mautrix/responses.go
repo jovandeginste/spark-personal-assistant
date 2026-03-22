@@ -258,6 +258,7 @@ func (r *UserDirectoryEntry) MarshalJSON() ([]byte, error) {
 type RespMutualRooms struct {
 	Joined    []id.RoomID `json:"joined"`
 	NextBatch string      `json:"next_batch,omitempty"`
+	Count     int         `json:"count,omitempty"`
 }
 
 type RespRoomSummary struct {
@@ -339,6 +340,13 @@ type LazyLoadSummary struct {
 	Heroes             []id.UserID `json:"m.heroes,omitempty"`
 	JoinedMemberCount  *int        `json:"m.joined_member_count,omitempty"`
 	InvitedMemberCount *int        `json:"m.invited_member_count,omitempty"`
+}
+
+func (lls *LazyLoadSummary) MemberCount() int {
+	if lls == nil {
+		return 0
+	}
+	return ptr.Val(lls.JoinedMemberCount) + ptr.Val(lls.InvitedMemberCount)
 }
 
 func (lls *LazyLoadSummary) Equal(other *LazyLoadSummary) bool {
