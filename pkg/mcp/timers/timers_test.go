@@ -95,6 +95,7 @@ func TestModule(t *testing.T) {
 			Name:    "Test Timer",
 			Message: "Time's up!",
 			Cron:    "* * * * *",
+			OneTime: false,
 		}
 
 		res, _, err := m.handleCreateTimer(ctx, &req, params)
@@ -113,6 +114,7 @@ func TestModule(t *testing.T) {
 			Name:    "Test Timer 2",
 			Message: "Time's up 2!",
 			Cron:    "0 * * * *",
+			OneTime: false,
 		}
 
 		res, _, err := m.handleCreateTimer(ctx, &req, params)
@@ -169,21 +171,21 @@ func TestModule(t *testing.T) {
 		err = m.writeTimers(map[string]Timer{})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-1", Name: "Cron 1", Message: "Msg", Cron: "* * * * *"})
+		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-1", Name: "Cron 1", Message: "Msg", Cron: "* * * * *", OneTime: false})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-2", Name: "Cron 2", Message: "Msg", Cron: "@hourly"})
+		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-2", Name: "Cron 2", Message: "Msg", Cron: "@hourly", OneTime: false})
 		require.NoError(t, err)
 
 		futureTime := "2099-01-01T00:00:00Z"
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-future", Name: "RFC Future", Message: "Msg", Cron: futureTime})
+		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-future", Name: "RFC Future", Message: "Msg", Cron: futureTime, OneTime: true})
 		require.NoError(t, err)
 
 		pastTime := "2000-01-01T00:00:00Z"
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-past", Name: "RFC Past", Message: "Msg", Cron: pastTime})
+		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-past", Name: "RFC Past", Message: "Msg", Cron: pastTime, OneTime: true})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "invalid", Name: "Invalid", Message: "Msg", Cron: "not a valid schedule"})
+		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "invalid", Name: "Invalid", Message: "Msg", Cron: "not a valid schedule", OneTime: false})
 		require.NoError(t, err)
 
 		res, _, err := m.handleListTimers(ctx, &req, struct{}{})
@@ -314,14 +316,22 @@ func TestProcessTimersAndDelete(t *testing.T) {
 	// Create initial timers
 	timers := map[string]Timer{
 		"past": {
-			ID:   "past",
-			Name: "Past Timer",
-			Cron: time.Now().Add(-1 * time.Minute).Format(time.RFC3339),
+			ID:      "past",
+			Name:    "Past Timer",
+			Cron:    time.Now().Add(-1 * time.Minute).Format(time.RFC3339),
+			OneTime: true,
 		},
 		"future": {
-			ID:   "future",
-			Name: "Future Timer",
-			Cron: time.Now().Add(10 * time.Minute).Format(time.RFC3339),
+			ID:      "future",
+			Name:    "Future Timer",
+			Cron:    time.Now().Add(10 * time.Minute).Format(time.RFC3339),
+			OneTime: true,
+		},
+		"onetime_cron": {
+			ID:      "onetime_cron",
+			Name:    "One Time Cron",
+			Cron:    "* * * * *",
+			OneTime: true,
 		},
 	}
 	err = m.writeTimers(timers)
@@ -330,11 +340,12 @@ func TestProcessTimersAndDelete(t *testing.T) {
 	// Test processing
 	m.processTimers(config, logger)
 
-	// Read timers back to see if "past" was deleted
+	// Read timers back to see if "past" and "onetime_cron" were deleted
 	updatedTimers, err := m.readTimers()
 	require.NoError(t, err)
 
 	assert.NotContains(t, updatedTimers, "past")
+	assert.NotContains(t, updatedTimers, "onetime_cron")
 	assert.Contains(t, updatedTimers, "future")
 }
 

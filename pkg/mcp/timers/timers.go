@@ -30,6 +30,7 @@ type Timer struct {
 	Name     string `json:"name"`
 	Message  string `json:"message"`
 	Cron     string `json:"cron"`
+	OneTime  bool   `json:"one_time"`
 	NextTime string `json:"next_time,omitempty"`
 }
 
@@ -128,8 +129,9 @@ func (m *Module) processTimers(config Config, logger *slog.Logger) {
 	for id, timer := range timers {
 		if m.shouldTriggerTimer(timer, parser, now) {
 			toTrigger = append(toTrigger, timer)
-			if _, err := parser.Parse(timer.Cron); err != nil {
-				// It's a one-time timer (parsing as cron failed), so delete it after triggering
+			_, err := parser.Parse(timer.Cron)
+			if timer.OneTime || err != nil {
+				// It's a one-time timer (explicitly requested or parsing as cron failed), so delete it after triggering
 				toDelete = append(toDelete, id)
 			}
 		}
@@ -163,13 +165,13 @@ func (m *Module) shouldTriggerTimer(timer Timer, parser cron.Parser, now time.Ti
 func (m *Module) triggerCallback(callbackTemplate string, timer Timer, logger *slog.Logger) {
 	nameSlug := slug.Make(timer.Name)
 	// Add prefix to the slug
-	nameSlug = fmt.Sprintf("[timers]-%s", nameSlug)
+	nameSlug = "[timers]-" + nameSlug
 	callbackUrl := strings.ReplaceAll(callbackTemplate, "_NAME_", nameSlug)
-	
+
 	// URL-encode the message
 	encodedMessage := url.QueryEscape(timer.Message)
 	callbackUrl = strings.ReplaceAll(callbackUrl, "_MESSAGE_", encodedMessage)
-	
+
 	logger.Info("Triggering timer", "id", timer.ID, "name", timer.Name, "slug", nameSlug, "url", callbackUrl)
 	go func(u string) {
 		// #nosec G107
@@ -242,6 +244,7 @@ type createTimerParams struct {
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Cron    string `json:"cron"`
+	OneTime bool   `json:"one_time"`
 }
 
 type deleteTimerParams struct {
@@ -349,6 +352,7 @@ func (m *Module) handleCreateTimer(ctx context.Context, request *mcp.CallToolReq
 		Name:    params.Name,
 		Message: params.Message,
 		Cron:    params.Cron,
+		OneTime: params.OneTime,
 	}
 	timers[params.ID] = timer
 
