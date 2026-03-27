@@ -228,6 +228,9 @@ github.com/modelcontextprotocol/go-sdk/oauthex
 # github.com/ncruces/go-strftime v1.0.0
 ## explicit; go 1.17
 github.com/ncruces/go-strftime
+# github.com/netresearch/go-cron v0.13.1
+## explicit; go 1.25
+github.com/netresearch/go-cron
 # github.com/openai/openai-go v1.12.0
 ## explicit; go 1.21
 github.com/openai/openai-go

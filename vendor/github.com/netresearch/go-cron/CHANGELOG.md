@@ -1,0 +1,519 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+This is a fork of [robfig/cron](https://github.com/robfig/cron) with additional
+features, bug fixes, and modernization improvements.
+
+## [Unreleased]
+
+### Planned for v2
+- Context-aware Job interface with graceful shutdown support
+
+## [0.13.1] - 2026-03-08
+
+### Fixed
+- **Race condition in `Entry`/`EntryByName` and `ScheduleJob`** ([PR#336]): When the
+  scheduler is running, `Entry`/`EntryByName` now route lookups through the run loop
+  channel while holding `runningMu`, preventing concurrent map access. `ScheduleJob`
+  now routes through the `c.add` channel when running, ensuring all heap/map
+  modifications happen atomically in the run loop. `Entry`, `EntryByName`, and
+  `Entries` now return struct copies with cloned `Tags` slices, preventing
+  callers from mutating internal scheduler state.
+
+[PR#336]: https://github.com/netresearch/go-cron/pull/336
+
+## [0.13.0] - 2026-02-23
+
+### Added
+- **Quoted timezone values** ([#335], [PR#337]): Shell users can now write
+  `TZ="America/New_York"` or `TZ='UTC'` in cron spec strings. Matching single
+  or double quotes are stripped before validation.
+
+[#335]: https://github.com/netresearch/go-cron/issues/335
+[PR#337]: https://github.com/netresearch/go-cron/pull/337
+
+## [0.12.0] - 2026-02-17
+
+### Added
+- **`PauseEntry`/`ResumeEntry`** ([#203], [PR#323]): Temporarily suspend individual
+  entries without removing them. Paused entries remain in the scheduler with their
+  schedule advancing, but execution is skipped. Includes `ByName` variants,
+  `IsEntryPaused`/`IsEntryPausedByName` query methods, `WithPaused()` JobOption,
+  and exported `Entry.Paused` field visible in snapshots.
+- **Triggered jobs** ([#311], [PR#325]): Jobs that never fire automatically, only when
+  explicitly triggered. Register with `@triggered`, `@manual`, or `@none` descriptors,
+  then execute on demand via `TriggerEntry`/`TriggerEntryByName`. Includes
+  `TriggeredSchedule` type, `IsTriggered()` helper, exported `Entry.Triggered` field,
+  `ErrEntryPaused`/`ErrNotRunning` sentinel errors, and compatibility with all existing
+  features (middleware, context, pause/resume, run-once, observability hooks).
+- **CircuitBreaker state monitoring** ([#185], [PR#326]): `CircuitBreakerWithHandle()`
+  returns a `*CircuitBreakerHandle` for querying state (`State()`, `Failures()`,
+  `LastFailure()`, `CooldownEnds()`). `WithStateChangeCallback()` option emits events
+  on state transitions (Closed→Open, Open→HalfOpen, HalfOpen→Closed, HalfOpen→Open).
+- **RetryWithBackoff/RetryOnError attempt callback** ([#186], [PR#326]):
+  `WithRetryCallback()` option invokes a callback after each attempt with
+  `RetryAttempt` metadata (attempt number, delay, error/panic value, whether another
+  retry will follow).
+- **Rate limiting middleware** ([#167], [PR#327]): `MaxConcurrent(n)` limits total
+  concurrent job executions across all wrapped entries (wait for slot).
+  `MaxConcurrentSkip(logger, n)` skips execution when full.
+- **`PrevN` schedule introspection** ([#297], [PR#328]): Query the previous n execution
+  times for any schedule implementing `ScheduleWithPrev`. Returns times in reverse
+  chronological order. Complements the existing `NextN`, `Between`, `Count`, and
+  `Matches` introspection functions.
+- **Workflow/DAG dependencies** ([#312], [PR#330]):
+  - `AddDependency`/`AddDependencyByName` — wire dependency edges between entries
+  - `RemoveDependency`/`RemoveDependencyByName` — remove dependency edges
+  - `Dependencies`/`DependenciesByName` — query dependency edges for an entry
+  - `NewWorkflow`/`AddWorkflow` — declarative workflow builder with `Step`, `After`, `Final`
+  - `WorkflowStatus`/`ActiveWorkflows` — query workflow execution state
+  - `WorkflowExecutionID` — extract execution ID from job context
+  - `WithWorkflowRetention` — configure completed execution retention count
+  - 4 trigger conditions: `OnSuccess`, `OnFailure`, `OnSkipped`, `OnComplete`
+  - `OnWorkflowComplete` observability hook
+- **CodSpeed continuous benchmarking** ([PR#333])
+
+### Fixed
+- **Recover workflow-awareness** ([PR#331]): `Recover` wrapper now re-panics in
+  workflow context so the workflow engine correctly detects job failures.
+- **Workflow shutdown hang** ([PR#331]): `Stop()` no longer hangs when workflow jobs
+  are in flight. The `jobDone` send is now non-blocking when the entry context is
+  canceled, preventing goroutines from blocking forever after the run loop exits.
+- **Workflow state isolation** ([PR#331]): `WorkflowStatus` and `ActiveWorkflows` now
+  return deep copies of workflow execution state, preventing callers from mutating
+  internal scheduler maps.
+- **Multi-condition dependency removal** ([PR#331]): `RemoveDependency` now correctly
+  removes all edges between a parent-child pair (e.g., `OnSuccess` + `OnFailure`),
+  not just the first match. Also fixed in `removeEntry` cleanup.
+
+[#167]: https://github.com/netresearch/go-cron/issues/167
+[#185]: https://github.com/netresearch/go-cron/issues/185
+[#186]: https://github.com/netresearch/go-cron/issues/186
+[#203]: https://github.com/netresearch/go-cron/issues/203
+[#297]: https://github.com/netresearch/go-cron/issues/297
+[#311]: https://github.com/netresearch/go-cron/issues/311
+[#312]: https://github.com/netresearch/go-cron/issues/312
+[PR#323]: https://github.com/netresearch/go-cron/pull/323
+[PR#325]: https://github.com/netresearch/go-cron/pull/325
+[PR#326]: https://github.com/netresearch/go-cron/pull/326
+[PR#327]: https://github.com/netresearch/go-cron/pull/327
+[PR#328]: https://github.com/netresearch/go-cron/pull/328
+[PR#330]: https://github.com/netresearch/go-cron/pull/330
+[PR#331]: https://github.com/netresearch/go-cron/pull/331
+[PR#333]: https://github.com/netresearch/go-cron/pull/333
+
+## [0.11.0] - 2026-02-12
+
+### Added
+- **`UpdateEntry`/`UpdateEntryByName`** ([#313], [PR#314]): Atomically replace both
+  schedule and job function of an existing entry. The new job is re-wrapped through
+  the configured Chain. Useful when rescheduling requires a new closure (e.g.,
+  `context.WithCancel` per schedule change). Returns `ErrNilJob` if job is nil.
+- **Per-entry context** ([PR#315]): Each entry now has its own `context.Context` derived
+  from the Cron's base context. Jobs implementing `JobWithContext` receive this per-entry
+  context instead of the shared base context. The entry context is automatically canceled
+  when the entry is removed or when its job is replaced via `UpdateEntry`. Schedule-only
+  updates (`UpdateSchedule`) do not cancel the context. `Stop()` cancels the base
+  context, which cascades to all entry contexts.
+- **`UpdateEntryJob`/`UpdateEntryJobByName`** ([PR#315]): Convenience methods that parse
+  a spec string with the Cron's configured parser, then atomically replace both schedule
+  and job. Eliminates the need for callers to construct their own parser matching the
+  Cron's configuration.
+- **Context-propagating chain wrappers** ([PR#316]): All chain wrappers (`Recover`,
+  `DelayIfStillRunning`, `SkipIfStillRunning`, `Timeout`, `Jitter`,
+  `JitterWithLogger`) now implement `JobWithContext` and propagate the incoming
+  context to inner jobs that also implement `JobWithContext`. Previously, only
+  `TimeoutWithContext` propagated context; other wrappers returned `FuncJob`
+  which broke the context chain. This means per-entry context now flows through
+  the entire wrapper chain to context-aware jobs.
+- **`UpsertJob`** ([PR#316]): Create-or-update convenience method that combines `AddJob`
+  and `UpdateEntry` into a single call. Requires `WithName` option. If an entry with
+  the name exists, its schedule and job are atomically updated; otherwise a new
+  entry is created. Handles TOCTOU races via retry. Returns `ErrNameRequired` if
+  no name is provided.
+- **`WaitForJob`/`WaitForJobByName`** ([#317], [PR#318]): Block until all
+  currently-running invocations of an entry complete. Returns immediately if the entry
+  is not running or does not exist. Enables graceful job replacement without manual
+  WaitGroup tracking: `cr.WaitForJobByName("job"); cr.UpsertJob(...)`. Per-entry
+  tracking uses a mutex-protected counter on each entry, wired into `startJob`.
+- **`IsJobRunning`/`IsJobRunningByName`** ([PR#319]): Non-blocking query to check
+  whether an entry has any invocations currently in flight. Useful for monitoring
+  dashboards and conditional logic (e.g., skip waiting if not running).
+
+[#313]: https://github.com/netresearch/go-cron/issues/313
+[PR#314]: https://github.com/netresearch/go-cron/pull/314
+[PR#315]: https://github.com/netresearch/go-cron/pull/315
+[PR#316]: https://github.com/netresearch/go-cron/pull/316
+[#317]: https://github.com/netresearch/go-cron/issues/317
+[PR#318]: https://github.com/netresearch/go-cron/pull/318
+[PR#319]: https://github.com/netresearch/go-cron/pull/319
+
+## [0.10.0] - 2026-02-08
+
+### Added
+- **`WithCapacity(n)`** ([#287], [PR#290]): Pre-allocate internal data structures for
+  known workload sizes.
+- **`WithMissedPolicy()`** ([#296], [PR#303]): Catch-up policy for jobs that missed
+  their scheduled time while the scheduler was stopped.
+- **`RetryOnError()`** ([PR#306]): Error-based retry middleware — retries when a job
+  returns an error (complements `RetryWithBackoff` which retries on panics).
+- **`UpdateSchedule()`/`UpdateScheduleByName()`** ([PR#307]): Atomically replace an
+  entry's schedule at runtime without removing and re-adding.
+- **`UpdateJob()`/`UpdateJobByName()`** ([PR#309]): Atomically replace an entry's job
+  function at runtime.
+- **`ValidateSpecWith()`/`Cron.ValidateSpec()`** ([PR#308]): Rich validation API that
+  returns structured analysis without creating a schedule.
+
+[#287]: https://github.com/netresearch/go-cron/issues/287
+[#296]: https://github.com/netresearch/go-cron/issues/296
+[PR#290]: https://github.com/netresearch/go-cron/pull/290
+[PR#303]: https://github.com/netresearch/go-cron/pull/303
+[PR#306]: https://github.com/netresearch/go-cron/pull/306
+[PR#307]: https://github.com/netresearch/go-cron/pull/307
+[PR#308]: https://github.com/netresearch/go-cron/pull/308
+[PR#309]: https://github.com/netresearch/go-cron/pull/309
+
+## [0.9.1] - 2026-01-17
+
+### Added
+- **DOM/DOW AND logic warnings** ([#277], [PR#285]): Runtime notification when both day-of-month
+  and day-of-week are restricted, helping users understand AND logic behavior
+  - `SpecAnalysis.Warnings` field for programmatic inspection via `AnalyzeSpec()`
+  - Cron-level logger emits info message when scheduling affected jobs
+  - Warnings suppressed when `DowOrDom` option is used (legacy OR behavior)
+
+### Documentation
+- **ADR-008** ([PR#284]): Architecture decision record documenting DOM/DOW AND logic rationale
+- Improved breaking change visibility in README, CHANGELOG, and MIGRATION.md ([PR#282])
+- Fixed version reference in RetryWithBackoff migration guide ([PR#283])
+
+[PR#282]: https://github.com/netresearch/go-cron/pull/282
+[PR#283]: https://github.com/netresearch/go-cron/pull/283
+[PR#284]: https://github.com/netresearch/go-cron/pull/284
+[PR#285]: https://github.com/netresearch/go-cron/pull/285
+
+## [0.9.0] - 2026-01-16
+
+> [!WARNING]
+> **Breaking change:** DOM/DOW matching now uses AND logic by default.
+> See [MIGRATION.md](docs/MIGRATION.md#domdow-and-logic-277) for details and the `DowOrDom` legacy option.
+
+### Changed
+- **BREAKING: DOM/DOW matching now uses AND logic** ([#277], [PR#279]): When both day-of-month
+  and day-of-week are specified, both must match. This is consistent with all other cron fields
+  and enables useful patterns:
+  - `0 0 25-31 * FRI` = last Friday of month
+  - `0 0 1-7 * MON` = first Monday of month
+  - `0 0 13 * FRI` = Friday the 13th
+  - Use `DowOrDom` parser option for legacy OR behavior
+
+### Added
+- **Wraparound ranges** ([#276], [PR#278]): Cyclic fields now support ranges where start > end
+  - Hours: `22-2` spans midnight (22, 23, 0, 1, 2)
+  - Day-of-week: `FRI-MON` spans weekend (FRI, SAT, SUN, MON)
+  - Month: `NOV-FEB` spans year boundary (NOV, DEC, JAN, FEB)
+  - Supports step values: `22-2/2` = every 2 hours from 10pm to 2am
+- **`DowOrDom` parser option** ([#277], [PR#279]): Legacy OR mode for DOM/DOW matching
+  - Provides robfig/cron compatibility for users depending on OR behavior
+
+### Fixed
+- **Test reliability** ([PR#278]): Fixed flaky chain tests using channel synchronization
+
+[#276]: https://github.com/netresearch/go-cron/issues/276
+[#277]: https://github.com/netresearch/go-cron/issues/277
+[PR#278]: https://github.com/netresearch/go-cron/pull/278
+[PR#279]: https://github.com/netresearch/go-cron/pull/279
+
+## [0.8.0] - 2025-12-26
+
+### Added
+- **`FullParser()` convenience function** ([PR#266]): Pre-configured parser with all features enabled
+  (seconds, year, hash, extended syntax)
+- **`YearOptional` parser option** ([PR#266]): Auto-detect year field by value >= 100
+
+### Changed
+- **Security hardening**: Improved workflow permissions and branch protection documentation
+
+### Documentation
+- Updated changelog with v0.7.1 contributor attribution
+
+[PR#266]: https://github.com/netresearch/go-cron/pull/266
+
+## [0.7.1] - 2025-12-17
+
+### Fixed
+- **Synchronize add/remove operations while cron is running** ([#262], [PR#264]): Fixed race condition
+  when adding or removing jobs while the scheduler is running. Operations now use synchronous
+  request/reply channels to ensure completion before returning. Thanks to [@jrouzierinverse] for
+  the contribution!
+- **Test reliability**: Fixed flaky `TestRunOnce_AddWhileRunning` test using polling instead of
+  sleep, with increased timeout for Windows CI
+
+### Changed
+- **CI: Skip gitleaks on fork PRs**: Fork PRs now pass CI without requiring secrets, as GitHub
+  Actions doesn't expose secrets to forks for security reasons
+
+[#262]: https://github.com/netresearch/go-cron/issues/262
+[PR#264]: https://github.com/netresearch/go-cron/pull/264
+[@jrouzierinverse]: https://github.com/jrouzierinverse
+
+## [0.7.0] - 2025-12-16
+
+### Added
+- **Extended cron syntax** ([#224], [#225], [PR#259]): Quartz/Jenkins-style modifiers as opt-in parser options
+  - `#n` nth weekday of month (e.g., `FRI#3` = 3rd Friday) — see [`ExampleDowNth`]
+  - `#L` last weekday of month (e.g., `FRI#L` = last Friday)
+  - `L` last day of month, `L-n` nth from last — see [`ExampleDomL`]
+  - `nW` nearest weekday, `LW` last weekday — see [`ExampleDomW`], [ADR-007]
+  - New parser options: `DowNth`, `DowLast`, `DomL`, `DomW`, `Extended`
+- **Year field support** ([#229], [PR#250], [PR#253]): Full year field in cron expressions
+  - Sparse map storage for memory efficiency (years 1–2147483647)
+  - Examples: `0 0 1 1 * 2025`, `0 0 * * * 2025-2030` — see [`ExampleNewParser_yearField`]
+- **Jenkins H hash expressions** ([#230], [PR#251]): Deterministic load distribution
+  - Hash-based scheduling: `H H * * *` distributes jobs across time
+  - Configurable hash key: `Parser.WithHashKey()` — see [`ExampleNewParser_hash`]
+- **Schedule introspection API** ([#210], [PR#249]): Query schedule metadata and field constraints
+  - `Bounds()`, `Fields()`, `Matches()` for runtime schedule analysis
+- **Validation API** ([#198], [PR#248]): Validate cron expressions without creating schedules
+  - `Validate(spec)` single expression, `ValidateSpecs(specs...)` bulk validation
+- **Run-once jobs** ([#231], [PR#252]): Single-execution scheduling with automatic removal
+  - `WithRunOnce()` option, `AddOnceFunc()`, `AddOnceJob()` — see [`ExampleWithRunOnce`]
+- **Schedule.Prev() method** ([#222], [PR#246]): Calculate previous execution time (inverse of `Next()`)
+  - Useful for missed job detection — see [`ExampleScheduleWithPrev_Prev_detectMissed`]
+- **Entry options** ([#221], [PR#245]): Fine-grained entry control
+  - `WithPrev` stores previous run time — see [`ExampleWithPrev`]
+  - `WithRunImmediately` triggers immediate first execution — see [`ExampleWithRunImmediately`]
+- **IsRunning() method** ([#232], [PR#244]): Query scheduler running state — see [`ExampleCron_IsRunning`]
+- **WithSecondOptional parser option** ([#220], [PR#242]): Flexible 5 or 6-field cron expressions
+- **Sunday=7 support** ([#234], [PR#243]): Accept `7` as Sunday in day-of-week field (POSIX extension)
+  - See [`ExampleParseStandard_sundayFormats`]
+- **Jitter wrappers** ([#227], [PR#258]): Prevent thundering herd with randomized delays
+  - `Jitter(maxJitter)`, `JitterWithLogger()` — see [`ExampleJitter`]
+
+### Fixed
+- **Test stability** ([PR#256]): Eliminated flaky timing in `SkipIfStillRunning` and `StopAndWait` tests
+  using proper channel synchronization
+
+### Changed
+- **ScheduleWithPrev interface** ([PR#260]): Now optional via interface assertion for backward
+  compatibility with custom Schedule implementations that don't implement `Prev()`
+- **PanicWithStack** ([PR#261]): Added type alias for backward compatibility with code referencing
+  the internal panic wrapper type
+- **Year field storage** ([PR#253]): Sparse map storage for memory efficiency with expanded bounds
+
+### Documentation
+- Added [COOKBOOK] ([#204]) with practical recipes for common patterns
+- Added [Architecture Decision Records][ADRs] ([#193]) for key design decisions
+- Added [TESTING_GUIDE] ([#211]) with FakeClock usage and real-time integration tests
+
+[#193]: https://github.com/netresearch/go-cron/issues/193
+[#198]: https://github.com/netresearch/go-cron/issues/198
+[#204]: https://github.com/netresearch/go-cron/issues/204
+[#210]: https://github.com/netresearch/go-cron/issues/210
+[#211]: https://github.com/netresearch/go-cron/issues/211
+[#220]: https://github.com/netresearch/go-cron/issues/220
+[#221]: https://github.com/netresearch/go-cron/issues/221
+[#222]: https://github.com/netresearch/go-cron/issues/222
+[#224]: https://github.com/netresearch/go-cron/issues/224
+[#225]: https://github.com/netresearch/go-cron/issues/225
+[#227]: https://github.com/netresearch/go-cron/issues/227
+[#229]: https://github.com/netresearch/go-cron/issues/229
+[#230]: https://github.com/netresearch/go-cron/issues/230
+[#231]: https://github.com/netresearch/go-cron/issues/231
+[#232]: https://github.com/netresearch/go-cron/issues/232
+[#234]: https://github.com/netresearch/go-cron/issues/234
+[PR#242]: https://github.com/netresearch/go-cron/pull/242
+[PR#243]: https://github.com/netresearch/go-cron/pull/243
+[PR#244]: https://github.com/netresearch/go-cron/pull/244
+[PR#245]: https://github.com/netresearch/go-cron/pull/245
+[PR#246]: https://github.com/netresearch/go-cron/pull/246
+[PR#248]: https://github.com/netresearch/go-cron/pull/248
+[PR#249]: https://github.com/netresearch/go-cron/pull/249
+[PR#250]: https://github.com/netresearch/go-cron/pull/250
+[PR#251]: https://github.com/netresearch/go-cron/pull/251
+[PR#252]: https://github.com/netresearch/go-cron/pull/252
+[PR#253]: https://github.com/netresearch/go-cron/pull/253
+[PR#256]: https://github.com/netresearch/go-cron/pull/256
+[PR#258]: https://github.com/netresearch/go-cron/pull/258
+[PR#259]: https://github.com/netresearch/go-cron/pull/259
+[PR#260]: https://github.com/netresearch/go-cron/pull/260
+[PR#261]: https://github.com/netresearch/go-cron/pull/261
+[ADR-007]: docs/adr/ADR-007-nw-skip-invalid-days.md
+[ADRs]: docs/adr/
+[COOKBOOK]: docs/COOKBOOK.md
+[TESTING_GUIDE]: docs/TESTING_GUIDE.md
+[`ExampleCron_IsRunning`]: example_test.go#ExampleCron_IsRunning
+[`ExampleDomL`]: example_test.go#ExampleDomL
+[`ExampleDomW`]: example_test.go#ExampleDomW
+[`ExampleDowNth`]: example_test.go#ExampleDowNth
+[`ExampleJitter`]: example_test.go#ExampleJitter
+[`ExampleNewParser_hash`]: example_test.go#ExampleNewParser_hash
+[`ExampleNewParser_yearField`]: example_test.go#ExampleNewParser_yearField
+[`ExampleParseStandard_sundayFormats`]: example_test.go#ExampleParseStandard_sundayFormats
+[`ExampleScheduleWithPrev_Prev_detectMissed`]: example_test.go#ExampleScheduleWithPrev_Prev_detectMissed
+[`ExampleWithPrev`]: example_test.go#ExampleWithPrev
+[`ExampleWithRunImmediately`]: example_test.go#ExampleWithRunImmediately
+[`ExampleWithRunOnce`]: example_test.go#ExampleWithRunOnce
+
+## [0.6.1] - 2025-12-03
+
+### Changed
+- **Go toolchain**: Updated from go1.25.0 to go1.25.5
+- **CodeQL action**: Upgraded from v3.28.0 to v4.31.6
+- **CodeQL workflow**: Added explicit workflow file for shields.io badge compatibility
+
+## [0.6.0] - 2025-12-03
+
+### Breaking Changes
+- **RetryWithBackoff semantics**: `maxRetries=0` now means "no retries" (execute once, fail on panic).
+  Previously `0` meant unlimited retries, which was a DoS risk.
+  - **Migration**: Use `maxRetries=-1` for unlimited retries (explicit opt-in)
+  - **Rationale**: Zero-value safety - forgotten configs now fail-fast instead of retrying forever
+
+### Added
+- **Min-heap scheduling**: O(log n) insertion/removal, O(1) next job lookup (upstream PR #423)
+- **Index map compaction**: Automatic cleanup of index maps after frequent entry removals
+- **WithClock option**: Inject custom time source for deterministic testing
+- **WithMaxSearchYears option**: Configure how many years schedule matching searches before giving up
+- **WithLogLevel option for Recover**: Configure log level (Error/Info) for recovered panics
+- **WithMinEveryInterval option**: Configure minimum interval for `@every` expressions
+  - Allow sub-second intervals for testing: `WithMinEveryInterval(0)` or `WithMinEveryInterval(100*time.Millisecond)`
+  - Enforce longer minimums for rate limiting: `WithMinEveryInterval(time.Minute)`
+- **EveryWithMin function**: Create constant delay schedules with custom minimum interval
+- **Parser.WithMinEveryInterval**: Configure minimum interval on parser level
+- **StandardParser function**: Get a copy of the standard parser for customization
+- **StopWithTimeout**: Graceful shutdown with configurable timeout
+- **StopAndWait**: Convenience method for blocking until all jobs complete
+- **Context support**: `JobWithContext` interface and `WithContext` option
+- **Job metadata**: `WithName` and `WithTags` options for job identification
+- **RetryWithBackoff wrapper**: Exponential backoff retry for transient failures
+- **CircuitBreaker wrapper**: Prevent cascading failures with automatic recovery
+- **WithMaxEntries option**: Limit maximum entries to prevent memory exhaustion
+- **Observability hooks**: `WithObservability` option for metrics integration
+- **TryNewParser/MustNewParser**: Safe and panic-on-error parser constructors
+- **Timeout callback**: Optional callback when job times out
+- **Benchmark suite**: Comprehensive benchmark tests for parser, scheduler, and job operations
+- **CI benchmarks**: CI job to run benchmarks and upload results as artifacts
+- **Input validation**: Maximum spec length limit (1024 chars) to prevent DoS
+- **Timeout JobWrapper**: `chain.Timeout(duration)` for job execution time limits
+- **slog adapter**: `SlogLogger` for structured logging with Go 1.21+ slog
+- **Multi-platform CI**: Windows, macOS, and Linux testing
+- **ExampleTimeout_withContext**: Demonstrates idiomatic context-based cancellation pattern
+- **Fuzz tests**: Fuzz testing for parser and scheduler robustness
+- **Enterprise security**: SLSA provenance, gosec, govulncheck, gitleaks, trivy scanning
+
+### Fixed
+- **Panic on NewParser with no fields**: Returns error instead of panicking
+- **Entry limit race condition**: Use atomic CAS for thread-safe limit checking
+- **Flaky tests**: Fixed timing-sensitive tests with channel synchronization
+  - `TestChainSkipIfStillRunning`
+  - `TestStopAndWait`
+  - `TestTimeoutWithContext`
+  - `TestFakeClockSchedulerIntegration` subtests
+- **Heap corruption**: Prevent stale heapIndex in Update operations
+- **Time backwards handling**: Scheduler iterates over copy when time goes backwards
+- **EntryID overflow**: Skip EntryID 0 on uint64 overflow
+
+### Changed
+- **EntryID uint64**: Changed from `int` to `uint64` for larger job capacity
+- **slices package**: Uses Go 1.21+ `slices.SortFunc` and `slices.DeleteFunc`
+- **Linting**: Uses golangci-lint v2.6.1 with modern rule set
+- **Timeout wrapper logging**: Enhanced message clarifies "goroutine still running in background"
+- **Parser complexity reduction**: Extracted helpers for better maintainability
+- **safeExecute consolidation**: Unified panic recovery across codebase
+
+### Security
+- **Timezone validation**: Character and length restrictions for timezone strings to prevent DoS
+- **RetryWithBackoff DoS prevention**: Zero-value is now safe default (no retries vs unlimited)
+- **Enterprise-grade CI**: GitHub Actions hardened with SHA pinning and SLSA
+
+## [0.5.0] - 2025-11-25
+
+Initial release of netresearch/go-cron fork.
+
+### Added
+- **Step range validation**: Step size must be less than range size (upstream #543)
+- **Minimum duration enforcement**: `@every` requires at least 1 second duration
+- **DST handling**: ISC cron-compatible behavior for spring forward transitions
+- **Time backwards handling**: Scheduler handles system time moving backwards gracefully
+- **GitHub Actions CI**: Migrated from Travis CI with comprehensive workflow
+
+### Fixed
+- **Panic on nil receiver** (upstream #551): `Entry.Run()` no longer panics
+- **Panic on empty timezone** (upstream #554): Parser returns error instead
+- **Panic on timezone-only spec** (upstream #555): Parser returns error instead
+- **removeEntry optimization**: Pre-allocates slice to reduce allocations
+- **SkipIfStillRunning graceful quit**: Fixed jobWrapper cleanup behavior
+
+### Changed
+- **Go version**: Requires Go 1.25+
+- **Module path**: Changed to `github.com/netresearch/go-cron`
+- **Code style**: Applied De Morgan's law optimizations
+- **Spelling**: Corrected 'cancelled' to 'canceled' (American English)
+
+### Security
+- Integrated gosec, govulncheck, gitleaks, and trivy security scanning
+
+## Differences from upstream robfig/cron
+
+This fork includes all features from robfig/cron v3 plus:
+
+| Feature | robfig/cron | netresearch/go-cron |
+|---------|-------------|---------------------|
+| Scheduling algorithm | O(n) sort | O(log n) min-heap |
+| Custom time source | No | WithClock option |
+| Step range validation | No | Yes |
+| @every minimum duration | No | 1 second (configurable) |
+| Timezone validation | No | Yes |
+| Input length limits | No | Yes |
+| Timeout wrapper | No | Yes |
+| slog adapter | No | Yes |
+| EntryID type | int | uint64 |
+| DST spring forward | Skips | ISC-compatible |
+| Time backwards handling | No | Yes |
+| Multi-platform CI | Linux only | Win/Mac/Linux |
+
+## Migration from robfig/cron
+
+1. Update import path:
+   ```go
+   // Before
+   import "github.com/robfig/cron/v3"
+
+   // After
+   import "github.com/netresearch/go-cron"
+   ```
+
+2. Update `EntryID` usage if storing as `int`:
+   ```go
+   // Before
+   var id int = c.AddJob(...)
+
+   // After
+   var id cron.EntryID = c.AddJob(...) // or uint64
+   ```
+
+3. Review cron expressions for step validation:
+   ```go
+   // Now returns error (step >= range size)
+   _, err := cron.ParseStandard("*/60 * * * *") // Error: step (60) must be less than range size (60)
+   ```
+
+[Unreleased]: https://github.com/netresearch/go-cron/compare/v0.13.1...HEAD
+[0.13.1]: https://github.com/netresearch/go-cron/compare/v0.13.0...v0.13.1
+[0.13.0]: https://github.com/netresearch/go-cron/compare/v0.12.0...v0.13.0
+[0.12.0]: https://github.com/netresearch/go-cron/compare/v0.11.0...v0.12.0
+[0.11.0]: https://github.com/netresearch/go-cron/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/netresearch/go-cron/compare/v0.9.1...v0.10.0
+[0.9.1]: https://github.com/netresearch/go-cron/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/netresearch/go-cron/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/netresearch/go-cron/compare/v0.7.1...v0.8.0
+[0.7.1]: https://github.com/netresearch/go-cron/compare/v0.7.0...v0.7.1
+[0.7.0]: https://github.com/netresearch/go-cron/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/netresearch/go-cron/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/netresearch/go-cron/compare/v0.5.0...v0.6.0
+[0.5.0]: https://github.com/netresearch/go-cron/releases/tag/v0.5.0
