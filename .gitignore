@@ -4,6 +4,7 @@ mcp-config.yaml
 mcp-hockey.yaml
 .aider*
 .cache
+.crush
 .direnv
 .gocache
 .gomodcache
