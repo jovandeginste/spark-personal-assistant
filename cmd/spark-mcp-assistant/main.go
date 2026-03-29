@@ -14,7 +14,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/jsonreader"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/projects"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/timers"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/reminders"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/webfetcher"
@@ -32,7 +32,7 @@ type Config struct {
 	GoogleContacts googlecontacts.Config `mapstructure:"googlecontacts"`
 	JSONReader     jsonreader.Config     `mapstructure:"jsonreader"`
 	WebFetcher     webfetcher.Config     `mapstructure:"webfetcher"`
-	Timers         timers.Config         `mapstructure:"timers"`
+	Reminders      reminders.Config      `mapstructure:"reminders"`
 	Port           string                `mapstructure:"port"`
 }
 
@@ -186,7 +186,7 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 		googlecontacts.New(config.GoogleContacts, logger),
 		jsonreader.New(config.JSONReader, logger),
 		webfetcher.New(config.WebFetcher, logger),
-		timers.New(config.Timers, logger),
+		reminders.New(config.Reminders, logger),
 	}
 
 	return modules

@@ -1,4 +1,4 @@
-package timers
+package reminders
 
 import (
 	"context"
@@ -16,14 +16,14 @@ import (
 )
 
 func TestModule(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "timers_test")
+	tempDir, err := os.MkdirTemp("", "reminders_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	timersFile := filepath.Join(tempDir, "timers.json")
+	remindersFile := filepath.Join(tempDir, "reminders.json")
 
 	config := Config{
-		File: timersFile,
+		File: remindersFile,
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := New(config, logger)
@@ -39,7 +39,7 @@ func TestModule(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Check if the initial file was created
-		_, err = os.Stat(timersFile)
+		_, err = os.Stat(remindersFile)
 		assert.NoError(t, err)
 	})
 
@@ -49,56 +49,56 @@ func TestModule(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("List Timers (Empty)", func(t *testing.T) {
-		res, _, err := m.handleListTimers(ctx, &req, struct{}{})
+	t.Run("List Reminders (Empty)", func(t *testing.T) {
+		res, _, err := m.handleListReminders(ctx, &req, struct{}{})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Len(t, res.Content, 1)
 
 		textContent, ok := res.Content[0].(*mcp.TextContent)
 		require.True(t, ok)
-		assert.Equal(t, "No timers found.", textContent.Text)
+		assert.Equal(t, "No reminders found.", textContent.Text)
 	})
 
-	t.Run("Create Invalid Timer", func(t *testing.T) {
-		res, _, err := m.handleCreateTimer(ctx, &req, createTimerParams{ID: ""})
+	t.Run("Create Invalid Reminder", func(t *testing.T) {
+		res, _, err := m.handleCreateReminder(ctx, &req, createReminderParams{ID: ""})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid 'id'")
 		assert.Nil(t, res)
 
-		res, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "test", Name: ""})
+		res, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "test", Name: ""})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid 'name'")
 		assert.Nil(t, res)
 
-		res, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "test", Name: "Test", Message: ""})
+		res, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "test", Name: "Test", Message: ""})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid 'message'")
 		assert.Nil(t, res)
 
-		res, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "test", Name: "Test", Message: "Msg", Cron: ""})
+		res, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "test", Name: "Test", Message: "Msg", Cron: ""})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid 'cron'")
 		assert.Nil(t, res)
 	})
 
-	t.Run("Delete Invalid Timer", func(t *testing.T) {
-		res, _, err := m.handleDeleteTimer(ctx, &req, deleteTimerParams{ID: ""})
+	t.Run("Delete Invalid Reminder", func(t *testing.T) {
+		res, _, err := m.handleDeleteReminder(ctx, &req, deleteReminderParams{ID: ""})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "missing or invalid 'id'")
 		assert.Nil(t, res)
 	})
 
-	t.Run("Create Timer", func(t *testing.T) {
-		params := createTimerParams{
+	t.Run("Create Reminder", func(t *testing.T) {
+		params := createReminderParams{
 			ID:      "test-1",
-			Name:    "Test Timer",
+			Name:    "Test Reminder",
 			Message: "Time's up!",
 			Cron:    "* * * * *",
 			OneTime: false,
 		}
 
-		res, _, err := m.handleCreateTimer(ctx, &req, params)
+		res, _, err := m.handleCreateReminder(ctx, &req, params)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Len(t, res.Content, 1)
@@ -108,23 +108,23 @@ func TestModule(t *testing.T) {
 		assert.Contains(t, textContent.Text, "created successfully")
 	})
 
-	t.Run("Create Duplicate Timer", func(t *testing.T) {
-		params := createTimerParams{
+	t.Run("Create Duplicate Reminder", func(t *testing.T) {
+		params := createReminderParams{
 			ID:      "test-1",
-			Name:    "Test Timer 2",
+			Name:    "Test Reminder 2",
 			Message: "Time's up 2!",
 			Cron:    "0 * * * *",
 			OneTime: false,
 		}
 
-		res, _, err := m.handleCreateTimer(ctx, &req, params)
+		res, _, err := m.handleCreateReminder(ctx, &req, params)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "already exists")
 		assert.Nil(t, res)
 	})
 
-	t.Run("List Timers (1 Timer)", func(t *testing.T) {
-		res, _, err := m.handleListTimers(ctx, &req, struct{}{})
+	t.Run("List Reminders (1 Reminder)", func(t *testing.T) {
+		res, _, err := m.handleListReminders(ctx, &req, struct{}{})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Len(t, res.Content, 1)
@@ -132,20 +132,20 @@ func TestModule(t *testing.T) {
 		textContent, ok := res.Content[0].(*mcp.TextContent)
 		require.True(t, ok)
 
-		var timers map[string]Timer
-		err = json.Unmarshal([]byte(textContent.Text), &timers)
+		var reminders map[string]Reminder
+		err = json.Unmarshal([]byte(textContent.Text), &reminders)
 		require.NoError(t, err)
 
-		assert.Len(t, timers, 1)
-		assert.Equal(t, "Test Timer", timers["test-1"].Name)
+		assert.Len(t, reminders, 1)
+		assert.Equal(t, "Test Reminder", reminders["test-1"].Name)
 	})
 
-	t.Run("Delete Timer", func(t *testing.T) {
-		params := deleteTimerParams{
+	t.Run("Delete Reminder", func(t *testing.T) {
+		params := deleteReminderParams{
 			ID: "test-1",
 		}
 
-		res, _, err := m.handleDeleteTimer(ctx, &req, params)
+		res, _, err := m.handleDeleteReminder(ctx, &req, params)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Len(t, res.Content, 1)
@@ -155,89 +155,89 @@ func TestModule(t *testing.T) {
 		assert.Contains(t, textContent.Text, "deleted successfully")
 	})
 
-	t.Run("Delete Non-existent Timer", func(t *testing.T) {
-		params := deleteTimerParams{
+	t.Run("Delete Non-existent Reminder", func(t *testing.T) {
+		params := deleteReminderParams{
 			ID: "test-1",
 		}
 
-		res, _, err := m.handleDeleteTimer(ctx, &req, params)
+		res, _, err := m.handleDeleteReminder(ctx, &req, params)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
 		assert.Nil(t, res)
 	})
 
-	t.Run("Timer Parsing", func(t *testing.T) {
+	t.Run("Reminder Parsing", func(t *testing.T) {
 		// Clean start
-		err = m.writeTimers(map[string]Timer{})
+		err = m.writeReminders(map[string]Reminder{})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-1", Name: "Cron 1", Message: "Msg", Cron: "* * * * *", OneTime: false})
+		_, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "cron-1", Name: "Cron 1", Message: "Msg", Cron: "* * * * *", OneTime: false})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "cron-2", Name: "Cron 2", Message: "Msg", Cron: "@hourly", OneTime: false})
+		_, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "cron-2", Name: "Cron 2", Message: "Msg", Cron: "@hourly", OneTime: false})
 		require.NoError(t, err)
 
 		futureTime := "2099-01-01T00:00:00Z"
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-future", Name: "RFC Future", Message: "Msg", Cron: futureTime, OneTime: true})
+		_, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "rfc-future", Name: "RFC Future", Message: "Msg", Cron: futureTime, OneTime: true})
 		require.NoError(t, err)
 
 		pastTime := "2000-01-01T00:00:00Z"
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "rfc-past", Name: "RFC Past", Message: "Msg", Cron: pastTime, OneTime: true})
+		_, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "rfc-past", Name: "RFC Past", Message: "Msg", Cron: pastTime, OneTime: true})
 		require.NoError(t, err)
 
-		_, _, err = m.handleCreateTimer(ctx, &req, createTimerParams{ID: "invalid", Name: "Invalid", Message: "Msg", Cron: "not a valid schedule", OneTime: false})
+		_, _, err = m.handleCreateReminder(ctx, &req, createReminderParams{ID: "invalid", Name: "Invalid", Message: "Msg", Cron: "not a valid schedule", OneTime: false})
 		require.NoError(t, err)
 
-		res, _, err := m.handleListTimers(ctx, &req, struct{}{})
+		res, _, err := m.handleListReminders(ctx, &req, struct{}{})
 		require.NoError(t, err)
 
 		textContent, ok := res.Content[0].(*mcp.TextContent)
 		require.True(t, ok)
 
-		var timers map[string]Timer
-		err = json.Unmarshal([]byte(textContent.Text), &timers)
+		var reminders map[string]Reminder
+		err = json.Unmarshal([]byte(textContent.Text), &reminders)
 		require.NoError(t, err)
 
-		assert.Len(t, timers, 5)
+		assert.Len(t, reminders, 5)
 
-		assert.NotEmpty(t, timers["cron-1"].NextTime)
-		assert.NotEqual(t, "Past", timers["cron-1"].NextTime)
-		assert.NotEqual(t, "Invalid schedule", timers["cron-1"].NextTime)
+		assert.NotEmpty(t, reminders["cron-1"].NextTime)
+		assert.NotEqual(t, "Past", reminders["cron-1"].NextTime)
+		assert.NotEqual(t, "Invalid schedule", reminders["cron-1"].NextTime)
 
-		assert.NotEmpty(t, timers["cron-2"].NextTime)
-		assert.NotEqual(t, "Past", timers["cron-2"].NextTime)
-		assert.NotEqual(t, "Invalid schedule", timers["cron-2"].NextTime)
+		assert.NotEmpty(t, reminders["cron-2"].NextTime)
+		assert.NotEqual(t, "Past", reminders["cron-2"].NextTime)
+		assert.NotEqual(t, "Invalid schedule", reminders["cron-2"].NextTime)
 
-		assert.Equal(t, futureTime, timers["rfc-future"].NextTime)
+		assert.Equal(t, futureTime, reminders["rfc-future"].NextTime)
 
-		assert.Equal(t, "Past", timers["rfc-past"].NextTime)
+		assert.Equal(t, "Past", reminders["rfc-past"].NextTime)
 
-		assert.Equal(t, "Invalid schedule", timers["invalid"].NextTime)
+		assert.Equal(t, "Invalid schedule", reminders["invalid"].NextTime)
 
 		// Clean up
-		err = m.writeTimers(map[string]Timer{})
+		err = m.writeReminders(map[string]Reminder{})
 		require.NoError(t, err)
 	})
 
-	t.Run("List Timers (Empty Again)", func(t *testing.T) {
-		res, _, err := m.handleListTimers(ctx, &req, struct{}{})
+	t.Run("List Reminders (Empty Again)", func(t *testing.T) {
+		res, _, err := m.handleListReminders(ctx, &req, struct{}{})
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
 		assert.Len(t, res.Content, 1)
 
 		textContent, ok := res.Content[0].(*mcp.TextContent)
 		require.True(t, ok)
-		assert.Equal(t, "No timers found.", textContent.Text)
+		assert.Equal(t, "No reminders found.", textContent.Text)
 	})
 }
 
-func TestShouldTriggerTimer(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "timers_test")
+func TestShouldTriggerReminder(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "reminders_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
 	config := Config{
-		File: filepath.Join(tempDir, "timers.json"),
+		File: filepath.Join(tempDir, "reminders.json"),
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := New(config, logger)
@@ -246,13 +246,13 @@ func TestShouldTriggerTimer(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		timer    Timer
+		reminder Reminder
 		now      time.Time
 		expected bool
 	}{
 		{
 			name: "Cron exact match",
-			timer: Timer{
+			reminder: Reminder{
 				Cron: "10 10 10 10 *",
 			},
 			now:      time.Date(2023, 10, 10, 10, 10, 30, 0, time.UTC),
@@ -260,7 +260,7 @@ func TestShouldTriggerTimer(t *testing.T) {
 		},
 		{
 			name: "Cron no match",
-			timer: Timer{
+			reminder: Reminder{
 				Cron: "11 10 10 10 *",
 			},
 			now:      time.Date(2023, 10, 10, 10, 10, 30, 0, time.UTC),
@@ -268,7 +268,7 @@ func TestShouldTriggerTimer(t *testing.T) {
 		},
 		{
 			name: "RFC3339 past",
-			timer: Timer{
+			reminder: Reminder{
 				Cron: time.Date(2023, 10, 10, 10, 9, 0, 0, time.UTC).Format(time.RFC3339),
 			},
 			now:      time.Date(2023, 10, 10, 10, 10, 30, 0, time.UTC),
@@ -276,7 +276,7 @@ func TestShouldTriggerTimer(t *testing.T) {
 		},
 		{
 			name: "RFC3339 future",
-			timer: Timer{
+			reminder: Reminder{
 				Cron: time.Date(2023, 10, 10, 10, 11, 0, 0, time.UTC).Format(time.RFC3339),
 			},
 			now:      time.Date(2023, 10, 10, 10, 10, 30, 0, time.UTC),
@@ -284,7 +284,7 @@ func TestShouldTriggerTimer(t *testing.T) {
 		},
 		{
 			name: "Invalid format",
-			timer: Timer{
+			reminder: Reminder{
 				Cron: "invalid_format",
 			},
 			now:      time.Date(2023, 10, 10, 10, 10, 30, 0, time.UTC),
@@ -294,36 +294,36 @@ func TestShouldTriggerTimer(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			result := m.shouldTriggerTimer(tc.timer, parser, tc.now)
+			result := m.shouldTriggerReminder(tc.reminder, parser, tc.now)
 			assert.Equal(t, tc.expected, result)
 		})
 	}
 }
 
-func TestProcessTimersAndDelete(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "timers_test")
+func TestProcessRemindersAndDelete(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "reminders_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	timersFile := filepath.Join(tempDir, "timers.json")
+	remindersFile := filepath.Join(tempDir, "reminders.json")
 	config := Config{
-		File:     timersFile,
+		File:     remindersFile,
 		Callback: "http://example.com/callback?name=_NAME_",
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := New(config, logger)
 
-	// Create initial timers
-	timers := map[string]Timer{
+	// Create initial reminders
+	reminders := map[string]Reminder{
 		"past": {
 			ID:      "past",
-			Name:    "Past Timer",
+			Name:    "Past Reminder",
 			Cron:    time.Now().Add(-1 * time.Minute).Format(time.RFC3339),
 			OneTime: true,
 		},
 		"future": {
 			ID:      "future",
-			Name:    "Future Timer",
+			Name:    "Future Reminder",
 			Cron:    time.Now().Add(10 * time.Minute).Format(time.RFC3339),
 			OneTime: true,
 		},
@@ -334,45 +334,45 @@ func TestProcessTimersAndDelete(t *testing.T) {
 			OneTime: true,
 		},
 	}
-	err = m.writeTimers(timers)
+	err = m.writeReminders(reminders)
 	require.NoError(t, err)
 
 	// Test processing
-	m.processTimers(config, logger)
+	m.processReminders(config, logger)
 
-	// Read timers back to see if "past" and "onetime_cron" were deleted
-	updatedTimers, err := m.readTimers()
+	// Read reminders back to see if "past" and "onetime_cron" were deleted
+	updatedReminders, err := m.readReminders()
 	require.NoError(t, err)
 
-	assert.NotContains(t, updatedTimers, "past")
-	assert.NotContains(t, updatedTimers, "onetime_cron")
-	assert.Contains(t, updatedTimers, "future")
+	assert.NotContains(t, updatedReminders, "past")
+	assert.NotContains(t, updatedReminders, "onetime_cron")
+	assert.Contains(t, updatedReminders, "future")
 }
 
-func TestDeleteTimers(t *testing.T) {
-	tempDir, err := os.MkdirTemp("", "timers_test")
+func TestDeleteReminders(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "reminders_test")
 	require.NoError(t, err)
 	defer os.RemoveAll(tempDir)
 
-	timersFile := filepath.Join(tempDir, "timers.json")
+	remindersFile := filepath.Join(tempDir, "reminders.json")
 	config := Config{
-		File: timersFile,
+		File: remindersFile,
 	}
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	m := New(config, logger)
 
-	timers := map[string]Timer{
+	reminders := map[string]Reminder{
 		"1": {ID: "1"},
 		"2": {ID: "2"},
 	}
-	err = m.writeTimers(timers)
+	err = m.writeReminders(reminders)
 	require.NoError(t, err)
 
-	m.deleteTimers(timersFile, []string{"1"})
+	m.deleteReminders(remindersFile, []string{"1"})
 
-	updatedTimers, err := m.readTimers()
+	updatedReminders, err := m.readReminders()
 	require.NoError(t, err)
 
-	assert.NotContains(t, updatedTimers, "1")
-	assert.Contains(t, updatedTimers, "2")
+	assert.NotContains(t, updatedReminders, "1")
+	assert.Contains(t, updatedReminders, "2")
 }
