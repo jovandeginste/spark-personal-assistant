@@ -1,6 +1,7 @@
 package reminders
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -168,14 +169,27 @@ func (m *Module) triggerCallback(callbackTemplate string, reminder Reminder, log
 	nameSlug = "[reminders]-" + nameSlug
 	callbackUrl := strings.ReplaceAll(callbackTemplate, "_NAME_", nameSlug)
 
-	// URL-encode the message
+	// Keep the original URL replacement for backward compatibility, but we will mostly rely on POST body now
 	encodedMessage := url.QueryEscape(reminder.Message)
 	callbackUrl = strings.ReplaceAll(callbackUrl, "_MESSAGE_", encodedMessage)
 
 	logger.Info("Triggering reminder", "id", reminder.ID, "name", reminder.Name, "slug", nameSlug, "url", callbackUrl)
-	go func(u string) {
+
+	go func(u string, r Reminder) {
+		payload := map[string]string{
+			"title":   r.Name,
+			"message": r.Message,
+			"source":  "reminders",
+		}
+
+		jsonData, err := json.Marshal(payload)
+		if err != nil {
+			logger.Error("Failed to marshal reminder payload", "error", err)
+			return
+		}
+
 		// #nosec G107
-		resp, err := http.Get(u)
+		resp, err := http.Post(u, "application/json", bytes.NewBuffer(jsonData))
 		if err != nil {
 			logger.Error("Failed to call callback", "url", u, "error", err)
 			return
@@ -184,7 +198,7 @@ func (m *Module) triggerCallback(callbackTemplate string, reminder Reminder, log
 		if resp.StatusCode >= 400 {
 			logger.Error("Callback returned error status", "url", u, "status", resp.Status)
 		}
-	}(callbackUrl)
+	}(callbackUrl, reminder)
 }
 
 func (m *Module) deleteReminders(file string, toDelete []string) {
