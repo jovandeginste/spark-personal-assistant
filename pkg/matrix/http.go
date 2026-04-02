@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -78,20 +79,24 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
 	}
 
-	prompt := payload.Title + "\n\n" + payload.Message
+	var prompt strings.Builder
+
+	prompt.WriteString(payload.Title + "\n\n" + payload.Message)
 	if payload.Source != "" {
-		prompt += "\n\nSource: " + payload.Source
+		prompt.WriteString("\n\nSource: " + payload.Source)
 	}
+
 	if len(payload.Extra) > 0 {
-		prompt += "\n\nExtra Metadata:\n"
+		prompt.WriteString("\n\nExtra Metadata:\n")
+
 		for k, v := range payload.Extra {
-			prompt += fmt.Sprintf("- %s: %v\n", k, v)
+			prompt.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
 		}
 	}
 
 	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt from "+payload.Source+": "+payload.Title)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
+	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt.String()); err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
