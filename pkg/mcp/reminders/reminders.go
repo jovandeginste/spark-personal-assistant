@@ -176,10 +176,14 @@ func (m *Module) triggerCallback(callbackTemplate string, reminder Reminder, log
 	logger.Info("Triggering reminder", "id", reminder.ID, "name", reminder.Name, "slug", nameSlug, "url", callbackUrl)
 
 	go func(u string, r Reminder) {
-		payload := map[string]string{
+		payload := map[string]any{
 			"title":   r.Name,
 			"message": r.Message,
 			"source":  "reminders",
+			"extra": map[string]any{
+				"cron":     r.Cron,
+				"one_time": r.OneTime,
+			},
 		}
 
 		jsonData, err := json.Marshal(payload)

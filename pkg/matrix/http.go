@@ -2,6 +2,7 @@ package matrix
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -61,9 +62,10 @@ func (mc *MatrixConfig) prompt(c echo.Context) error {
 }
 
 type PromptPayload struct {
-	Title   string `json:"title"`
-	Message string `json:"message"`
-	Source  string `json:"source"`
+	Title   string         `json:"title"`
+	Message string         `json:"message"`
+	Source  string         `json:"source"`
+	Extra   map[string]any `json:"extra"`
 }
 
 func (mc *MatrixConfig) postPrompt(c echo.Context) error {
@@ -79,6 +81,12 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 	prompt := payload.Title + "\n\n" + payload.Message
 	if payload.Source != "" {
 		prompt += "\n\nSource: " + payload.Source
+	}
+	if len(payload.Extra) > 0 {
+		prompt += "\n\nExtra Metadata:\n"
+		for k, v := range payload.Extra {
+			prompt += fmt.Sprintf("- %s: %v\n", k, v)
+		}
 	}
 
 	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt from "+payload.Source+": "+payload.Title)
