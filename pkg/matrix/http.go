@@ -34,6 +34,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 
 	// Routes
 	e.GET("/prompt", mc.prompt)
+	e.POST("/prompt", mc.postPrompt)
 	e.GET("/persona", mc.switchPersona)
 	e.GET("/update", mc.update)
 
@@ -54,6 +55,36 @@ func (mc *MatrixConfig) prompt(c echo.Context) error {
 
 	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
+	}
+
+	return c.String(http.StatusOK, "Prompt sent")
+}
+
+type PromptPayload struct {
+	Title   string `json:"title"`
+	Message string `json:"message"`
+	Source  string `json:"source"`
+}
+
+func (mc *MatrixConfig) postPrompt(c echo.Context) error {
+	var payload PromptPayload
+	if err := c.Bind(&payload); err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+	}
+
+	if payload.Title == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
+	}
+
+	prompt := payload.Title + "\n\n" + payload.Message
+	if payload.Source != "" {
+		prompt += "\n\nSource: " + payload.Source
+	}
+
+	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt from "+payload.Source+": "+payload.Title)
+
+	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
+		return c.JSON(http.StatusInternalServerError, err)
 	}
 
 	return c.String(http.StatusOK, "Prompt sent")
