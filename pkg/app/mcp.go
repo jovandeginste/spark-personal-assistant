@@ -346,7 +346,7 @@ type headerTransport struct {
 
 func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	r := req.Clone(req.Context())
-	r.Header.Set("Accept", "text/event-stream")
+	r.Header.Set("Accept", "application/json, text/event-stream")
 	if t.token != "" {
 		r.Header.Set("Authorization", "Bearer "+t.token)
 	}
