@@ -1,10 +1,7 @@
+---
 port: :8081
 weather:
   apiurl: https://api.open-meteo.com/v1/forecast
-kitchenowl:
-  apiurl: https://your-kitchenowl-instance/api
-  token: your-token
-  householdid: 1
 ical:
   calendars:
     - name: "Personal"

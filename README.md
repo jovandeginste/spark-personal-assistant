@@ -65,10 +65,6 @@ prefix).
 port: :8081
 weather:
   apiurl: https://api.open-meteo.com/v1/forecast
-kitchenowl:
-  apiurl: https://your-kitchenowl-instance/api
-  token: your-token
-  householdid: 1
 ical:
   calendars:
     - name: "Personal"
@@ -79,8 +75,6 @@ googlecontacts:
   client_secret: '{"installed":{"client_id":"...","client_secret":"..."}}'
   token_file: /path/to/token.json
 ```
-
-If `kitchenowl.token` is not provided, the meal planning tool will be disabled.
 
 ## Customization
 

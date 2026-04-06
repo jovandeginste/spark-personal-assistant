@@ -33,6 +33,7 @@ type MCPServerConfig struct {
 	Env          []string `mapstructure:"env"`
 	URL          string   `mapstructure:"url"`
 	Transport    string   `mapstructure:"transport"`
+	Token        string   `mapstructure:"token"`
 	AllowedRooms []string `mapstructure:"allowed_rooms"`
 }
 
