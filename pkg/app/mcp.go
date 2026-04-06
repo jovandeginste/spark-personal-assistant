@@ -62,6 +62,20 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 	}
 
 	switch config.Transport {
+	case "streamable":
+		if config.URL == "" {
+			return nil, fmt.Errorf("MCP server %s configured with streamable transport but no url", name)
+		}
+
+		transport = &mcp.StreamableClientTransport{
+			Endpoint: config.URL,
+			HTTPClient: &http.Client{
+				Transport: &headerTransport{
+					transport: http.DefaultTransport,
+					token:     config.Token,
+				},
+			},
+		}
 	case "sse":
 		if config.URL == "" {
 			return nil, fmt.Errorf("MCP server %s configured with sse transport but no url", name)
@@ -72,6 +86,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 			HTTPClient: &http.Client{
 				Transport: &headerTransport{
 					transport: http.DefaultTransport,
+					token:     config.Token,
 				},
 			},
 		}
@@ -326,11 +341,15 @@ func (a *App) UpdateMCPServers(ctx context.Context) map[string]string {
 
 type headerTransport struct {
 	transport http.RoundTripper
+	token     string
 }
 
 func (t *headerTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	r := req.Clone(req.Context())
 	r.Header.Set("Accept", "text/event-stream")
+	if t.token != "" {
+		r.Header.Set("Authorization", "Bearer "+t.token)
+	}
 
 	tr := t.transport
 	if tr == nil {

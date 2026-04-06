@@ -72,10 +72,37 @@ func main() {
 		return server
 	}, nil)
 
-	logger.Info("Starting SSE server on " + config.Port)
+	streamableHandler := sdk.NewStreamableHTTPHandler(func(r *http.Request) *sdk.Server {
+		server := sdk.NewServer(&sdk.Implementation{
+			Name:    "spark-mcp-hockey",
+			Version: "1.0.0",
+		}, &sdk.ServerOptions{
+			Logger: logger,
+		})
+
+		for _, module := range modules {
+			if err := module.Enabled(); err != nil {
+				logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
+				continue
+			}
+
+			if err := module.Register(server); err != nil {
+				logger.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
+				continue
+			}
+
+			logger.Info("Module registered", "module", fmt.Sprintf("%T", module))
+		}
+
+		return server
+	}, nil)
+
+	logger.Info("Starting server on " + config.Port)
 
 	mux := http.NewServeMux()
 	mux.Handle("/sse", sseHandler)
+	mux.Handle("/message", sseHandler)
+	mux.Handle("/", streamableHandler)
 
 	server := &http.Server{
 		Addr:              config.Port,

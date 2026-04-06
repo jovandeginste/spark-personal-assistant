@@ -12,7 +12,6 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/googlecontacts"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/jsonreader"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/kitchenowl"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/projects"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/reminders"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
@@ -24,7 +23,6 @@ import (
 )
 
 type Config struct {
-	KitchenOwl     kitchenowl.Config     `mapstructure:"kitchenowl"`
 	Weather        weather.Config        `mapstructure:"weather"`
 	ICal           ical.Config           `mapstructure:"ical"`
 	VCF            vcf.Config            `mapstructure:"vcf"`
@@ -97,10 +95,38 @@ func main() {
 		return server
 	}, nil)
 
-	logger.Info("Starting SSE server on " + config.Port)
+	// Create Streamable handler
+	streamableHandler := sdk.NewStreamableHTTPHandler(func(r *http.Request) *sdk.Server {
+		server := sdk.NewServer(&sdk.Implementation{
+			Name:    "mcp-personal-data",
+			Version: "1.0.0",
+		}, &sdk.ServerOptions{
+			Logger: logger,
+		})
+
+		for _, module := range modules {
+			if err := module.Enabled(); err != nil {
+				logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
+				continue
+			}
+
+			if err := module.Register(server); err != nil {
+				logger.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
+				continue
+			}
+
+			logger.Info("Module registered", "module", fmt.Sprintf("%T", module))
+		}
+
+		return server
+	}, nil)
+
+	logger.Info("Starting server on " + config.Port)
 
 	mux := http.NewServeMux()
 	mux.Handle("/sse", sseHandler)
+	mux.Handle("/message", sseHandler)
+	mux.Handle("/", streamableHandler)
 	mux.HandleFunc("/update", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -179,7 +205,6 @@ func loadConfig() (*Config, error) {
 func allModules(config *Config, logger *slog.Logger, cacheService *caching.Service) []mcp.Module {
 	modules := []mcp.Module{
 		weather.New(config.Weather, logger),
-		kitchenowl.New(config.KitchenOwl, cacheService, logger),
 		ical.New(config.ICal, cacheService, logger),
 		vcf.New(config.VCF, cacheService, logger),
 		projects.New(config.Projects, logger),
