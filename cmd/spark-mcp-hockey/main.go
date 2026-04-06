@@ -95,7 +95,9 @@ func main() {
 		}
 
 		return server
-	}, nil)
+	}, &sdk.StreamableHTTPOptions{
+		Stateless: true,
+	})
 
 	logger.Info("Starting server on " + config.Port)
 
