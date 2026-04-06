@@ -67,8 +67,16 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 			return nil, fmt.Errorf("MCP server %s configured with streamable transport but no url", name)
 		}
 
+		endpoint := config.URL
+		if strings.HasSuffix(endpoint, "/sse") {
+			endpoint = strings.TrimSuffix(endpoint, "/sse")
+		}
+		if endpoint == "" {
+			endpoint = "/"
+		}
+
 		transport = &mcp.StreamableClientTransport{
-			Endpoint: config.URL,
+			Endpoint: endpoint,
 			HTTPClient: &http.Client{
 				Transport: &headerTransport{
 					transport: http.DefaultTransport,
