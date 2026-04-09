@@ -195,7 +195,10 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
-	mc.sendNotice(roomID, eventID, "Calculating response...")
+	_, err := mc.Client.SendReaction(context.Background(), roomID, eventID, "✨")
+	if err != nil {
+		mc.App.Logger().Error("Failed to send reaction", "error", err)
+	}
 
 	tools, err := mc.App.GetMCPTools(context.Background(), roomID.String())
 	if err != nil {
