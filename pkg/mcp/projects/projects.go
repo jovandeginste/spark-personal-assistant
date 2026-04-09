@@ -499,33 +499,42 @@ func (m *Module) handleReadFileHeaders(ctx context.Context, request *mcp.CallToo
 	}, nil, nil
 }
 
-func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallToolRequest, params replaceSectionParams) (*mcp.CallToolResult, any, error) {
-	config := m.Config().(Config)
-	logger := m.Logger().With("handler", "replaceSection")
-	logger.Debug("Replacing section in file", "project", params.Project, "file", params.FileName)
-
-	if params.Project == "" || params.FileName == "" {
-		return nil, nil, errors.New("project and file_name are required")
+func (m *Module) resolveFileAndProject(projectName, fileName string) (string, string, string, string, error) {
+	if projectName == "" || fileName == "" {
+		return "", "", "", "", errors.New("project and file_name are required")
 	}
 
-	safeProject := slug.Make(params.Project)
+	config := m.Config().(Config)
+	safeProject := slug.Make(projectName)
 
-	ext := filepath.Ext(params.FileName)
-	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
+	ext := filepath.Ext(fileName)
+	nameWithoutExt := strings.TrimSuffix(fileName, ext)
 	safeFile := slug.Make(nameWithoutExt) + ext
 
 	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
-		return nil, nil, errors.New("invalid file name")
+		return "", "", "", "", errors.New("invalid file name")
 	}
 
 	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
 	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
-		return nil, nil, errors.New("invalid project path")
+		return "", "", "", "", errors.New("invalid project path")
 	}
 
 	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
 	if err := safe.IsSubPath(projectPath, filePath); err != nil {
-		return nil, nil, errors.New("invalid file path")
+		return "", "", "", "", errors.New("invalid file path")
+	}
+
+	return safeProject, safeFile, projectPath, filePath, nil
+}
+
+func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallToolRequest, params replaceSectionParams) (*mcp.CallToolResult, any, error) {
+	logger := m.Logger().With("handler", "replaceSection")
+	logger.Debug("Replacing section in file", "project", params.Project, "file", params.FileName)
+
+	safeProject, safeFile, projectPath, filePath, err := m.resolveFileAndProject(params.Project, params.FileName)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	if params.OldContent == "" {
@@ -539,7 +548,6 @@ func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallTool
 		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
 	}
 
-	var content string
 	fileBytes, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -547,9 +555,9 @@ func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallTool
 		}
 		return nil, nil, fmt.Errorf("failed to read file: %w", err)
 	}
-	
-	content = string(fileBytes)
-	
+
+	content := string(fileBytes)
+
 	// Check if unique
 	occurrences := strings.Count(content, params.OldContent)
 	if occurrences == 0 {
@@ -558,7 +566,7 @@ func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallTool
 	if occurrences > 1 {
 		return nil, nil, errors.New("old_content is not unique in file, please provide more context")
 	}
-	
+
 	content = strings.Replace(content, params.OldContent, params.NewContent, 1)
 
 	// Write to a temporary file first, then rename for atomicity
@@ -701,7 +709,7 @@ func (m *Module) handleDeleteProject(ctx context.Context, request *mcp.CallToolR
 	if params.Name == "" {
 		return nil, nil, errors.New("project name is required")
 	}
-	
+
 	if params.Content == "" {
 		return nil, nil, errors.New("project content is required for deletion confirmation")
 	}

@@ -77,16 +77,16 @@ func TestMemoryModule(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, searchRes.Content[0].(*mcp.TextContent).Text, "Review API documentation emails first")
 	})
-	
+
 	t.Run("Enabled", func(t *testing.T) {
 		err := m.Enabled()
 		assert.NoError(t, err)
-		
+
 		m2 := New(Config{}, logger)
 		err = m2.Enabled()
 		assert.Error(t, err)
 	})
-	
+
 	t.Run("Register", func(t *testing.T) {
 		server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "1"}, nil)
 		err := m.Register(server)
