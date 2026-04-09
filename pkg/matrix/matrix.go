@@ -206,7 +206,15 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		if mc.App.Config.Matrix.ThreadedTools {
-			mc.sendNotice(roomID, eventID, "Using tool "+name)
+			argsStr := ""
+			if len(args) > 0 {
+				var argList []string
+				for k, v := range args {
+					argList = append(argList, fmt.Sprintf("%s: %v", k, v))
+				}
+				argsStr = "(" + strings.Join(argList, ", ") + ")"
+			}
+			mc.sendNotice(roomID, eventID, fmt.Sprintf("> Using tool: `%s%s`", name, argsStr))
 		}
 		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
 	}, mc.AIData.FileURIs)
