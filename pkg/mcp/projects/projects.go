@@ -14,6 +14,9 @@ import (
 	safe "github.com/jovandeginste/spark-personal-assistant/pkg/helpers/safe"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 type Config struct {
@@ -81,9 +84,19 @@ func (m *Module) Register(server *mcp.Server) error {
 	}, m.handleReadFile)
 
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "project_update",
-		Description: "Add or update a file in a project",
-	}, m.handleUpdateProject)
+		Name:        "project_read_file_headers",
+		Description: "Read the markdown headers of a specific file within a project. Useful to get an overview of the structure of a file before reading or updating it.",
+	}, m.handleReadFileHeaders)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_replace_section",
+		Description: "Replace or delete a specific section of a file in a project. Provide the old content (which must match exactly and be unique) and the new content.",
+	}, m.handleReplaceSection)
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "project_create_file",
+		Description: "Create a new file in an existing project. The file must not exist yet.",
+	}, m.handleCreateFile)
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "project_delete_file",
@@ -114,10 +127,22 @@ type readFileParams struct {
 	FileName string `json:"file_name" jsonschema:"Name of the file to read (e.g., notes.md, index.md)"`
 }
 
-type updateProjectParams struct {
+type readFileHeadersParams struct {
 	Project  string `json:"project" jsonschema:"Name of the project"`
-	FileName string `json:"file_name" jsonschema:"Name of the file to add/update (e.g., notes.md, index.md)"`
-	Content  string `json:"content" jsonschema:"Content to write to the file"`
+	FileName string `json:"file_name" jsonschema:"Name of the file to read (e.g., notes.md, index.md)"`
+}
+
+type replaceSectionParams struct {
+	Project    string `json:"project" jsonschema:"Name of the project"`
+	FileName   string `json:"file_name" jsonschema:"Name of the file to update (e.g., notes.md, index.md)"`
+	OldContent string `json:"old_content" jsonschema:"The exact content to replace. Must not be empty. Must be unique within the file."`
+	NewContent string `json:"new_content" jsonschema:"The new content to insert. Leave empty to delete the old content."`
+}
+
+type createFileParams struct {
+	Project  string `json:"project" jsonschema:"Name of the project"`
+	FileName string `json:"file_name" jsonschema:"Name of the file to create (e.g., notes.md, index.md)"`
+	Content  string `json:"content" jsonschema:"Initial content of the file"`
 }
 
 type deleteFileParams struct {
@@ -126,7 +151,8 @@ type deleteFileParams struct {
 }
 
 type deleteProjectParams struct {
-	Name string `json:"name" jsonschema:"Name of the project to delete"`
+	Name    string `json:"name" jsonschema:"Name of the project to delete"`
+	Content string `json:"content" jsonschema:"Content of the index.md file to confirm deletion"`
 }
 
 // Handlers
@@ -378,10 +404,188 @@ func (m *Module) handleReadFile(ctx context.Context, request *mcp.CallToolReques
 	}, nil, nil
 }
 
-func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolRequest, params updateProjectParams) (*mcp.CallToolResult, any, error) {
+func extractHeaders(content []byte) ([]string, error) {
+	var headers []string
+
+	md := goldmark.New()
+	reader := text.NewReader(content)
+	doc := md.Parser().Parse(reader)
+
+	err := ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+
+		if heading, ok := n.(*ast.Heading); ok {
+			level := heading.Level
+			prefix := strings.Repeat("#", level)
+
+			var textContent []byte
+			for c := heading.FirstChild(); c != nil; c = c.NextSibling() {
+				if textNode, ok := c.(*ast.Text); ok {
+					textContent = append(textContent, textNode.Segment.Value(content)...)
+				}
+			}
+
+			headers = append(headers, fmt.Sprintf("%s %s", prefix, string(textContent)))
+		}
+		return ast.WalkContinue, nil
+	})
+
+	return headers, err
+}
+
+func (m *Module) handleReadFileHeaders(ctx context.Context, request *mcp.CallToolRequest, params readFileHeadersParams) (*mcp.CallToolResult, any, error) {
 	config := m.Config().(Config)
-	logger := m.Logger().With("handler", "updateProject")
-	logger.Debug("Updating project", "project", params.Project, "file", params.FileName)
+	logger := m.Logger().With("handler", "readFileHeaders")
+
+	if params.Project == "" || params.FileName == "" {
+		return nil, nil, errors.New("project and file_name are required")
+	}
+
+	safeProject := slug.Make(params.Project)
+
+	ext := filepath.Ext(params.FileName)
+	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
+	safeFile := slug.Make(nameWithoutExt) + ext
+
+	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
+		return nil, nil, errors.New("invalid file name")
+	}
+
+	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
+	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
+		return nil, nil, errors.New("invalid project path")
+	}
+
+	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
+	if err := safe.IsSubPath(projectPath, filePath); err != nil {
+		return nil, nil, errors.New("invalid file path")
+	}
+
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
+	}
+
+	fileContent, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, fmt.Errorf("file '%s' does not exist in project '%s'", safeFile, safeProject)
+		}
+		logger.Error("Failed to read file", "file", filePath, "error", err)
+		return nil, nil, fmt.Errorf("failed to read file: %w", err)
+	}
+
+	headers, err := extractHeaders(fileContent)
+	if err != nil {
+		logger.Error("Failed to parse markdown", "file", filePath, "error", err)
+		return nil, nil, fmt.Errorf("failed to parse markdown: %w", err)
+	}
+
+	headerText := strings.Join(headers, "\n")
+	if len(headers) == 0 {
+		headerText = "No markdown headers found in this file."
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: headerText,
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleReplaceSection(ctx context.Context, request *mcp.CallToolRequest, params replaceSectionParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "replaceSection")
+	logger.Debug("Replacing section in file", "project", params.Project, "file", params.FileName)
+
+	if params.Project == "" || params.FileName == "" {
+		return nil, nil, errors.New("project and file_name are required")
+	}
+
+	safeProject := slug.Make(params.Project)
+
+	ext := filepath.Ext(params.FileName)
+	nameWithoutExt := strings.TrimSuffix(params.FileName, ext)
+	safeFile := slug.Make(nameWithoutExt) + ext
+
+	if safeFile == "" || safeFile == ext || strings.Contains(safeFile, "/") || strings.Contains(safeFile, "\\") {
+		return nil, nil, errors.New("invalid file name")
+	}
+
+	projectPath := filepath.Clean(filepath.Join(config.Path, safeProject))
+	if err := safe.IsSubPath(config.Path, projectPath); err != nil {
+		return nil, nil, errors.New("invalid project path")
+	}
+
+	filePath := filepath.Clean(filepath.Join(projectPath, safeFile))
+	if err := safe.IsSubPath(projectPath, filePath); err != nil {
+		return nil, nil, errors.New("invalid file path")
+	}
+
+	if params.OldContent == "" {
+		return nil, nil, errors.New("old_content must not be empty")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
+	}
+
+	var content string
+	fileBytes, err := os.ReadFile(filePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil, fmt.Errorf("file '%s' does not exist. Use project_create_file to create new files", safeFile)
+		}
+		return nil, nil, fmt.Errorf("failed to read file: %w", err)
+	}
+	
+	content = string(fileBytes)
+	
+	// Check if unique
+	occurrences := strings.Count(content, params.OldContent)
+	if occurrences == 0 {
+		return nil, nil, errors.New("old_content not found in file")
+	}
+	if occurrences > 1 {
+		return nil, nil, errors.New("old_content is not unique in file, please provide more context")
+	}
+	
+	content = strings.Replace(content, params.OldContent, params.NewContent, 1)
+
+	// Write to a temporary file first, then rename for atomicity
+	tmpFile := filePath + ".tmp"
+	if err := os.WriteFile(tmpFile, []byte(content), 0o600); err != nil {
+		return nil, nil, fmt.Errorf("failed to write temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpFile, filePath); err != nil {
+		// Clean up the temp file if rename fails
+		os.Remove(tmpFile)
+		return nil, nil, fmt.Errorf("failed to save file atomically: %w", err)
+	}
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{
+				Text: fmt.Sprintf("File '%s' in project '%s' updated successfully", safeFile, safeProject),
+			},
+		},
+	}, nil, nil
+}
+
+func (m *Module) handleCreateFile(ctx context.Context, request *mcp.CallToolRequest, params createFileParams) (*mcp.CallToolResult, any, error) {
+	config := m.Config().(Config)
+	logger := m.Logger().With("handler", "createFile")
+	logger.Debug("Creating file in project", "project", params.Project, "file", params.FileName)
 
 	if params.Project == "" || params.FileName == "" {
 		return nil, nil, errors.New("project and file_name are required")
@@ -414,6 +618,12 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 		return nil, nil, fmt.Errorf("project '%s' does not exist", safeProject)
 	}
 
+	if _, err := os.Stat(filePath); err == nil {
+		return nil, nil, fmt.Errorf("file '%s' already exists in project '%s', use project_replace_section to modify it", safeFile, safeProject)
+	} else if !os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("failed to check if file exists: %w", err)
+	}
+
 	// Write to a temporary file first, then rename for atomicity
 	tmpFile := filePath + ".tmp"
 	if err := os.WriteFile(tmpFile, []byte(params.Content), 0o600); err != nil {
@@ -429,7 +639,7 @@ func (m *Module) handleUpdateProject(ctx context.Context, request *mcp.CallToolR
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{
-				Text: fmt.Sprintf("File '%s' in project '%s' updated successfully", safeFile, safeProject),
+				Text: fmt.Sprintf("File '%s' created in project '%s' successfully", safeFile, safeProject),
 			},
 		},
 	}, nil, nil
@@ -491,6 +701,10 @@ func (m *Module) handleDeleteProject(ctx context.Context, request *mcp.CallToolR
 	if params.Name == "" {
 		return nil, nil, errors.New("project name is required")
 	}
+	
+	if params.Content == "" {
+		return nil, nil, errors.New("project content is required for deletion confirmation")
+	}
 
 	safeName := slug.Make(params.Name)
 	projectPath := filepath.Clean(filepath.Join(config.Path, safeName))
@@ -504,6 +718,16 @@ func (m *Module) handleDeleteProject(ctx context.Context, request *mcp.CallToolR
 
 	if _, err := os.Stat(projectPath); os.IsNotExist(err) {
 		return nil, nil, fmt.Errorf("project '%s' does not exist", safeName)
+	}
+
+	indexPath := filepath.Clean(filepath.Join(projectPath, "index.md"))
+	indexContent, err := os.ReadFile(indexPath)
+	if err == nil {
+		if strings.TrimSpace(string(indexContent)) != strings.TrimSpace(params.Content) {
+			return nil, nil, errors.New("provided content does not match index.md content. Project deletion aborted")
+		}
+	} else if !os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("failed to read index.md for confirmation: %w", err)
 	}
 
 	if err := os.RemoveAll(projectPath); err != nil {

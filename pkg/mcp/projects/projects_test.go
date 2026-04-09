@@ -88,23 +88,54 @@ func TestModule(t *testing.T) {
 		assert.Contains(t, text, "A test project synopsis")
 	})
 
-	t.Run("Update Project", func(t *testing.T) {
-		params := updateProjectParams{
+	t.Run("Create File", func(t *testing.T) {
+		params := createFileParams{
 			Project:  "test-project",
 			FileName: "My Notes.md", // Should be slugified to my-notes.md
 			Content:  "Some project notes",
 		}
 
-		res, _, err := m.handleUpdateProject(nil, nil, params)
+		res, _, err := m.handleCreateFile(nil, nil, params)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "'my-notes.md' in project 'test-project' updated successfully")
+		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "'my-notes.md' created in project 'test-project' successfully")
 
 		// Verify on disk
 		notesPath := filepath.Join(tempDir, "test-project", "my-notes.md")
 		content, err := os.ReadFile(notesPath)
 		assert.NoError(t, err)
 		assert.Equal(t, "Some project notes", string(content))
+	})
+
+	t.Run("Replace Section (Empty OldContent fails)", func(t *testing.T) {
+		params := replaceSectionParams{
+			Project:    "test-project",
+			FileName:   "My Notes.md",
+			OldContent: "",
+			NewContent: "\nAppended notes",
+		}
+
+		_, _, err := m.handleReplaceSection(nil, nil, params)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "old_content must not be empty")
+	})
+
+	t.Run("Replace Section (Replace)", func(t *testing.T) {
+		params := replaceSectionParams{
+			Project:    "test-project",
+			FileName:   "My Notes.md",
+			OldContent: "project",
+			NewContent: "cool project",
+		}
+
+		res, _, err := m.handleReplaceSection(nil, nil, params)
+		assert.NoError(t, err)
+		assert.NotNil(t, res)
+
+		notesPath := filepath.Join(tempDir, "test-project", "my-notes.md")
+		content, err := os.ReadFile(notesPath)
+		assert.NoError(t, err)
+		assert.Equal(t, "Some cool project notes", string(content))
 	})
 
 	t.Run("Read File", func(t *testing.T) {
@@ -116,7 +147,7 @@ func TestModule(t *testing.T) {
 		res, _, err := m.handleReadFile(nil, nil, params)
 		assert.NoError(t, err)
 		assert.NotNil(t, res)
-		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "Some project notes")
+		assert.Contains(t, res.Content[0].(*mcp.TextContent).Text, "Some cool project notes")
 	})
 
 	t.Run("Delete File", func(t *testing.T) {
@@ -138,7 +169,8 @@ func TestModule(t *testing.T) {
 
 	t.Run("Delete Project", func(t *testing.T) {
 		params := deleteProjectParams{
-			Name: "test-project",
+			Name:    "test-project",
+			Content: "A test project synopsis",
 		}
 
 		res, _, err := m.handleDeleteProject(nil, nil, params)
