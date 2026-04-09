@@ -177,7 +177,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, eventID id.EventID, sende
 	}
 
 	if result != "" {
-		mc.sendMessage(roomID, eventID, result)
+		mc.sendMessage(roomID, result)
 		return nil
 	}
 
@@ -186,7 +186,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, eventID id.EventID, sende
 		return err
 	}
 
-	mc.sendMessage(roomID, eventID, result)
+	mc.sendMessage(roomID, result)
 
 	return nil
 }
@@ -206,7 +206,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		if mc.App.Config.Matrix.ThreadedTools {
-			mc.sendNotice(roomID, eventID, fmt.Sprintf("Using tool %s", name))
+			mc.sendNotice(roomID, eventID, "Using tool "+name)
 		}
 		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
 	}, mc.AIData.FileURIs)
@@ -314,8 +314,8 @@ func (mc *MatrixConfig) sendNotice(roomID id.RoomID, eventID id.EventID, text st
 	mc.send(roomID, eventID, event.MsgNotice, text)
 }
 
-func (mc *MatrixConfig) sendMessage(roomID id.RoomID, eventID id.EventID, text string) {
-	mc.send(roomID, eventID, event.MsgText, text)
+func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
+	mc.send(roomID, "", event.MsgText, text)
 }
 
 func (mc *MatrixConfig) Greet() error {
