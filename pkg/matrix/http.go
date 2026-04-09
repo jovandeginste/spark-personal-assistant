@@ -53,9 +53,9 @@ func (mc *MatrixConfig) ServeHTTP() {
 // Handler
 func (mc *MatrixConfig) prompt(c echo.Context) error {
 	prompt := c.QueryParam("prompt")
-	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt: "+prompt)
+	mc.sendNotice(mc.DefaultRoomID(), "", "Parsing prompt: "+prompt)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt); err != nil {
+	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", prompt); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
@@ -94,9 +94,9 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 		}
 	}
 
-	mc.sendNotice(mc.DefaultRoomID(), "Parsing prompt from "+payload.Source+": "+payload.Title)
+	mc.sendNotice(mc.DefaultRoomID(), "", "Parsing prompt from "+payload.Source+": "+payload.Title)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "web", prompt.String()); err != nil {
+	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", prompt.String()); err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
@@ -105,9 +105,9 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 
 func (mc *MatrixConfig) switchPersona(c echo.Context) error {
 	persona := c.QueryParam("persona")
-	mc.sendNotice(mc.DefaultRoomID(), "Switching to persona: "+persona)
+	mc.sendNotice(mc.DefaultRoomID(), "", "Switching to persona: "+persona)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "web", "switch "+persona); err != nil {
+	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", "switch "+persona); err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 

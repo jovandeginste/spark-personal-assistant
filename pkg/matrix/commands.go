@@ -111,7 +111,7 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 }
 
 func (mc *MatrixConfig) performCommandUpdate() (string, error) {
-	mc.sendNotice(mc.DefaultRoomID(), "Updating MCP servers...")
+	mc.sendNotice(mc.DefaultRoomID(), "", "Updating MCP servers...")
 
 	results := mc.App.UpdateMCPServers(context.Background())
 

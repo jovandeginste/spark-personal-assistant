@@ -38,12 +38,13 @@ type MCPServerConfig struct {
 }
 
 type MatrixConfig struct {
-	Homeserver  string   `mapstructure:"homeserver"`
-	Username    string   `mapstructure:"username"`
-	Password    string   `mapstructure:"password"`
-	RoomID      string   `mapstructure:"room_id"`
-	CryptoStore string   `mapstructure:"database"`
-	Users       []string `mapstructure:"users"`
+	Homeserver    string   `mapstructure:"homeserver"`
+	Username      string   `mapstructure:"username"`
+	Password      string   `mapstructure:"password"`
+	RoomID        string   `mapstructure:"room_id"`
+	CryptoStore   string   `mapstructure:"database"`
+	Users         []string `mapstructure:"users"`
+	ThreadedTools bool     `mapstructure:"threaded_tools"`
 }
 
 type WebserverConfig struct {

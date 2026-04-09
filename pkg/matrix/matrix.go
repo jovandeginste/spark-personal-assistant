@@ -37,6 +37,7 @@ type MatrixConfig struct {
 
 type msg struct {
 	RoomID  id.RoomID
+	EventID id.EventID
 	Content event.MessageEventContent
 }
 
@@ -81,8 +82,8 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		return
 	}
 
-	if err := mc.sendResponse(evt.RoomID, evt.Sender, body); err != nil {
-		mc.sendNotice(evt.RoomID, "Failed to send response: "+err.Error())
+	if err := mc.sendResponse(evt.RoomID, evt.ID, evt.Sender, body); err != nil {
+		mc.sendNotice(evt.RoomID, evt.ID, "Failed to send response: "+err.Error())
 		mc.App.Logger().Error("Failed to send response", "error", err)
 	}
 }
@@ -114,7 +115,7 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 	file, err := mc.Client.DownloadBytes(ctx, uri)
 	if err != nil {
 		mc.App.Logger().Error("Failed to download file", "error", err)
-		mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
+		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
 		return true
 	}
 
@@ -122,14 +123,14 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 		err = encryptedFile.DecryptInPlace(file)
 		if err != nil {
 			mc.App.Logger().Error("Failed to decrypt file", "error", err)
-			mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to decrypt file %s: %v", evt.Content.AsMessage().Body, err))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to decrypt file %s: %v", evt.Content.AsMessage().Body, err))
 			return true
 		}
 	}
 
 	if len(file) == 0 {
 		mc.App.Logger().Error("Downloaded file is empty", "filename", evt.Content.AsMessage().Body)
-		mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s: file is empty", evt.Content.AsMessage().Body))
+		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s: file is empty", evt.Content.AsMessage().Body))
 		return true
 	}
 
@@ -146,20 +147,20 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 	aiURI, err := mc.AIClient.UploadFile(ctx, evt.Content.AsMessage().Body, file, evt.Content.AsMessage().Info.MimeType)
 	if err != nil {
 		if strings.Contains(err.Error(), "The document has no pages") {
-			mc.sendNotice(evt.RoomID, fmt.Sprintf("AI rejected the file %s: The document appears to be empty or corrupted (Gemini error: document has no pages).", evt.Content.AsMessage().Body))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("AI rejected the file %s: The document appears to be empty or corrupted (Gemini error: document has no pages).", evt.Content.AsMessage().Body))
 		} else {
-			mc.sendNotice(evt.RoomID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
 		}
 		mc.App.Logger().Error("Failed to upload file to AI", "error", err)
 		return true
 	}
 
 	mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
-	mc.sendNotice(evt.RoomID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
+	mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
 	return true
 }
 
-func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input string) error {
+func (mc *MatrixConfig) sendResponse(roomID id.RoomID, eventID id.EventID, sender id.UserID, input string) error {
 	mc.Client.UserTyping(context.Background(), roomID, true, 60*time.Second)
 	defer func() {
 		mc.Client.UserTyping(context.Background(), roomID, false, 0)
@@ -176,25 +177,25 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, sender id.UserID, input s
 	}
 
 	if result != "" {
-		mc.sendMessage(roomID, result)
+		mc.sendMessage(roomID, eventID, result)
 		return nil
 	}
 
-	result, err = mc.calculateResponse(roomID, sender, input)
+	result, err = mc.calculateResponse(roomID, eventID, sender, input)
 	if err != nil {
 		return err
 	}
 
-	mc.sendMessage(roomID, result)
+	mc.sendMessage(roomID, eventID, result)
 
 	return nil
 }
 
-func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, input string) (string, error) {
+func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, sender id.UserID, input string) (string, error) {
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
-	mc.sendNotice(roomID, "Calculating response...")
+	mc.sendNotice(roomID, eventID, "Calculating response...")
 
 	tools, err := mc.App.GetMCPTools(context.Background(), roomID.String())
 	if err != nil {
@@ -204,6 +205,9 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, sender id.UserID, in
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		if mc.App.Config.Matrix.ThreadedTools {
+			mc.sendNotice(roomID, eventID, fmt.Sprintf("Using tool %s", name))
+		}
 		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
 	}, mc.AIData.FileURIs)
 	if err != nil {
@@ -291,20 +295,27 @@ func (mc *MatrixConfig) InitChat() {
 	}()
 }
 
-func (mc *MatrixConfig) send(roomID id.RoomID, msgType event.MessageType, text string) {
+func (mc *MatrixConfig) send(roomID id.RoomID, eventID id.EventID, msgType event.MessageType, text string) {
 	content := format.RenderMarkdown(text, true, true)
 	content.MsgType = msgType
 
-	mc.msges <- msg{RoomID: roomID, Content: content}
+	if eventID != "" {
+		content.RelatesTo = &event.RelatesTo{
+			EventID: eventID,
+			Type:    event.RelThread,
+		}
+	}
+
+	mc.msges <- msg{RoomID: roomID, EventID: eventID, Content: content}
 }
 
-func (mc *MatrixConfig) sendNotice(roomID id.RoomID, text string) {
+func (mc *MatrixConfig) sendNotice(roomID id.RoomID, eventID id.EventID, text string) {
 	mc.App.Logger().Info(text)
-	mc.send(roomID, event.MsgNotice, text)
+	mc.send(roomID, eventID, event.MsgNotice, text)
 }
 
-func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
-	mc.send(roomID, event.MsgText, text)
+func (mc *MatrixConfig) sendMessage(roomID id.RoomID, eventID id.EventID, text string) {
+	mc.send(roomID, eventID, event.MsgText, text)
 }
 
 func (mc *MatrixConfig) Greet() error {
@@ -312,7 +323,7 @@ func (mc *MatrixConfig) Greet() error {
 		mc.App.Logger().Error("Failed to set display name", "error", err)
 	}
 
-	mc.send(mc.DefaultRoomID(), event.MsgEmote, "reporting for duty")
+	mc.send(mc.DefaultRoomID(), "", event.MsgEmote, "reporting for duty")
 
 	return nil
 }
