@@ -105,6 +105,7 @@ from the codebase and repo configuration.
   `-count 1`, and `-tags goolm`.
 - Typical test frameworks: standard `go test` + `github.com/stretchr/testify`
   (in `go.mod`).
+- Ensure tests and linting pass before committing code.
 
 ## Linting
 
