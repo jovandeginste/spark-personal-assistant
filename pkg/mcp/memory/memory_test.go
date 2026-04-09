@@ -25,7 +25,9 @@ func TestMemoryModule(t *testing.T) {
 
 	err := m.Initialize()
 	require.NoError(t, err)
-	defer m.db.Close()
+	sqlDB, err := m.db.DB()
+	require.NoError(t, err)
+	defer sqlDB.Close()
 
 	t.Run("Semantic Memory", func(t *testing.T) {
 		// Store

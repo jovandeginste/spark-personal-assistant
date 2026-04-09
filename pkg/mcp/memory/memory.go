@@ -2,14 +2,16 @@ package memory
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
-	_ "github.com/glebarez/go-sqlite"
+	"github.com/glebarez/sqlite"
+	"gorm.io/gorm"
+
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -20,8 +22,41 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
-	db *sql.DB
+	db *gorm.DB
 	mu sync.RWMutex
+}
+
+type SemanticMemory struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	Entity    string    `gorm:"not null;uniqueIndex:idx_entity_fact"`
+	Fact      string    `gorm:"not null;uniqueIndex:idx_entity_fact"`
+	CreatedAt time.Time `gorm:"default:CURRENT_TIMESTAMP"`
+}
+
+func (SemanticMemory) TableName() string {
+	return "semantic_memory"
+}
+
+type EpisodicMemory struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	Event     string    `gorm:"not null"`
+	Lesson    string    `gorm:"not null"`
+	CreatedAt time.Time `gorm:"default:CURRENT_TIMESTAMP"`
+}
+
+func (EpisodicMemory) TableName() string {
+	return "episodic_memory"
+}
+
+type ProceduralMemory struct {
+	ID          uint      `gorm:"primaryKey;autoIncrement"`
+	Trigger     string    `gorm:"not null;uniqueIndex:idx_trigger_instruction"`
+	Instruction string    `gorm:"not null;uniqueIndex:idx_trigger_instruction"`
+	CreatedAt   time.Time `gorm:"default:CURRENT_TIMESTAMP"`
+}
+
+func (ProceduralMemory) TableName() string {
+	return "procedural_memory"
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -41,38 +76,13 @@ func (m *Module) Enabled() error {
 func (m *Module) Initialize() error {
 	config := m.Config().(Config)
 
-	db, err := sql.Open("sqlite", config.DatabasePath)
+	db, err := gorm.Open(sqlite.Open(config.DatabasePath), &gorm.Config{})
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 
-	queries := []string{
-		`CREATE TABLE IF NOT EXISTS semantic_memory (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			entity TEXT NOT NULL,
-			fact TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(entity, fact)
-		)`,
-		`CREATE TABLE IF NOT EXISTS episodic_memory (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			event TEXT NOT NULL,
-			lesson TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-		)`,
-		`CREATE TABLE IF NOT EXISTS procedural_memory (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			trigger TEXT NOT NULL,
-			instruction TEXT NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			UNIQUE(trigger, instruction)
-		)`,
-	}
-
-	for _, q := range queries {
-		if _, err := db.Exec(q); err != nil {
-			return fmt.Errorf("failed to initialize schema: %w", err)
-		}
+	if err := db.AutoMigrate(&SemanticMemory{}, &EpisodicMemory{}, &ProceduralMemory{}); err != nil {
+		return fmt.Errorf("failed to initialize schema: %w", err)
 	}
 
 	m.db = db
@@ -148,9 +158,10 @@ func (m *Module) handleSemanticStore(ctx context.Context, request *mcp.CallToolR
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	_, err := m.db.Exec("INSERT OR IGNORE INTO semantic_memory (entity, fact) VALUES (?, ?)", params.Entity, params.Fact)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to store semantic memory: %w", err)
+	memory := SemanticMemory{Entity: params.Entity, Fact: params.Fact}
+	result := m.db.Where(SemanticMemory{Entity: params.Entity, Fact: params.Fact}).FirstOrCreate(&memory)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to store semantic memory: %w", result.Error)
 	}
 
 	return &mcp.CallToolResult{
@@ -170,20 +181,16 @@ func (m *Module) handleSemanticSearch(ctx context.Context, request *mcp.CallTool
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	rows, err := m.db.Query("SELECT entity, fact FROM semantic_memory WHERE entity LIKE ? OR fact LIKE ? ORDER BY created_at DESC LIMIT 20",
-		"%"+params.Query+"%", "%"+params.Query+"%")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to search semantic memory: %w", err)
+	var memories []SemanticMemory
+	likeQuery := "%" + params.Query + "%"
+	result := m.db.Where("entity LIKE ? OR fact LIKE ?", likeQuery, likeQuery).Order("created_at desc").Limit(20).Find(&memories)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to search semantic memory: %w", result.Error)
 	}
-	defer rows.Close()
 
 	var results []string
-	for rows.Next() {
-		var entity, fact string
-		if err := rows.Scan(&entity, &fact); err != nil {
-			return nil, nil, err
-		}
-		results = append(results, fmt.Sprintf("- **%s**: %s", entity, fact))
+	for _, memory := range memories {
+		results = append(results, fmt.Sprintf("- **%s**: %s", memory.Entity, memory.Fact))
 	}
 
 	text := "No semantic memories found matching the query."
@@ -208,9 +215,10 @@ func (m *Module) handleEpisodicStore(ctx context.Context, request *mcp.CallToolR
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	_, err := m.db.Exec("INSERT INTO episodic_memory (event, lesson) VALUES (?, ?)", params.Event, params.Lesson)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to store episodic memory: %w", err)
+	memory := EpisodicMemory{Event: params.Event, Lesson: params.Lesson}
+	result := m.db.Create(&memory)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to store episodic memory: %w", result.Error)
 	}
 
 	return &mcp.CallToolResult{
@@ -230,20 +238,16 @@ func (m *Module) handleEpisodicSearch(ctx context.Context, request *mcp.CallTool
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	rows, err := m.db.Query("SELECT event, lesson, created_at FROM episodic_memory WHERE event LIKE ? OR lesson LIKE ? ORDER BY created_at DESC LIMIT 20",
-		"%"+params.Query+"%", "%"+params.Query+"%")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to search episodic memory: %w", err)
+	var memories []EpisodicMemory
+	likeQuery := "%" + params.Query + "%"
+	result := m.db.Where("event LIKE ? OR lesson LIKE ?", likeQuery, likeQuery).Order("created_at desc").Limit(20).Find(&memories)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to search episodic memory: %w", result.Error)
 	}
-	defer rows.Close()
 
 	var results []string
-	for rows.Next() {
-		var event, lesson, createdAt string
-		if err := rows.Scan(&event, &lesson, &createdAt); err != nil {
-			return nil, nil, err
-		}
-		results = append(results, fmt.Sprintf("- [%s] **Event**: %s\n  **Lesson**: %s", createdAt, event, lesson))
+	for _, memory := range memories {
+		results = append(results, fmt.Sprintf("- [%s] **Event**: %s\n  **Lesson**: %s", memory.CreatedAt.Format("2006-01-02 15:04:05.999999999Z07:00"), memory.Event, memory.Lesson))
 	}
 
 	text := "No episodic memories found matching the query."
@@ -268,9 +272,10 @@ func (m *Module) handleProceduralStore(ctx context.Context, request *mcp.CallToo
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	_, err := m.db.Exec("INSERT OR IGNORE INTO procedural_memory (trigger, instruction) VALUES (?, ?)", params.Trigger, params.Instruction)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to store procedural memory: %w", err)
+	memory := ProceduralMemory{Trigger: params.Trigger, Instruction: params.Instruction}
+	result := m.db.Where(ProceduralMemory{Trigger: params.Trigger, Instruction: params.Instruction}).FirstOrCreate(&memory)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to store procedural memory: %w", result.Error)
 	}
 
 	return &mcp.CallToolResult{
@@ -290,20 +295,16 @@ func (m *Module) handleProceduralSearch(ctx context.Context, request *mcp.CallTo
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	rows, err := m.db.Query("SELECT trigger, instruction FROM procedural_memory WHERE trigger LIKE ? OR instruction LIKE ? ORDER BY created_at DESC LIMIT 20",
-		"%"+params.Query+"%", "%"+params.Query+"%")
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to search procedural memory: %w", err)
+	var memories []ProceduralMemory
+	likeQuery := "%" + params.Query + "%"
+	result := m.db.Where("trigger LIKE ? OR instruction LIKE ?", likeQuery, likeQuery).Order("created_at desc").Limit(20).Find(&memories)
+	if result.Error != nil {
+		return nil, nil, fmt.Errorf("failed to search procedural memory: %w", result.Error)
 	}
-	defer rows.Close()
 
 	var results []string
-	for rows.Next() {
-		var trigger, instruction string
-		if err := rows.Scan(&trigger, &instruction); err != nil {
-			return nil, nil, err
-		}
-		results = append(results, fmt.Sprintf("- **When**: %s\n  **Do**: %s", trigger, instruction))
+	for _, memory := range memories {
+		results = append(results, fmt.Sprintf("- **When**: %s\n  **Do**: %s", memory.Trigger, memory.Instruction))
 	}
 
 	text := "No procedural memories found matching the query."
@@ -322,13 +323,13 @@ func (m *Module) handleProceduralSearch(ctx context.Context, request *mcp.CallTo
 
 func joinWithNewlines(s []string) string {
 	result := ""
-	var resultSb323 strings.Builder
+	var resultSb strings.Builder
 	for i, v := range s {
 		if i > 0 {
-			resultSb323.WriteString("\n\n")
+			resultSb.WriteString("\n\n")
 		}
-		resultSb323.WriteString(v)
+		resultSb.WriteString(v)
 	}
-	result += resultSb323.String()
+	result += resultSb.String()
 	return result
 }
