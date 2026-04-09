@@ -48,5 +48,5 @@ build-docker-mcp:
 
 run-docker: build-docker
 	-docker rm -v -f spark-mcp-assistant
-	docker run -d --rm --name spark-mcp-assistant --network host -v $(PWD)/mcp-config.yaml:/mcp-config.yaml -v ./data:/data -w / spark-mcp-assistant
-	docker run --rm --name spark-personal-assistant --network host -v $(PWD)/spark.yaml:/spark.yaml -v ./data:/data -w / spark-personal-assistant matrix
+	docker run -d --rm --name spark-mcp-assistant --network host -v ./mcp-config.yaml:/mcp-config.yaml -v ./data:/data -w / spark-mcp-assistant
+	docker run --rm --name spark-personal-assistant --network host -v ./spark.yaml:/spark.yaml -v ./data:/data -w / spark-personal-assistant matrix
