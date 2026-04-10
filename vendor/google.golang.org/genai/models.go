@@ -1285,6 +1285,11 @@ func generateContentConfigToMldev(ac *InternalAPIClient, fromObject map[string]a
 		return nil, fmt.Errorf("modelArmorConfig parameter is not supported in Gemini API")
 	}
 
+	fromServiceTier := InternalGetValueByPath(fromObject, []string{"serviceTier"})
+	if fromServiceTier != nil {
+		InternalSetValueByPath(parentObject, []string{"serviceTier"}, fromServiceTier)
+	}
+
 	return toObject, nil
 }
 
@@ -1458,6 +1463,11 @@ func generateContentConfigToVertex(ac *InternalAPIClient, fromObject map[string]
 			return nil, err
 		}
 
+		fromSpeechConfig, err = speechConfigToVertex(fromSpeechConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
 		InternalSetValueByPath(toObject, []string{"speechConfig"}, fromSpeechConfig)
 	}
 
@@ -1488,6 +1498,11 @@ func generateContentConfigToVertex(ac *InternalAPIClient, fromObject map[string]
 	fromModelArmorConfig := InternalGetValueByPath(fromObject, []string{"modelArmorConfig"})
 	if fromModelArmorConfig != nil {
 		InternalSetValueByPath(parentObject, []string{"modelArmorConfig"}, fromModelArmorConfig)
+	}
+
+	fromServiceTier := InternalGetValueByPath(fromObject, []string{"serviceTier"})
+	if fromServiceTier != nil {
+		InternalSetValueByPath(parentObject, []string{"serviceTier"}, fromServiceTier)
 	}
 
 	return toObject, nil
@@ -1611,6 +1626,11 @@ func generateContentResponseFromMldev(fromObject map[string]any, parentObject ma
 	fromUsageMetadata := InternalGetValueByPath(fromObject, []string{"usageMetadata"})
 	if fromUsageMetadata != nil {
 		InternalSetValueByPath(toObject, []string{"usageMetadata"}, fromUsageMetadata)
+	}
+
+	fromModelStatus := InternalGetValueByPath(fromObject, []string{"modelStatus"})
+	if fromModelStatus != nil {
+		InternalSetValueByPath(toObject, []string{"modelStatus"}, fromModelStatus)
 	}
 
 	return toObject, nil
@@ -2039,6 +2059,10 @@ func generateVideosConfigToMldev(fromObject map[string]any, parentObject map[str
 		return nil, fmt.Errorf("compressionQuality parameter is not supported in Gemini API")
 	}
 
+	if InternalGetValueByPath(fromObject, []string{"labels"}) != nil {
+		return nil, fmt.Errorf("labels parameter is not supported in Gemini API")
+	}
+
 	return toObject, nil
 }
 
@@ -2138,6 +2162,11 @@ func generateVideosConfigToVertex(fromObject map[string]any, parentObject map[st
 	fromCompressionQuality := InternalGetValueByPath(fromObject, []string{"compressionQuality"})
 	if fromCompressionQuality != nil {
 		InternalSetValueByPath(parentObject, []string{"parameters", "compressionQuality"}, fromCompressionQuality)
+	}
+
+	fromLabels := InternalGetValueByPath(fromObject, []string{"labels"})
+	if fromLabels != nil {
+		InternalSetValueByPath(parentObject, []string{"labels"}, fromLabels)
 	}
 
 	return toObject, nil
@@ -2648,6 +2677,11 @@ func generationConfigToVertex(fromObject map[string]any, parentObject map[string
 
 	fromSpeechConfig := InternalGetValueByPath(fromObject, []string{"speechConfig"})
 	if fromSpeechConfig != nil {
+		fromSpeechConfig, err = speechConfigToVertex(fromSpeechConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
 		InternalSetValueByPath(toObject, []string{"speechConfig"}, fromSpeechConfig)
 	}
 
@@ -3239,6 +3273,22 @@ func modelFromVertex(fromObject map[string]any, parentObject map[string]any, roo
 	return toObject, nil
 }
 
+func multiSpeakerVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromSpeakerVoiceConfigs := InternalGetValueByPath(fromObject, []string{"speakerVoiceConfigs"})
+	if fromSpeakerVoiceConfigs != nil {
+		fromSpeakerVoiceConfigs, err = applyConverterToSliceWithRoot(fromSpeakerVoiceConfigs.([]any), speakerVoiceConfigToVertex, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
+		InternalSetValueByPath(toObject, []string{"speakerVoiceConfigs"}, fromSpeakerVoiceConfigs)
+	}
+
+	return toObject, nil
+}
+
 func partToMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
@@ -3322,6 +3372,11 @@ func partToMldev(fromObject map[string]any, parentObject map[string]any, rootObj
 		InternalSetValueByPath(toObject, []string{"toolResponse"}, fromToolResponse)
 	}
 
+	fromPartMetadata := InternalGetValueByPath(fromObject, []string{"partMetadata"})
+	if fromPartMetadata != nil {
+		InternalSetValueByPath(toObject, []string{"partMetadata"}, fromPartMetadata)
+	}
+
 	return toObject, nil
 }
 
@@ -3389,6 +3444,10 @@ func partToVertex(fromObject map[string]any, parentObject map[string]any, rootOb
 
 	if InternalGetValueByPath(fromObject, []string{"toolResponse"}) != nil {
 		return nil, fmt.Errorf("toolResponse parameter is not supported in Vertex AI")
+	}
+
+	if InternalGetValueByPath(fromObject, []string{"partMetadata"}) != nil {
+		return nil, fmt.Errorf("partMetadata parameter is not supported in Vertex AI")
 	}
 
 	return toObject, nil
@@ -3606,6 +3665,22 @@ func referenceImageAPIToVertex(fromObject map[string]any, parentObject map[strin
 	return toObject, nil
 }
 
+func replicatedVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromMimeType := InternalGetValueByPath(fromObject, []string{"mimeType"})
+	if fromMimeType != nil {
+		InternalSetValueByPath(toObject, []string{"mimeType"}, fromMimeType)
+	}
+
+	fromVoiceSampleAudio := InternalGetValueByPath(fromObject, []string{"voiceSampleAudio"})
+	if fromVoiceSampleAudio != nil {
+		InternalSetValueByPath(toObject, []string{"voiceSampleAudio"}, fromVoiceSampleAudio)
+	}
+
+	return toObject, nil
+}
+
 func safetyAttributesFromMldev(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
 	toObject = make(map[string]any)
 
@@ -3794,6 +3869,58 @@ func segmentImageSourceToVertex(fromObject map[string]any, parentObject map[stri
 		}
 
 		InternalSetValueByPath(parentObject, []string{"instances[0]", "scribble"}, fromScribbleImage)
+	}
+
+	return toObject, nil
+}
+
+func speakerVoiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromSpeaker := InternalGetValueByPath(fromObject, []string{"speaker"})
+	if fromSpeaker != nil {
+		InternalSetValueByPath(toObject, []string{"speaker"}, fromSpeaker)
+	}
+
+	fromVoiceConfig := InternalGetValueByPath(fromObject, []string{"voiceConfig"})
+	if fromVoiceConfig != nil {
+		fromVoiceConfig, err = voiceConfigToVertex(fromVoiceConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
+		InternalSetValueByPath(toObject, []string{"voiceConfig"}, fromVoiceConfig)
+	}
+
+	return toObject, nil
+}
+
+func speechConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromVoiceConfig := InternalGetValueByPath(fromObject, []string{"voiceConfig"})
+	if fromVoiceConfig != nil {
+		fromVoiceConfig, err = voiceConfigToVertex(fromVoiceConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
+		InternalSetValueByPath(toObject, []string{"voiceConfig"}, fromVoiceConfig)
+	}
+
+	fromLanguageCode := InternalGetValueByPath(fromObject, []string{"languageCode"})
+	if fromLanguageCode != nil {
+		InternalSetValueByPath(toObject, []string{"languageCode"}, fromLanguageCode)
+	}
+
+	fromMultiSpeakerVoiceConfig := InternalGetValueByPath(fromObject, []string{"multiSpeakerVoiceConfig"})
+	if fromMultiSpeakerVoiceConfig != nil {
+		fromMultiSpeakerVoiceConfig, err = multiSpeakerVoiceConfigToVertex(fromMultiSpeakerVoiceConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
+		InternalSetValueByPath(toObject, []string{"multiSpeakerVoiceConfig"}, fromMultiSpeakerVoiceConfig)
 	}
 
 	return toObject, nil
@@ -4385,6 +4512,27 @@ func videoToVertex(fromObject map[string]any, parentObject map[string]any, rootO
 	return toObject, nil
 }
 
+func voiceConfigToVertex(fromObject map[string]any, parentObject map[string]any, rootObject map[string]any) (toObject map[string]any, err error) {
+	toObject = make(map[string]any)
+
+	fromReplicatedVoiceConfig := InternalGetValueByPath(fromObject, []string{"replicatedVoiceConfig"})
+	if fromReplicatedVoiceConfig != nil {
+		fromReplicatedVoiceConfig, err = replicatedVoiceConfigToVertex(fromReplicatedVoiceConfig.(map[string]any), toObject, rootObject)
+		if err != nil {
+			return nil, err
+		}
+
+		InternalSetValueByPath(toObject, []string{"replicatedVoiceConfig"}, fromReplicatedVoiceConfig)
+	}
+
+	fromPrebuiltVoiceConfig := InternalGetValueByPath(fromObject, []string{"prebuiltVoiceConfig"})
+	if fromPrebuiltVoiceConfig != nil {
+		InternalSetValueByPath(toObject, []string{"prebuiltVoiceConfig"}, fromPrebuiltVoiceConfig)
+	}
+
+	return toObject, nil
+}
+
 // Models provides methods for interacting with the available language models.
 // You don't need to initiate this struct. Create a client instance via NewClient, and
 // then access Models through client.Models field.
@@ -4827,10 +4975,8 @@ func (m Models) upscaleImage(ctx context.Context, model string, image *Image, up
 }
 
 // RecontextImage recontextualizes an image.
-// There are two types of recontextualization currently supported:
-// 1) Imagen Product Recontext - Generate images of products in new scenes
-// and contexts.
-// 2) Virtual Try-On: Generate images of persons modeling fashion products.
+// There is one type of recontextualization currently supported:
+// 1) Virtual Try-On: Generate images of persons modeling fashion products.
 func (m Models) RecontextImage(ctx context.Context, model string, source *RecontextImageSource, config *RecontextImageConfig) (*RecontextImageResponse, error) {
 	parameterMap := make(map[string]any)
 

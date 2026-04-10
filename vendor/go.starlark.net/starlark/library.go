@@ -15,6 +15,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -40,7 +41,7 @@ func init() {
 		"True":      True,
 		"False":     False,
 		"abs":       NewBuiltin("abs", abs),
-		"any":       NewBuiltin("any", any),
+		"any":       NewBuiltin("any", any_),
 		"all":       NewBuiltin("all", all),
 		"bool":      NewBuiltin("bool", bool_),
 		"bytes":     NewBuiltin("bytes", bytes_),
@@ -63,7 +64,7 @@ func init() {
 		"range":     NewBuiltin("range", range_),
 		"repr":      NewBuiltin("repr", repr),
 		"reversed":  NewBuiltin("reversed", reversed),
-		"set":       NewBuiltin("set", set), // requires resolve.AllowSet
+		"set":       NewBuiltin("set", set),
 		"sorted":    NewBuiltin("sorted", sorted),
 		"str":       NewBuiltin("str", str),
 		"tuple":     NewBuiltin("tuple", tuple),
@@ -140,7 +141,18 @@ var (
 	}
 
 	setMethods = map[string]*Builtin{
-		"union": NewBuiltin("union", set_union),
+		"add":                  NewBuiltin("add", set_add),
+		"clear":                NewBuiltin("clear", set_clear),
+		"difference":           NewBuiltin("difference", set_difference),
+		"discard":              NewBuiltin("discard", set_discard),
+		"intersection":         NewBuiltin("intersection", set_intersection),
+		"issubset":             NewBuiltin("issubset", set_issubset),
+		"issuperset":           NewBuiltin("issuperset", set_issuperset),
+		"pop":                  NewBuiltin("pop", set_pop),
+		"remove":               NewBuiltin("remove", set_remove),
+		"symmetric_difference": NewBuiltin("symmetric_difference", set_symmetric_difference),
+		"union":                NewBuiltin("union", set_union),
+		"update":               NewBuiltin("update", set_update),
 	}
 )
 
@@ -200,7 +212,7 @@ func all(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) 
 }
 
 // https://github.com/google/starlark-go/blob/master/doc/spec.md#any
-func any(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+func any_(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
 	var iterable Iterable
 	if err := UnpackPositionalArgs("any", args, kwargs, 1, &iterable); err != nil {
 		return nil, err
@@ -485,10 +497,8 @@ func hasattr(thread *Thread, _ *Builtin, args Tuple, kwargs []Tuple) (Value, err
 		// absence of a field: it could occur while computing
 		// the value of a present attribute, or it could be a
 		// "no such attribute" error with details.
-		for _, x := range object.AttrNames() {
-			if x == name {
-				return True, nil
-			}
+		if slices.Contains(object.AttrNames(), name) {
+			return True, nil
 		}
 	}
 	return False, nil
@@ -843,6 +853,7 @@ var (
 	_ Sequence   = rangeValue{}
 	_ Comparable = rangeValue{}
 	_ Sliceable  = rangeValue{}
+	_ Container  = rangeValue{}
 )
 
 func (r rangeValue) Len() int          { return r.len }
@@ -903,6 +914,14 @@ func (x rangeValue) CompareSameType(op syntax.Token, y_ Value, depth int) (bool,
 	default:
 		return false, fmt.Errorf("%s %s %s not implemented", x.Type(), op, y.Type())
 	}
+}
+
+func (r rangeValue) Has(y Value) (bool, error) {
+	i, err := NumberToInt(y)
+	if err != nil {
+		return false, fmt.Errorf("'in <range>' requires integer as left operand, not %s", y.Type())
+	}
+	return r.contains(i), nil
 }
 
 func rangeEqual(x, y rangeValue) bool {
@@ -1734,11 +1753,11 @@ func string_format(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, er
 			name = field[:i]
 			field = field[i+1:]
 			// "conv" or "conv:spec"
-			if i := strings.IndexByte(field, ':'); i < 0 {
+			if before, after, ok := strings.Cut(field, ":"); !ok {
 				conv = field
 			} else {
-				conv = field[:i]
-				spec = field[i+1:]
+				conv = before
+				spec = after
 			}
 		}
 
@@ -1812,7 +1831,7 @@ func string_format(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, er
 // decimal interprets s as a sequence of decimal digits.
 func decimal(s string) (x int, ok bool) {
 	n := len(s)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		digit := s[i] - '0'
 		if digit > 9 {
 			return 0, false
@@ -2168,19 +2187,189 @@ func string_splitlines(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value
 	return NewList(list), nil
 }
 
-// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·union.
-func set_union(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
-	var iterable Iterable
-	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &iterable); err != nil {
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·add.
+func set_add(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var elem Value
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 1, &elem); err != nil {
 		return nil, err
 	}
-	iter := iterable.Iterate()
-	defer iter.Done()
-	union, err := b.Receiver().(*Set).Union(iter)
+	recv := b.Receiver().(*Set)
+	// It is always an error to attempt to mutate a set that cannot be mutated
+	if err := recv.ht.checkMutable("insert into"); err != nil {
+		return nil, nameErr(b, err)
+	}
+	// TODO(adonovan): opt: combine Has+Insert. (e.g. use Insert and re-check Len)
+	if found, err := recv.Has(elem); err != nil {
+		return nil, nameErr(b, err)
+	} else if found {
+		return None, nil
+	}
+	err := recv.Insert(elem)
 	if err != nil {
 		return nil, nameErr(b, err)
 	}
-	return union, nil
+	return None, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·clear.
+func set_clear(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0); err != nil {
+		return nil, err
+	}
+	if b.Receiver().(*Set).Len() > 0 {
+		if err := b.Receiver().(*Set).Clear(); err != nil {
+			return nil, nameErr(b, err)
+		}
+	}
+	return None, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·difference.
+func set_difference(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	// TODO: support multiple others: s.difference(*others)
+	var other Iterable
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &other); err != nil {
+		return nil, err
+	}
+	iter := other.Iterate()
+	defer iter.Done()
+	diff, err := b.Receiver().(*Set).Difference(iter)
+	if err != nil {
+		return nil, nameErr(b, err)
+	}
+	return diff, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set_intersection.
+func set_intersection(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	// TODO: support multiple others: s.difference(*others)
+	var other Iterable
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &other); err != nil {
+		return nil, err
+	}
+	iter := other.Iterate()
+	defer iter.Done()
+	diff, err := b.Receiver().(*Set).Intersection(iter)
+	if err != nil {
+		return nil, nameErr(b, err)
+	}
+	return diff, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set_issubset.
+func set_issubset(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var other Iterable
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &other); err != nil {
+		return nil, err
+	}
+	iter := other.Iterate()
+	defer iter.Done()
+	diff, err := b.Receiver().(*Set).IsSubset(iter)
+	if err != nil {
+		return nil, nameErr(b, err)
+	}
+	return Bool(diff), nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set_issuperset.
+func set_issuperset(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var other Iterable
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &other); err != nil {
+		return nil, err
+	}
+	iter := other.Iterate()
+	defer iter.Done()
+	diff, err := b.Receiver().(*Set).IsSuperset(iter)
+	if err != nil {
+		return nil, nameErr(b, err)
+	}
+	return Bool(diff), nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·discard.
+func set_discard(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var k Value
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 1, &k); err != nil {
+		return nil, err
+	}
+	recv := b.Receiver().(*Set)
+	// It is always an error to attempt to mutate a set that cannot be mutated
+	if err := recv.ht.checkMutable("delete from"); err != nil {
+		return nil, nameErr(b, err)
+	}
+	// TODO(adonovan): opt: combine Has+Delete (e.g. use Delete and re-check Len)
+	if found, err := recv.Has(k); err != nil {
+		return nil, nameErr(b, err)
+	} else if !found {
+		return None, nil
+	}
+	if _, err := recv.Delete(k); err != nil {
+		return nil, nameErr(b, err) // set is frozen
+	}
+	return None, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·pop.
+func set_pop(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0); err != nil {
+		return nil, err
+	}
+	recv := b.Receiver().(*Set)
+	k, ok := recv.ht.first()
+	if !ok {
+		return nil, nameErr(b, "empty set")
+	}
+	_, err := recv.Delete(k)
+	if err != nil {
+		return nil, nameErr(b, err) // set is frozen
+	}
+	return k, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·remove.
+func set_remove(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var k Value
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 1, &k); err != nil {
+		return nil, err
+	}
+	if found, err := b.Receiver().(*Set).Delete(k); err != nil {
+		return nil, nameErr(b, err) // dict is frozen or key is unhashable
+	} else if found {
+		return None, nil
+	}
+	return nil, nameErr(b, "missing key")
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·symmetric_difference.
+func set_symmetric_difference(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	var other Iterable
+	if err := UnpackPositionalArgs(b.Name(), args, kwargs, 0, &other); err != nil {
+		return nil, err
+	}
+	iter := other.Iterate()
+	defer iter.Done()
+	diff, err := b.Receiver().(*Set).SymmetricDifference(iter)
+	if err != nil {
+		return nil, nameErr(b, err)
+	}
+	return diff, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·union.
+func set_union(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	receiverSet := b.Receiver().(*Set).clone()
+	if err := setUpdate(receiverSet, args, kwargs); err != nil {
+		return nil, nameErr(b, err)
+	}
+	return receiverSet, nil
+}
+
+// https://github.com/google/starlark-go/blob/master/doc/spec.md#set·update.
+func set_update(_ *Thread, b *Builtin, args Tuple, kwargs []Tuple) (Value, error) {
+	if err := setUpdate(b.Receiver().(*Set), args, kwargs); err != nil {
+		return nil, nameErr(b, err)
+	}
+	return None, nil
 }
 
 // Common implementation of string_{r}{find,index}.
@@ -2282,8 +2471,30 @@ func updateDict(dict *Dict, updates Tuple, kwargs []Tuple) error {
 	return nil
 }
 
+func setUpdate(s *Set, args Tuple, kwargs []Tuple) error {
+	if len(kwargs) > 0 {
+		return errors.New("does not accept keyword arguments")
+	}
+
+	for i, arg := range args {
+		iterable, ok := arg.(Iterable)
+		if !ok {
+			return fmt.Errorf("argument #%d is not iterable: %s", i+1, arg.Type())
+		}
+		if err := func() error {
+			iter := iterable.Iterate()
+			defer iter.Done()
+			return s.InsertAll(iter)
+		}(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // nameErr returns an error message of the form "name: msg"
 // where name is b.Name() and msg is a string or error.
-func nameErr(b *Builtin, msg interface{}) error {
+func nameErr(b *Builtin, msg any) error {
 	return fmt.Errorf("%s: %v", b.Name(), msg)
 }

@@ -25,7 +25,7 @@ type Unpacker interface {
 // If the variable is a bool, integer, string, *List, *Dict, Callable,
 // Iterable, or user-defined implementation of Value,
 // UnpackArgs performs the appropriate type check.
-// Predeclared Go integer types uses the AsInt check.
+// Predeclared Go integer types use the AsInt check.
 //
 // If the parameter name ends with "?", it is optional.
 //
@@ -33,7 +33,7 @@ type Unpacker interface {
 // as if the argument was absent.
 //
 // If a parameter is marked optional, then all following parameters are
-// implicitly optional where or not they are marked.
+// implicitly optional whether or not they are marked.
 //
 // If the variable implements Unpacker, its Unpack argument
 // is called with the argument value, allowing an application
@@ -44,23 +44,23 @@ type Unpacker interface {
 //
 // Examples:
 //
-//      var (
-//          a Value
-//          b = MakeInt(42)
-//          c Value = starlark.None
-//      )
+//	var (
+//	    a Value
+//	    b = MakeInt(42)
+//	    c Value = starlark.None
+//	)
 //
-//      // 1. mixed parameters, like def f(a, b=42, c=None).
-//      err := UnpackArgs("f", args, kwargs, "a", &a, "b?", &b, "c?", &c)
+//	// 1. mixed parameters, like def f(a, b=42, c=None).
+//	err := UnpackArgs("f", args, kwargs, "a", &a, "b?", &b, "c?", &c)
 //
-//      // 2. keyword parameters only, like def f(*, a, b, c=None).
-//      if len(args) > 0 {
-//              return fmt.Errorf("f: unexpected positional arguments")
-//      }
-//      err := UnpackArgs("f", args, kwargs, "a", &a, "b?", &b, "c?", &c)
+//	// 2. keyword parameters only, like def f(*, a, b, c=None).
+//	if len(args) > 0 {
+//	        return fmt.Errorf("f: unexpected positional arguments")
+//	}
+//	err := UnpackArgs("f", args, kwargs, "a", &a, "b?", &b, "c?", &c)
 //
-//      // 3. positional parameters only, like def f(a, b=42, c=None, /) in Python 3.8.
-//      err := UnpackPositionalArgs("f", args, kwargs, 1, &a, &b, &c)
+//	// 3. positional parameters only, like def f(a, b=42, c=None, /) in Python 3.8.
+//	err := UnpackPositionalArgs("f", args, kwargs, 1, &a, &b, &c)
 //
 // More complex forms such as def f(a, b=42, *args, c, d=123, **kwargs)
 // require additional logic, but their need in built-ins is exceedingly rare.
@@ -79,26 +79,25 @@ type Unpacker interface {
 // for the zero values of variables of type *List, *Dict, Callable, or
 // Iterable. For example:
 //
-//      // def myfunc(d=None, e=[], f={})
-//      var (
-//          d Value
-//          e *List
-//          f *Dict
-//      )
-//      err := UnpackArgs("myfunc", args, kwargs, "d?", &d, "e?", &e, "f?", &f)
-//      if d == nil { d = None; }
-//      if e == nil { e = new(List); }
-//      if f == nil { f = new(Dict); }
-//
-func UnpackArgs(fnname string, args Tuple, kwargs []Tuple, pairs ...interface{}) error {
+//	// def myfunc(d=None, e=[], f={})
+//	var (
+//	    d Value
+//	    e *List
+//	    f *Dict
+//	)
+//	err := UnpackArgs("myfunc", args, kwargs, "d?", &d, "e?", &e, "f?", &f)
+//	if d == nil { d = None; }
+//	if e == nil { e = new(List); }
+//	if f == nil { f = new(Dict); }
+func UnpackArgs(fnname string, args Tuple, kwargs []Tuple, pairs ...any) error {
 	nparams := len(pairs) / 2
 	var defined intset
 	defined.init(nparams)
 
-	paramName := func(x interface{}) (name string, skipNone bool) { // (no free variables)
+	paramName := func(x any) (name string, skipNone bool) { // (no free variables)
 		name = x.(string)
-		if strings.HasSuffix(name, "??") {
-			name = strings.TrimSuffix(name, "??")
+		if before, ok := strings.CutSuffix(name, "??"); ok {
+			name = before
 			skipNone = true
 		} else if name[len(name)-1] == '?' {
 			name = name[:len(name)-1]
@@ -120,7 +119,7 @@ func UnpackArgs(fnname string, args Tuple, kwargs []Tuple, pairs ...interface{})
 				continue
 			}
 		}
-		if err := unpackOneArg(arg, pairs[2*i+1]); err != nil {
+		if err := UnpackArg(arg, pairs[2*i+1]); err != nil {
 			return fmt.Errorf("%s: for parameter %s: %s", fnname, name, err)
 		}
 	}
@@ -129,7 +128,7 @@ func UnpackArgs(fnname string, args Tuple, kwargs []Tuple, pairs ...interface{})
 kwloop:
 	for _, item := range kwargs {
 		name, arg := item[0].(String), item[1]
-		for i := 0; i < nparams; i++ {
+		for i := range nparams {
 			pName, skipNone := paramName(pairs[2*i])
 			if pName == string(name) {
 				// found it
@@ -145,7 +144,7 @@ kwloop:
 				}
 
 				ptr := pairs[2*i+1]
-				if err := unpackOneArg(arg, ptr); err != nil {
+				if err := UnpackArg(arg, ptr); err != nil {
 					return fmt.Errorf("%s: for parameter %s: %s", fnname, name, err)
 				}
 				continue kwloop
@@ -164,11 +163,14 @@ kwloop:
 	}
 
 	// Check that all non-optional parameters are defined.
-	// (We needn't check the first len(args).)
-	for i := len(args); i < nparams; i++ {
+	for i := range nparams {
 		name := pairs[2*i].(string)
 		if strings.HasSuffix(name, "?") {
 			break // optional
+		}
+		// (We needn't check the first len(args).)
+		if i < len(args) {
+			continue
 		}
 		if !defined.get(i) {
 			return fmt.Errorf("%s: missing argument for %s", fnname, name)
@@ -187,7 +189,7 @@ kwloop:
 // any conversion fails.
 //
 // See UnpackArgs for general comments.
-func UnpackPositionalArgs(fnname string, args Tuple, kwargs []Tuple, min int, vars ...interface{}) error {
+func UnpackPositionalArgs(fnname string, args Tuple, kwargs []Tuple, min int, vars ...any) error {
 	if len(kwargs) > 0 {
 		return fmt.Errorf("%s: unexpected keyword arguments", fnname)
 	}
@@ -207,14 +209,21 @@ func UnpackPositionalArgs(fnname string, args Tuple, kwargs []Tuple, min int, va
 		return fmt.Errorf("%s: got %d arguments, want %s%d", fnname, len(args), atmost, max)
 	}
 	for i, arg := range args {
-		if err := unpackOneArg(arg, vars[i]); err != nil {
+		if err := UnpackArg(arg, vars[i]); err != nil {
 			return fmt.Errorf("%s: for parameter %d: %s", fnname, i+1, err)
 		}
 	}
 	return nil
 }
 
-func unpackOneArg(v Value, ptr interface{}) error {
+// UnpackArg unpacks a Value v into the variable pointed to by ptr.
+// See [UnpackArgs] for details, including which types of variable are supported.
+//
+// This function defines the unpack operation for a single value.
+// The implementations of most built-in functions use [UnpackArgs] and
+// [UnpackPositionalArgs] to unpack a sequence of positional and/or
+// keyword arguments.
+func UnpackArg(v Value, ptr any) error {
 	// On failure, don't clobber *ptr.
 	switch ptr := ptr.(type) {
 	case Unpacker:
@@ -269,7 +278,7 @@ func unpackOneArg(v Value, ptr interface{}) error {
 	default:
 		// v must have type *V, where V is some subtype of starlark.Value.
 		ptrv := reflect.ValueOf(ptr)
-		if ptrv.Kind() != reflect.Ptr {
+		if ptrv.Kind() != reflect.Pointer {
 			log.Panicf("internal error: not a pointer: %T", ptr)
 		}
 		paramVar := ptrv.Elem()
@@ -279,7 +288,7 @@ func unpackOneArg(v Value, ptr interface{}) error {
 			// Detect a possible bug in the Go program that called Unpack:
 			// If the variable *ptr is not a subtype of Value,
 			// no value of v can possibly work.
-			if !paramVar.Type().AssignableTo(reflect.TypeOf(new(Value)).Elem()) {
+			if !paramVar.Type().AssignableTo(reflect.TypeFor[Value]()) {
 				log.Panicf("pointer element type does not implement Value: %T", ptr)
 			}
 
@@ -344,7 +353,7 @@ func (is *intset) len() int {
 	if is.large == nil {
 		// Suboptimal, but used only for error reporting.
 		len := 0
-		for i := 0; i < 64; i++ {
+		for i := range 64 {
 			if is.small&(1<<uint(i)) != 0 {
 				len++
 			}

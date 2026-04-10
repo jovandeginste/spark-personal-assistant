@@ -293,6 +293,8 @@ func NewInternalAPIClient(ctx context.Context, cc *ClientConfig) (*InternalAPICl
 		if cc.HTTPOptions.BaseURL == "" {
 			if cc.Location == "global" || cc.APIKey != "" {
 				cc.HTTPOptions.BaseURL = "https://aiplatform.googleapis.com/"
+			} else if cc.Location == "us" {
+				cc.HTTPOptions.BaseURL = fmt.Sprintf("https://aiplatform.%s.rep.googleapis.com/", cc.Location)
 			} else {
 				cc.HTTPOptions.BaseURL = fmt.Sprintf("https://%s-aiplatform.googleapis.com/", cc.Location)
 			}

@@ -10,7 +10,6 @@ import (
 
 	"go.starlark.net/internal/compile"
 	"go.starlark.net/internal/spell"
-	"go.starlark.net/resolve"
 	"go.starlark.net/syntax"
 )
 
@@ -24,19 +23,29 @@ func (fn *Function) CallInternal(thread *Thread, args Tuple, kwargs []Tuple) (Va
 	// Postcondition: args is not mutated. This is stricter than required by Callable,
 	// but allows CALL to avoid a copy.
 
-	if !resolve.AllowRecursion {
+	f := fn.funcode
+	if f.Prog.Recursion {
+		// prevent stack overflow
+		//
+		// Each CallInternal recursion (via Call) uses ~1.4KB,
+		// but the stack limit is on the order of 1GB, so a
+		// maximum of about 700K recursive calls is possible.
+		// Limit it to much less here.
+		if len(thread.stack) > 100_000 {
+			return nil, fmt.Errorf("Starlark stack overflow")
+		}
+	} else {
 		// detect recursion
 		for _, fr := range thread.stack[:len(thread.stack)-1] {
 			// We look for the same function code,
 			// not function value, otherwise the user could
 			// defeat the check by writing the Y combinator.
-			if frfn, ok := fr.Callable().(*Function); ok && frfn.funcode == fn.funcode {
+			if frfn, ok := fr.Callable().(*Function); ok && frfn.funcode == f {
 				return nil, fmt.Errorf("function %s called recursively", fn.Name())
 			}
 		}
 	}
 
-	f := fn.funcode
 	fr := thread.frameAt(0)
 
 	// Allocate space for stack and locals.
@@ -301,7 +310,7 @@ loop:
 				kvpairs = make([]Tuple, 0, nkvpairs)
 				kvpairsAlloc := make(Tuple, 2*nkvpairs) // allocate a single backing array
 				sp -= 2 * nkvpairs
-				for i := 0; i < nkvpairs; i++ {
+				for i := range nkvpairs {
 					pair := kvpairsAlloc[:2:2]
 					kvpairsAlloc = kvpairsAlloc[2:]
 					pair[0] = stack[sp+2*i]   // name
@@ -542,7 +551,7 @@ loop:
 		case compile.MAKEFUNC:
 			funcode := f.Prog.Functions[arg]
 			tuple := stack[sp-1].(Tuple)
-			n := len(tuple) - len(funcode.Freevars)
+			n := len(tuple) - len(funcode.FreeVars)
 			defaults := tuple[:n:n]
 			freevars := tuple[n:]
 			stack[sp-1] = &Function{
@@ -573,7 +582,7 @@ loop:
 				break loop
 			}
 
-			for i := 0; i < n; i++ {
+			for i := range n {
 				from := string(stack[sp-1-i].(String))
 				v, ok := dict[from]
 				if !ok {
@@ -623,7 +632,7 @@ loop:
 		case compile.FREECELL:
 			v := fn.freevars[arg].(*cell).v
 			if v == nil {
-				err = fmt.Errorf("local variable %s referenced before assignment", f.Freevars[arg].Name)
+				err = fmt.Errorf("local variable %s referenced before assignment", f.FreeVars[arg].Name)
 				break loop
 			}
 			stack[sp] = v

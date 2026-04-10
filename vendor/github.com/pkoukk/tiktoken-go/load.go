@@ -4,7 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -14,6 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
+type BpeLoader interface {
+	LoadTiktokenBpe(tiktokenBpeFile string) (map[string]int, error)
+}
+
 func readFile(blobpath string) ([]byte, error) {
 	if !strings.HasPrefix(blobpath, "http://") && !strings.HasPrefix(blobpath, "https://") {
 		file, err := os.Open(blobpath)
@@ -21,7 +25,7 @@ func readFile(blobpath string) ([]byte, error) {
 			return nil, err
 		}
 		defer file.Close()
-		return ioutil.ReadAll(file)
+		return io.ReadAll(file)
 	}
 	// avoiding blobfile for public files helps avoid auth issues, like MFA prompts
 	resp, err := http.Get(blobpath)
@@ -29,29 +33,27 @@ func readFile(blobpath string) ([]byte, error) {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	return ioutil.ReadAll(resp.Body)
+	return io.ReadAll(resp.Body)
 }
 
 func readFileCached(blobpath string) ([]byte, error) {
-	var cacheDir string
-	if os.Getenv("TIKTOKEN_CACHE_DIR") != "" {
-		cacheDir = os.Getenv("TIKTOKEN_CACHE_DIR")
-	} else if os.Getenv("DATA_GYM_CACHE_DIR") != "" {
-		cacheDir = os.Getenv("DATA_GYM_CACHE_DIR")
-	} else {
-		cacheDir = filepath.Join(os.TempDir(), "data-gym-cache")
+	if blobpath == "" {
+		return nil, fmt.Errorf("blobpath cannot be empty")
+	}
+
+	cacheDir := strings.TrimSpace(os.Getenv("TIKTOKEN_CACHE_DIR"))
+	if cacheDir == "" {
+		cacheDir = strings.TrimSpace(os.Getenv("DATA_GYM_CACHE_DIR"))
 	}
 
 	if cacheDir == "" {
-		// disable caching
-		return readFile(blobpath)
+		cacheDir = filepath.Join(os.TempDir(), "data-gym-cache")
 	}
 
 	cacheKey := fmt.Sprintf("%x", sha1.Sum([]byte(blobpath)))
-
 	cachePath := filepath.Join(cacheDir, cacheKey)
 	if _, err := os.Stat(cachePath); err == nil {
-		return ioutil.ReadFile(cachePath)
+		return os.ReadFile(cachePath)
 	}
 
 	contents, err := readFile(blobpath)
@@ -59,12 +61,21 @@ func readFileCached(blobpath string) ([]byte, error) {
 		return nil, err
 	}
 
-	os.MkdirAll(cacheDir, os.ModePerm)
-	tmpFilename := cachePath + "." + uuid.New().String() + ".tmp"
-	if err := ioutil.WriteFile(tmpFilename, contents, os.ModePerm); err != nil {
-		return nil, err
+	if err := os.MkdirAll(cacheDir, os.ModePerm); err != nil {
+		return nil, fmt.Errorf("failed to create cache directory: %w", err)
 	}
-	return contents, os.Rename(tmpFilename, cachePath)
+
+	tmpFilename := fmt.Sprintf("%s.%s.tmp", cachePath, uuid.NewString())
+	if err := os.WriteFile(tmpFilename, contents, 0644); err != nil {
+		return nil, fmt.Errorf("failed to write temporary file: %w", err)
+	}
+
+	if err := os.Rename(tmpFilename, cachePath); err != nil {
+		os.Remove(tmpFilename) // Clean up on failure
+		return nil, fmt.Errorf("failed to rename temporary file: %w", err)
+	}
+
+	return contents, nil
 }
 
 func loadTiktokenBpe(tiktokenBpeFile string) (map[string]int, error) {
@@ -90,4 +101,14 @@ func loadTiktokenBpe(tiktokenBpeFile string) (map[string]int, error) {
 		bpeRanks[string(token)] = rank
 	}
 	return bpeRanks, nil
+}
+
+type defaultBpeLoader struct{}
+
+func (l *defaultBpeLoader) LoadTiktokenBpe(tiktokenBpeFile string) (map[string]int, error) {
+	return loadTiktokenBpe(tiktokenBpeFile)
+}
+
+func NewDefaultBpeLoader() BpeLoader {
+	return &defaultBpeLoader{}
 }
