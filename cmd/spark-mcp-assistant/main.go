@@ -18,6 +18,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/webfetcher"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/websearch"
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/viper"
@@ -32,6 +33,7 @@ type Config struct {
 	GoogleContacts googlecontacts.Config `mapstructure:"googlecontacts"`
 	JSONReader     jsonreader.Config     `mapstructure:"jsonreader"`
 	WebFetcher     webfetcher.Config     `mapstructure:"webfetcher"`
+	WebSearch      websearch.Config      `mapstructure:"websearch"`
 	Reminders      reminders.Config      `mapstructure:"reminders"`
 	Port           string                `mapstructure:"port"`
 }
@@ -216,6 +218,7 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 		googlecontacts.New(config.GoogleContacts, logger),
 		jsonreader.New(config.JSONReader, logger),
 		webfetcher.New(config.WebFetcher, logger),
+		websearch.New(config.WebSearch, logger),
 		reminders.New(config.Reminders, logger),
 	}
 
