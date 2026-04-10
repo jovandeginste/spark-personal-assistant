@@ -80,6 +80,9 @@ func main() {
 			Version: "1.0.0",
 		}, &sdk.ServerOptions{
 			Logger: logger,
+			Capabilities: &sdk.ServerCapabilities{
+				Tools: &sdk.ToolCapabilities{ListChanged: false},
+			},
 		})
 
 		for _, module := range modules {
@@ -106,6 +109,9 @@ func main() {
 			Version: "1.0.0",
 		}, &sdk.ServerOptions{
 			Logger: logger,
+			Capabilities: &sdk.ServerCapabilities{
+				Tools: &sdk.ToolCapabilities{ListChanged: false},
+			},
 		})
 
 		for _, module := range modules {
