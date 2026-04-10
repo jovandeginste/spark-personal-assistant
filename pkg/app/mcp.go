@@ -132,6 +132,8 @@ func (a *App) forceReconnect(name string) {
 		a.Logger().Info("Forcing reconnection for MCP server", "name", name)
 		session.Close()
 		delete(a.mcpClients, name)
+		// invalidate cached tools when we reconnect, they might have changed
+		delete(a.mcpTools, name)
 	}
 }
 
@@ -161,6 +163,11 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 			continue
 		}
 
+		if cachedTools, ok := a.mcpTools[name]; ok {
+			tools = append(tools, cachedTools...)
+			continue
+		}
+
 		client, err := a.getMCPClient(ctx, name)
 		if err != nil {
 			a.Logger().Error("Failed to get MCP client", "client", name, "error", err)
@@ -187,13 +194,17 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 			}
 		}
 
+		var serverTools []ai.Tool
 		for _, t := range result.Tools {
-			tools = append(tools, ai.Tool{
+			serverTools = append(serverTools, ai.Tool{
 				Name:        name + "__" + t.Name, // Use server name as prefix, not clientName map key which is same
 				Description: t.Description,
 				InputSchema: t.InputSchema,
 			})
 		}
+		
+		a.mcpTools[name] = serverTools
+		tools = append(tools, serverTools...)
 	}
 
 	return tools, nil

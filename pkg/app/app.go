@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"os"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -15,11 +16,13 @@ type App struct {
 
 	mcpClients map[string]*mcp.ClientSession
 	mcpCleanup []func()
+	mcpTools   map[string][]ai.Tool
 }
 
 func NewApp() *App {
 	a := &App{
 		mcpClients: make(map[string]*mcp.ClientSession),
+		mcpTools:   make(map[string][]ai.Tool),
 	}
 
 	return a
