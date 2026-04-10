@@ -55,7 +55,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 	// Default to stdio if not specified
 	if config.Transport == "" {
 		if config.URL != "" {
-			config.Transport = "sse"
+			config.Transport = "streamable"
 		} else {
 			config.Transport = "stdio"
 		}
@@ -68,29 +68,12 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 		}
 
 		endpoint := config.URL
-		if strings.HasSuffix(endpoint, "/sse") {
-			endpoint = strings.TrimSuffix(endpoint, "/sse")
-		}
 		if endpoint == "" {
 			endpoint = "/"
 		}
 
 		transport = &mcp.StreamableClientTransport{
 			Endpoint: endpoint,
-			HTTPClient: &http.Client{
-				Transport: &headerTransport{
-					transport: http.DefaultTransport,
-					token:     config.Token,
-				},
-			},
-		}
-	case "sse":
-		if config.URL == "" {
-			return nil, fmt.Errorf("MCP server %s configured with sse transport but no url", name)
-		}
-
-		transport = &mcp.SSEClientTransport{
-			Endpoint: config.URL,
 			HTTPClient: &http.Client{
 				Transport: &headerTransport{
 					transport: http.DefaultTransport,
@@ -310,10 +293,6 @@ func (a *App) UpdateMCPServers(ctx context.Context) map[string]string {
 			updateURL := url
 			if updateURL[len(updateURL)-1] == '/' {
 				updateURL = updateURL[:len(updateURL)-1]
-			}
-			// If the URL ends with /sse, strip it
-			if len(updateURL) > 4 && updateURL[len(updateURL)-4:] == "/sse" {
-				updateURL = updateURL[:len(updateURL)-4]
 			}
 			updateURL += "/update"
 
