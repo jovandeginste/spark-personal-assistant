@@ -21,6 +21,8 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
+const maxToolArgLengthLog = 40
+
 func init() {
 	sql.Register("sqlite3-fk-wal", &sqlite.Driver{})
 }
@@ -213,8 +215,16 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 			if len(args) > 0 {
 				var argList []string
 				for k, v := range args {
-					argList = append(argList, fmt.Sprintf("%s: %v", k, v))
+					n := fmt.Sprintf("%v", v)
+					if len(n) > maxToolArgLengthLog {
+						n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
+					} else {
+						n = fmt.Sprintf("%q", n)
+					}
+
+					argList = append(argList, fmt.Sprintf("%s: %v", k, n))
 				}
+
 				argsStr = "(" + strings.Join(argList, ", ") + ")"
 			}
 			mc.sendNotice(roomID, eventID, fmt.Sprintf("> Using tool: `%s%s`", name, argsStr))
