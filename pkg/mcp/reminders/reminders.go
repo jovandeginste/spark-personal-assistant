@@ -8,10 +8,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -163,15 +161,10 @@ func (m *Module) shouldTriggerReminder(reminder Reminder, parser cron.Parser, no
 	return false
 }
 
-func (m *Module) triggerCallback(callbackTemplate string, reminder Reminder, logger *slog.Logger) {
+func (m *Module) triggerCallback(callbackUrl string, reminder Reminder, logger *slog.Logger) {
 	nameSlug := slug.Make(reminder.Name)
 	// Add prefix to the slug
 	nameSlug = "[reminders]-" + nameSlug
-	callbackUrl := strings.ReplaceAll(callbackTemplate, "_NAME_", nameSlug)
-
-	// Keep the original URL replacement for backward compatibility, but we will mostly rely on POST body now
-	encodedMessage := url.QueryEscape(reminder.Message)
-	callbackUrl = strings.ReplaceAll(callbackUrl, "_MESSAGE_", encodedMessage)
 
 	logger.Info("Triggering reminder", "id", reminder.ID, "name", reminder.Name, "slug", nameSlug, "url", callbackUrl)
 

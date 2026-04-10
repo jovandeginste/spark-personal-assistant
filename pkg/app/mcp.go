@@ -194,7 +194,7 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 			}
 		}
 
-		var serverTools []ai.Tool
+		serverTools := make([]ai.Tool, 0, len(result.Tools))
 		for _, t := range result.Tools {
 			serverTools = append(serverTools, ai.Tool{
 				Name:        name + "__" + t.Name, // Use server name as prefix, not clientName map key which is same
@@ -202,7 +202,7 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 				InputSchema: t.InputSchema,
 			})
 		}
-		
+
 		a.mcpTools[name] = serverTools
 		tools = append(tools, serverTools...)
 	}
