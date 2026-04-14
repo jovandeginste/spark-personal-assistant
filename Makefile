@@ -15,6 +15,10 @@ test:
 lint:
 	CGO_ENABLED=0 golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --build-tags="goolm,sqlite_foreign_keys"
 
+install-hooks:
+	printf "#!/bin/sh\nset -e\n\necho 'Running tests...'\nmake test\n\necho 'Running linter...'\nmake lint\n" > .git/hooks/pre-commit
+	chmod +x .git/hooks/pre-commit
+
 build: build-spark build-mcp
 
 build-spark:
