@@ -81,25 +81,8 @@ func (m *Module) Initialize() error {
 		return fmt.Errorf("failed to open database: %w", err)
 	}
 
-	if db.Migrator().HasTable("semantic_memory") {
-		// FIX: rename table to bypass broken gorm migration for UNIQUE constraint
-		db.Exec("ALTER TABLE semantic_memory RENAME TO semantic_memory_old;")
-	}
-	if db.Migrator().HasTable("procedural_memory") {
-		db.Exec("ALTER TABLE procedural_memory RENAME TO procedural_memory_old;")
-	}
-
 	if err := db.AutoMigrate(&SemanticMemory{}, &EpisodicMemory{}, &ProceduralMemory{}); err != nil {
 		return fmt.Errorf("failed to initialize schema: %w", err)
-	}
-
-	if db.Migrator().HasTable("semantic_memory_old") {
-		db.Exec("INSERT INTO semantic_memory (id, entity, fact, created_at) SELECT id, entity, fact, created_at FROM semantic_memory_old;")
-		db.Exec("DROP TABLE semantic_memory_old;")
-	}
-	if db.Migrator().HasTable("procedural_memory_old") {
-		db.Exec("INSERT INTO procedural_memory (id, trigger, instruction, created_at) SELECT id, trigger, instruction, created_at FROM procedural_memory_old;")
-		db.Exec("DROP TABLE procedural_memory_old;")
 	}
 
 	m.db = db
