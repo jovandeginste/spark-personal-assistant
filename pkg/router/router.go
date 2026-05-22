@@ -76,7 +76,14 @@ func (r *Router) handleMessage(ctx context.Context, msg Message) {
 
 func (r *Router) routeToAI(ctx context.Context, msg Message) {
 	// Simple route using GenerateWithTools to have parity with Matrix handler
-	tools, err := r.app.GetMCPTools(ctx, "")
+	roomID := ""
+	if msg.Metadata != nil {
+		if rID, ok := msg.Metadata["room_id"].(string); ok {
+			roomID = rID
+		}
+	}
+
+	tools, err := r.app.GetMCPTools(ctx, roomID)
 	if err != nil {
 		slog.Error("Failed to get MCP tools", "error", err)
 	}
@@ -91,7 +98,7 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 	}
 
 	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		return r.app.ExecuteMCPTool(ctx, name, args, "")
+		return r.app.ExecuteMCPTool(ctx, name, args, roomID)
 	}, nil)
 	if err != nil {
 		slog.Error("Failed to get AI response", "error", err)

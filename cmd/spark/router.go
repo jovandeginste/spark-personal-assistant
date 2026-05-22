@@ -83,6 +83,7 @@ func (c *cli) routerCmd() *cobra.Command {
 									"Email from: %s\nSubject: %s\nDate: %s\n\n%s", msg.From, msg.Subject, msg.Date, msg.Body),
 								Metadata: map[string]any{
 									"from":    msg.FromAddress,
+									"room_id": string(mc.DefaultRoomID()),
 									"subject": "Re: " + msg.Subject,
 								},
 							})
