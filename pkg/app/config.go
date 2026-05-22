@@ -23,8 +23,19 @@ type Config struct {
 	Assistant        ai.AssistantConfig         `mapstructure:"assistant"`
 	Matrix           MatrixConfig               `mapstructure:"matrix"`
 	Webserver        WebserverConfig            `mapstructure:"webserver"`
+	IMAP             IMAPConfig                 `mapstructure:"imap"`
 	MCPServers       map[string]MCPServerConfig `mapstructure:"mcp_servers"`
 	Prompts          map[string]string          `mapstructure:"prompts"`
+}
+
+type IMAPConfig struct {
+	Enabled  bool   `mapstructure:"enabled"`
+	Host     string `mapstructure:"host"`
+	Port     int    `mapstructure:"port"`
+	Username string `mapstructure:"username"`
+	Password string `mapstructure:"password"`
+	Folder   string `mapstructure:"folder"`
+	UseTLS   bool   `mapstructure:"use_tls"`
 }
 
 type MCPServerConfig struct {
@@ -182,6 +193,14 @@ func (a *App) SetDefaults() {
 
 	if a.Config.Assistant.Language == "" {
 		a.Config.Assistant.Language = "English"
+	}
+
+	if a.Config.IMAP.Port == 0 {
+		if a.Config.IMAP.UseTLS {
+			a.Config.IMAP.Port = 993
+		} else {
+			a.Config.IMAP.Port = 143
+		}
 	}
 
 	a.setDefaultPersona()

@@ -335,6 +335,10 @@ func (mc *MatrixConfig) sendNotice(roomID id.RoomID, eventID id.EventID, text st
 	mc.send(roomID, eventID, event.MsgNotice, text)
 }
 
+func (mc *MatrixConfig) SendMessage(roomID id.RoomID, text string) {
+	mc.sendMessage(roomID, text)
+}
+
 func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
 	mc.send(roomID, "", event.MsgText, text)
 }

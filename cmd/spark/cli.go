@@ -33,6 +33,7 @@ func (c *cli) root() *cobra.Command {
 	cmd.AddCommand(c.printCmd())
 	cmd.AddCommand(c.chatCmd())
 	cmd.AddCommand(c.matrixChatCmd())
+	cmd.AddCommand(c.routerCmd())
 
 	sparkConfig, ok := os.LookupEnv("SPARK_CONFIG")
 	if !ok {
