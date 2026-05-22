@@ -5,10 +5,12 @@ import (
 	"log/slog"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 )
 
 type Router struct {
 	aiClient ai.Client
+	app      *app.App
 
 	// Channels for routing messages
 	incoming chan Message
@@ -24,9 +26,10 @@ type Message struct {
 	Metadata map[string]any
 }
 
-func NewRouter(aiClient ai.Client) *Router {
+func NewRouter(aiClient ai.Client, a *app.App) *Router {
 	return &Router{
 		aiClient: aiClient,
+		app:      a,
 		incoming: make(chan Message, 100),
 		outgoing: make(chan Message, 100),
 	}
@@ -72,8 +75,24 @@ func (r *Router) handleMessage(ctx context.Context, msg Message) {
 }
 
 func (r *Router) routeToAI(ctx context.Context, msg Message) {
-	// Simple route using GeneratePrompt
-	response, err := r.aiClient.GeneratePrompt(ctx, msg.Content)
+	// Simple route using GenerateWithTools to have parity with Matrix handler
+	tools, err := r.app.GetMCPTools(ctx, "")
+	if err != nil {
+		slog.Error("Failed to get MCP tools", "error", err)
+	}
+	slog.Info("Using tools in router", "count", len(tools))
+
+	aiData, err := r.app.BuildData()
+	if err != nil {
+		slog.Error("Failed to build AI data", "error", err)
+	}
+	if aiData != nil {
+		aiData.EmployerQuestion = []string{msg.Content}
+	}
+
+	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		return r.app.ExecuteMCPTool(ctx, name, args, "")
+	}, nil)
 	if err != nil {
 		slog.Error("Failed to get AI response", "error", err)
 		r.outgoing <- Message{

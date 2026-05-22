@@ -29,7 +29,7 @@ func (c *cli) routerCmd() *cobra.Command {
 				return fmt.Errorf("failed to initialize AI client: %w", err)
 			}
 
-			r := router.NewRouter(aiClient)
+			r := router.NewRouter(aiClient, c.app)
 
 			// Initialize Matrix client
 			mc := matrix.MatrixConfig{App: c.app}
