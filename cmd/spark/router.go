@@ -98,8 +98,8 @@ func (c *cli) routerCmd() *cobra.Command {
 						Password: c.app.Config.IMAP.Password,
 						Folder:   c.app.Config.IMAP.Folder,
 						UseTLS:   c.app.Config.IMAP.UseTLS,
-					}, msgChan); err != nil {
-						slog.Error("IMAP connection failed", "error", err)
+					}, msgChan, c.app.Logger()); err != nil {
+						c.app.Logger().Error("IMAP connection failed", "error", err)
 					}
 				}()
 			} else {

@@ -35,7 +35,7 @@ func init() {
 	imap.CharsetReader = charset.Reader
 }
 
-func ConnectAndIdle(cfg Config, msgChan chan<- Message) error {
+func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) error {
 	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
 	var c *client.Client
 	var err error
@@ -69,9 +69,9 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message) error {
 	}
 
 	// Fetch any existing unseen messages first
-	msgs, err := fetchUnseen(c)
+	msgs, err := fetchUnseen(c, logger)
 	if err != nil {
-		slog.Error("failed to fetch initial unseen messages", "error", err)
+		logger.Error("failed to fetch initial unseen messages", "error", err)
 	} else {
 		for _, m := range msgs {
 			msgChan <- m
@@ -93,16 +93,16 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message) error {
 
 		select {
 		case update := <-updates:
-			slog.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
+			logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
 			if _, ok := update.(*client.MessageUpdate); ok {
 				close(stop)
 				<-done // Wait for IDLE to finish
 
-				newMsgs, err := fetchUnseen(c)
+				newMsgs, err := fetchUnseen(c, logger)
 				if err != nil {
-					slog.Error("failed to fetch unseen messages", "error", err)
+					logger.Error("failed to fetch unseen messages", "error", err)
 				} else {
-					slog.Info("Fetched new unseen messages", "count", len(newMsgs))
+					logger.Info("Fetched new unseen messages", "count", len(newMsgs))
 					for _, m := range newMsgs {
 						msgChan <- m
 					}
@@ -116,7 +116,7 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message) error {
 	}
 }
 
-func fetchUnseen(c *client.Client) ([]Message, error) {
+func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
 	criteria := imap.NewSearchCriteria()
 	criteria.WithoutFlags = []string{imap.SeenFlag}
 
@@ -128,7 +128,7 @@ func fetchUnseen(c *client.Client) ([]Message, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to search messages: %w", err)
 	}
-	slog.Info("IMAP search found unseen messages", "count", len(uids))
+	logger.Info("IMAP search found unseen messages", "count", len(uids))
 	if len(uids) == 0 {
 		return []Message{}, nil
 	}
@@ -169,13 +169,13 @@ func fetchUnseen(c *client.Client) ([]Message, error) {
 		if r != nil {
 			parsed, err := mail.ReadMessage(r)
 			if err != nil {
-				slog.Error("failed to read message body", "error", err)
+				logger.Error("failed to read message body", "error", err)
 				continue
 			}
 
 			body, err := io.ReadAll(parsed.Body)
 			if err != nil {
-				slog.Error("failed to read message body", "error", err)
+				logger.Error("failed to read message body", "error", err)
 				continue
 			}
 			m.Body = string(body)
@@ -192,7 +192,7 @@ func fetchUnseen(c *client.Client) ([]Message, error) {
 	flags := []any{imap.SeenFlag}
 	item := imap.FormatFlagsOp(imap.AddFlags, true)
 	if err := c.Store(seqset, item, flags, nil); err != nil {
-		slog.Error("failed to mark messages as seen", "error", err)
+		logger.Error("failed to mark messages as seen", "error", err)
 	}
 
 	return results, nil
