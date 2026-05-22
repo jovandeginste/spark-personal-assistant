@@ -2,7 +2,6 @@ package router
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
@@ -54,7 +53,7 @@ func (r *Router) processIncoming(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("Router stopped")
+			r.app.Logger().Info("Router stopped")
 			return
 		case msg := <-r.incoming:
 			r.handleMessage(ctx, msg)
@@ -63,7 +62,7 @@ func (r *Router) processIncoming(ctx context.Context) {
 }
 
 func (r *Router) handleMessage(ctx context.Context, msg Message) {
-	slog.Info("Routing message", "source", msg.Source, "target", msg.Target)
+	r.app.Logger().Info("Routing message", "source", msg.Source, "target", msg.Target)
 
 	if msg.Target == "ai" {
 		// Example implementation of asking AI and replying back to source
@@ -85,13 +84,13 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 
 	tools, err := r.app.GetMCPTools(ctx, roomID)
 	if err != nil {
-		slog.Error("Failed to get MCP tools", "error", err)
+		r.app.Logger().Error("Failed to get MCP tools", "error", err)
 	}
-	slog.Info("Using tools in router", "count", len(tools))
+	r.app.Logger().Info("Using tools in router", "count", len(tools))
 
 	aiData, err := r.app.BuildData()
 	if err != nil {
-		slog.Error("Failed to build AI data", "error", err)
+		r.app.Logger().Error("Failed to build AI data", "error", err)
 	}
 	if aiData != nil {
 		aiData.EmployerQuestion = []string{msg.Content}
@@ -101,7 +100,7 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 		return r.app.ExecuteMCPTool(ctx, name, args, roomID)
 	}, nil)
 	if err != nil {
-		slog.Error("Failed to get AI response", "error", err)
+		r.app.Logger().Error("Failed to get AI response", "error", err)
 		r.outgoing <- Message{
 			Source:   "ai",
 			Target:   msg.Source,

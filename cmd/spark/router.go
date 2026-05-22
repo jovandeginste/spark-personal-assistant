@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -61,20 +60,20 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			// Initialize Web server
 			if c.app.Config.Webserver.Enabled {
-				slog.Info("Initializing Web server...")
+				c.app.Logger().Info("Initializing Web server...")
 				mc.ServeHTTP()
 			} else {
-				slog.Info("Web server is disabled in config")
+				c.app.Logger().Info("Web server is disabled in config")
 			}
 
 			// Initialize IMAP client
 			if c.app.Config.IMAP.Enabled {
-				slog.Info("Initializing IMAP client...", "host", c.app.Config.IMAP.Host, "port", c.app.Config.IMAP.Port)
+				c.app.Logger().Info("Initializing IMAP client...", "host", c.app.Config.IMAP.Host, "port", c.app.Config.IMAP.Port)
 				go func() {
 					msgChan := make(chan imap.Message, 10)
 					go func() {
 						for msg := range msgChan {
-							slog.Info("Received email via IMAP", "subject", msg.Subject, "from", msg.From)
+							c.app.Logger().Info("Received email via IMAP", "subject", msg.Subject, "from", msg.From)
 							r.SubmitMessage(router.Message{
 								Source: "imap",
 								Target: "ai",
@@ -90,7 +89,7 @@ func (c *cli) routerCmd() *cobra.Command {
 						}
 					}()
 
-					slog.Info("Starting IMAP idle connection...")
+					c.app.Logger().Info("Starting IMAP idle connection...")
 					if err := imap.ConnectAndIdle(imap.Config{
 						Host:     c.app.Config.IMAP.Host,
 						Port:     c.app.Config.IMAP.Port,
@@ -103,23 +102,23 @@ func (c *cli) routerCmd() *cobra.Command {
 					}
 				}()
 			} else {
-				slog.Info("IMAP client is disabled in config")
+				c.app.Logger().Info("IMAP client is disabled in config")
 			}
 
 			r.Start(ctx)
-			slog.Info("Router started")
+			c.app.Logger().Info("Router started")
 
 			// Consume outgoing messages and route them to Matrix if needed
 			go func() {
 				for msg := range r.OutgoingMessages() {
-					slog.Info("Received outgoing message from Router", "source", msg.Source, "target", msg.Target)
+					c.app.Logger().Info("Received outgoing message from Router", "source", msg.Source, "target", msg.Target)
 					if msg.Target == "matrix" {
-						slog.Info("Forwarding response to Matrix", "content", msg.Content)
+						c.app.Logger().Info("Forwarding response to Matrix", "content", msg.Content)
 						mc.SendMessage(mc.DefaultRoomID(), fmt.Sprintf("Response to %s:\n%s", msg.Target, msg.Content))
 					} else if msg.Target == "imap" {
 						to, _ := msg.Metadata["from"].(string)
 						subject, _ := msg.Metadata["subject"].(string)
-						slog.Info("Forwarding IMAP response to Matrix", "to", to, "subject", subject)
+						c.app.Logger().Info("Forwarding IMAP response to Matrix", "to", to, "subject", subject)
 
 						mc.SendMessage(mc.DefaultRoomID(), fmt.Sprintf("Processed email from %s (%s). Result:\n%s", to, subject, msg.Content))
 					}
@@ -132,7 +131,7 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			select {
 			case <-sigChan:
-				slog.Info("Shutting down router...")
+				c.app.Logger().Info("Shutting down router...")
 				cancel()
 			}
 

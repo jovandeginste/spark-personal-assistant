@@ -3,32 +3,22 @@ package matrix
 import (
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	slogecho "github.com/samber/slog-echo"
 )
 
 func (mc *MatrixConfig) ServeHTTP() {
 	// Echo instance
 	e := echo.New()
 
+	// Use slog adapter for Echo middleware and internal logging
+	e.Use(slogecho.New(mc.App.Logger()))
+
 	// Middleware
-	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
-		LogStatus: true,
-		LogURI:    true,
-		LogMethod: true,
-		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
-			slog.Info("request",
-				"method", v.Method,
-				"uri", v.URI,
-				"status", v.Status,
-			)
-			return nil
-		},
-	}))
 	e.Use(middleware.Recover())
 
 	e.HideBanner = true
@@ -43,7 +33,7 @@ func (mc *MatrixConfig) ServeHTTP() {
 	go func() {
 		// Start server
 		if err := e.Start(mc.App.Config.Webserver.Bind); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			slog.Error("failed to start server", "error", err)
+			mc.App.Logger().Error("failed to start server", "error", err)
 		}
 	}()
 
