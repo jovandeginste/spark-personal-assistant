@@ -12,7 +12,6 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/googlecontacts"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/ical"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/jsonreader"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/memory"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/projects"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/reminders"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
@@ -29,7 +28,6 @@ type Config struct {
 	ICal           ical.Config           `mapstructure:"ical"`
 	VCF            vcf.Config            `mapstructure:"vcf"`
 	Projects       projects.Config       `mapstructure:"projects"`
-	Memory         memory.Config         `mapstructure:"memory"`
 	GoogleContacts googlecontacts.Config `mapstructure:"googlecontacts"`
 	JSONReader     jsonreader.Config     `mapstructure:"jsonreader"`
 	WebFetcher     webfetcher.Config     `mapstructure:"webfetcher"`
@@ -188,7 +186,6 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 		weather.New(config.Weather, logger),
 		ical.New(config.ICal, cacheService, logger),
 		vcf.New(config.VCF, cacheService, logger),
-		memory.New(config.Memory, logger),
 		projects.New(config.Projects, logger),
 		googlecontacts.New(config.GoogleContacts, logger),
 		jsonreader.New(config.JSONReader, logger),

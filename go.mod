@@ -16,7 +16,6 @@ require (
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-vcard v0.0.0-20241024213814-c9703dde27ff
 	github.com/glebarez/go-sqlite v1.22.0
-	github.com/glebarez/sqlite v1.11.0
 	github.com/google/go-querystring v1.2.0
 	github.com/gosimple/slug v1.15.0
 	github.com/jovandeginste/workout-tracker/v2 v2.6.0
@@ -36,7 +35,6 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.275.0
 	google.golang.org/genai v1.53.0
-	gorm.io/gorm v1.31.1
 	maunium.net/go/mautrix v0.26.4
 )
 
@@ -74,8 +72,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/jinzhu/inflection v1.0.0 // indirect
-	github.com/jinzhu/now v1.1.5 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect
