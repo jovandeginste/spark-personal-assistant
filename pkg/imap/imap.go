@@ -93,27 +93,42 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 
 		select {
 		case update := <-updates:
-			logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
-
-			close(stop)
-			<-done // Wait for IDLE to finish
-
-			newMsgs, err := fetchUnseen(c, logger)
-			if err != nil {
-				logger.Error("failed to fetch unseen messages", "error", err)
-			} else {
-				logger.Info("Fetched new unseen messages", "count", len(newMsgs))
-				for _, m := range newMsgs {
-					msgChan <- m
-				}
+			if err := handleUpdate(update, c, logger, stop, done, msgChan); err != nil {
+				return err
 			}
-			logger.Info("IMAP updates parsed")
 		case err := <-done:
 			if err != nil {
 				return fmt.Errorf("idle disconnected: %w", err)
 			}
 		}
 	}
+}
+
+func handleUpdate(update client.Update, c *client.Client, logger *slog.Logger, stop chan struct{}, done chan error, msgChan chan<- Message) error {
+	logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
+
+	close(stop)
+	err := <-done // Wait for IDLE to finish
+	if err != nil {
+		return fmt.Errorf("idle disconnected: %w", err)
+	}
+
+	newMsgs, err := fetchUnseen(c, logger)
+	if err != nil {
+		logger.Error("failed to fetch unseen messages", "error", err)
+		return nil
+	}
+
+	if len(newMsgs) == 0 {
+		return nil
+	}
+
+	logger.Info("Fetched new unseen messages", "count", len(newMsgs))
+	for _, m := range newMsgs {
+		msgChan <- m
+	}
+	logger.Info("IMAP updates parsed")
+	return nil
 }
 
 func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
