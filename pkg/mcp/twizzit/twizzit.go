@@ -317,7 +317,8 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 }
 
 type GetEventsParams struct {
-	Limit int `json:"limit" jsonschema:"The number of events to retrieve (0..50). Default is 50."`
+	Limit  int `json:"limit" jsonschema:"The number of events to retrieve (0..50). Default is 50."`
+	Offset int `json:"offset" jsonschema:"The offset to start retrieving events from. Default is 0."`
 }
 
 func (t *Twizzit) registerGetEvents(server *sdk.Server) {
@@ -335,7 +336,12 @@ func (t *Twizzit) registerGetEvents(server *sdk.Server) {
 			limit = 50
 		}
 
-		u := fmt.Sprintf("https://app.twizzit.com/v2/ajax/feed?limit=%d", limit)
+		offset := params.Offset
+		if offset < 0 {
+			offset = 0
+		}
+
+		u := fmt.Sprintf("https://app.twizzit.com/v2/ajax/feed?limit=%d&offset=%d", limit, offset)
 		result, _, err := t.makeRequest("GET", u)
 		if err != nil {
 			return nil, nil, err
