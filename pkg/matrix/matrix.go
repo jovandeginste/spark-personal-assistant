@@ -50,6 +50,11 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 }
 
 func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
+	if evt.RoomID != mc.DefaultRoomID() {
+		mc.App.Logger().Info("Ignoring message from non-default room", "room_id", evt.RoomID.String())
+		return
+	}
+
 	mc.AIData.CleanHistory(evt.RoomID.String())
 
 	body := evt.Content.AsMessage().Body
@@ -245,6 +250,11 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 }
 
 func (mc *MatrixConfig) syncFunc(ctx context.Context, evt *event.Event) {
+	if evt.RoomID != mc.DefaultRoomID() {
+		mc.App.Logger().Info("Ignoring invite for non-default room", "room_id", evt.RoomID.String())
+		return
+	}
+
 	if evt.GetStateKey() != mc.Client.UserID.String() || evt.Content.AsMember().Membership != event.MembershipInvite {
 		return
 	}

@@ -39,13 +39,12 @@ type IMAPConfig struct {
 }
 
 type MCPServerConfig struct {
-	Command      string   `mapstructure:"command"`
-	Args         []string `mapstructure:"args"`
-	Env          []string `mapstructure:"env"`
-	URL          string   `mapstructure:"url"`
-	Transport    string   `mapstructure:"transport"`
-	Token        string   `mapstructure:"token"`
-	AllowedRooms []string `mapstructure:"allowed_rooms"`
+	Command   string   `mapstructure:"command"`
+	Args      []string `mapstructure:"args"`
+	Env       []string `mapstructure:"env"`
+	URL       string   `mapstructure:"url"`
+	Transport string   `mapstructure:"transport"`
+	Token     string   `mapstructure:"token"`
 }
 
 type MatrixConfig struct {

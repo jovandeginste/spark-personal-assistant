@@ -30,6 +30,24 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			r := router.NewRouter(aiClient, c.app)
 
+			matrixBackend := router.Backend{
+				Incoming: make(chan router.Message, 100),
+				Outgoing: make(chan router.Message, 100),
+			}
+			r.RegisterBackend("matrix", matrixBackend.Incoming, matrixBackend.Outgoing)
+
+			imapBackend := router.Backend{
+				Incoming: make(chan router.Message, 100),
+				Outgoing: make(chan router.Message, 100),
+			}
+			r.RegisterBackend("imap", imapBackend.Incoming, imapBackend.Outgoing)
+
+			httpBackend := router.Backend{
+				Incoming: make(chan router.Message, 100),
+				Outgoing: make(chan router.Message, 100),
+			}
+			r.RegisterBackend("http", httpBackend.Incoming, httpBackend.Outgoing)
+
 			// Initialize Matrix client
 			mc := matrix.MatrixConfig{App: c.app}
 			mc.AIClient = aiClient
@@ -61,7 +79,7 @@ func (c *cli) routerCmd() *cobra.Command {
 			// Initialize Web server
 			if c.app.Config.Webserver.Enabled {
 				c.app.Logger().Info("Initializing Web server...")
-				mc.ServeHTTP()
+				mc.ServeHTTP() // TODO: Web server should probably use httpBackend
 			} else {
 				c.app.Logger().Info("Web server is disabled in config")
 			}
@@ -110,18 +128,39 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			// Consume outgoing messages and route them to Matrix if needed
 			go func() {
-				for msg := range r.OutgoingMessages() {
-					c.app.Logger().Info("Received outgoing message from Router", "source", msg.Source, "target", msg.Target)
-					if msg.Target == "matrix" {
-						c.app.Logger().Info("Forwarding response to Matrix", "content", msg.Content)
-						mc.SendMessage(mc.DefaultRoomID(), fmt.Sprintf("Response to %s:\n%s", msg.Target, msg.Content))
-					} else if msg.Target == "imap" {
-						to, _ := msg.Metadata["from"].(string)
-						subject, _ := msg.Metadata["subject"].(string)
-						c.app.Logger().Info("Forwarding IMAP response to Matrix", "to", to, "subject", subject)
+				for msg := range matrixBackend.Outgoing {
+					c.app.Logger().Info("Received outgoing message for Matrix", "source", msg.Source)
+					c.app.Logger().Info("Forwarding response to Matrix", "content", msg.Content)
+					mc.SendMessage(mc.DefaultRoomID(), msg.Content)
+				}
+			}()
 
-						mc.SendMessage(mc.DefaultRoomID(), fmt.Sprintf("Processed email from %s (%s). Result:\n%s", to, subject, msg.Content))
+			go func() {
+				for msg := range imapBackend.Outgoing {
+					c.app.Logger().Info("Received outgoing message for IMAP", "source", msg.Source)
+					// Currently no way to send email out, but keeping the channel ready
+					c.app.Logger().Warn("IMAP sending not yet implemented", "content", msg.Content)
+					metaStr := ""
+					if addr, ok := msg.Metadata["target_address"].(string); ok && addr != "" {
+						metaStr += "\nTo: " + addr
 					}
+					if subj, ok := msg.Metadata["target_subject"].(string); ok && subj != "" {
+						metaStr += "\nSubject: " + subj
+					}
+					mc.SendMessage(mc.DefaultRoomID(), "I tried to send an email via IMAP"+metaStr+"\n\nHowever, sending via IMAP is not yet supported. The content was:\n\n"+msg.Content)
+				}
+			}()
+
+			go func() {
+				for msg := range httpBackend.Outgoing {
+					c.app.Logger().Info("Received outgoing message for HTTP", "source", msg.Source)
+					// Currently no way to send HTTP push out, but keeping the channel ready
+					c.app.Logger().Warn("HTTP sending not yet implemented", "content", msg.Content)
+					metaStr := ""
+					if addr, ok := msg.Metadata["target_address"].(string); ok && addr != "" {
+						metaStr += "\nTo: " + addr
+					}
+					mc.SendMessage(mc.DefaultRoomID(), "I tried to send a message via HTTP"+metaStr+"\n\nHowever, sending via HTTP is not yet supported. The content was:\n\n"+msg.Content)
 				}
 			}()
 
@@ -129,11 +168,8 @@ func (c *cli) routerCmd() *cobra.Command {
 			sigChan := make(chan os.Signal, 1)
 			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-			select {
-			case <-sigChan:
-				c.app.Logger().Info("Shutting down router...")
-				cancel()
-			}
+			<-sigChan
+			c.app.Logger().Info("Shutting down router...")
 
 			return nil
 		},

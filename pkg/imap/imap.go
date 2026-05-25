@@ -94,20 +94,20 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 		select {
 		case update := <-updates:
 			logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
-			if _, ok := update.(*client.MessageUpdate); ok {
-				close(stop)
-				<-done // Wait for IDLE to finish
 
-				newMsgs, err := fetchUnseen(c, logger)
-				if err != nil {
-					logger.Error("failed to fetch unseen messages", "error", err)
-				} else {
-					logger.Info("Fetched new unseen messages", "count", len(newMsgs))
-					for _, m := range newMsgs {
-						msgChan <- m
-					}
+			close(stop)
+			<-done // Wait for IDLE to finish
+
+			newMsgs, err := fetchUnseen(c, logger)
+			if err != nil {
+				logger.Error("failed to fetch unseen messages", "error", err)
+			} else {
+				logger.Info("Fetched new unseen messages", "count", len(newMsgs))
+				for _, m := range newMsgs {
+					msgChan <- m
 				}
 			}
+			logger.Info("IMAP updates parsed")
 		case err := <-done:
 			if err != nil {
 				return fmt.Errorf("idle disconnected: %w", err)

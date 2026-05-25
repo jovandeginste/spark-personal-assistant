@@ -141,28 +141,7 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 	var tools []ai.Tool
 
 	// Iterate over configured servers instead of active clients to ensure we try to connect to all
-	for name, config := range a.Config.MCPServers {
-		allowed := false
-		if len(config.AllowedRooms) == 0 {
-			// No rooms allowed
-			allowed = false
-		} else {
-			for _, r := range config.AllowedRooms {
-				if r == "*" {
-					allowed = true
-					break
-				}
-				if r == roomID {
-					allowed = true
-					break
-				}
-			}
-		}
-
-		if !allowed {
-			continue
-		}
-
+	for name := range a.Config.MCPServers {
 		if cachedTools, ok := a.mcpTools[name]; ok {
 			tools = append(tools, cachedTools...)
 			continue
@@ -220,27 +199,9 @@ func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]a
 
 	clientName, toolName := parts[0], parts[1]
 
-	config, ok := a.Config.MCPServers[clientName]
+	_, ok := a.Config.MCPServers[clientName]
 	if !ok {
 		return "", fmt.Errorf("mcp server config not found: %s", clientName)
-	}
-
-	allowed := false
-	if len(config.AllowedRooms) > 0 {
-		for _, r := range config.AllowedRooms {
-			if r == "*" {
-				allowed = true
-				break
-			}
-			if r == roomID {
-				allowed = true
-				break
-			}
-		}
-	}
-
-	if !allowed {
-		return "", fmt.Errorf("mcp server %s not allowed in room %s", clientName, roomID)
 	}
 
 	// Helper to execute the call
