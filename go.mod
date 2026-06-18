@@ -18,6 +18,7 @@ require (
 	github.com/glebarez/go-sqlite v1.22.0
 	github.com/google/go-querystring v1.2.0
 	github.com/gosimple/slug v1.15.0
+	github.com/jovandeginste/recycleapp-ics v0.0.0-20260618074123-ea7dee7e2503
 	github.com/jovandeginste/workout-tracker/v2 v2.6.0
 	github.com/labstack/echo/v4 v4.15.1
 	github.com/modelcontextprotocol/go-sdk v1.5.0
@@ -72,6 +73,7 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/jordic/goics v0.0.0-20210404174824-5a0337b716a0 // indirect
 	github.com/labstack/gommon v0.4.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.21 // indirect

@@ -14,6 +14,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/jsonreader"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/projects"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/reminders"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/recycleapp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/vcf"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/weather"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/webfetcher"
@@ -33,6 +34,7 @@ type Config struct {
 	WebFetcher     webfetcher.Config     `mapstructure:"webfetcher"`
 	WebSearch      websearch.Config      `mapstructure:"websearch"`
 	Reminders      reminders.Config      `mapstructure:"reminders"`
+	RecycleApp     recycleapp.Config     `mapstructure:"recycleapp"`
 	Port           string                `mapstructure:"port"`
 }
 
@@ -192,6 +194,7 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 		webfetcher.New(config.WebFetcher, logger),
 		websearch.New(config.WebSearch, logger),
 		reminders.New(config.Reminders, logger),
+		recycleapp.New(config.RecycleApp, logger),
 	}
 
 	return modules

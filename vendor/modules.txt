@@ -213,6 +213,12 @@ github.com/hashicorp/go-retryablehttp
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
+# github.com/jordic/goics v0.0.0-20210404174824-5a0337b716a0
+## explicit; go 1.14
+github.com/jordic/goics
+# github.com/jovandeginste/recycleapp-ics v0.0.0-20260618074123-ea7dee7e2503
+## explicit; go 1.23
+github.com/jovandeginste/recycleapp-ics/pkg/recycleapp
 # github.com/jovandeginste/workout-tracker/v2 v2.6.0
 ## explicit; go 1.25
 github.com/jovandeginste/workout-tracker/v2/pkg/geocoder

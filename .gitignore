@@ -11,3 +11,4 @@ mcp-hockey.yaml
 .venv/
 /matrix.*
 drillster-token.json
+tmp
