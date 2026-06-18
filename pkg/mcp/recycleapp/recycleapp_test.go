@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/recycleapp-ics/pkg/recycleapp"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 )

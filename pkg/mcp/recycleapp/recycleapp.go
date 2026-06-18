@@ -3,11 +3,12 @@ package recycleapp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
-	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/recycleapp-ics/pkg/recycleapp"
+	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -79,13 +80,13 @@ func (m *Module) handleGetCollections(ctx context.Context, request *mcp.CallTool
 	}
 
 	if zipcode == 0 {
-		return nil, nil, fmt.Errorf("zipcode parameter is required and cannot be 0")
+		return nil, nil, errors.New("zipcode parameter is required and cannot be 0")
 	}
 	if street == "" {
-		return nil, nil, fmt.Errorf("street parameter is required")
+		return nil, nil, errors.New("street parameter is required")
 	}
 	if houseNumber == 0 {
-		return nil, nil, fmt.Errorf("house_number parameter is required and cannot be 0")
+		return nil, nil, errors.New("house_number parameter is required and cannot be 0")
 	}
 
 	start, end, err := params.ParseDateRange()
