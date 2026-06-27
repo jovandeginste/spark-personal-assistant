@@ -1,0 +1,33 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "github-copilot/gpt-5.5",
+  "mcp": {
+    "assistant": {
+      "type": "remote",
+      "url": "http://mcp-assistant:8081/mcp",
+      "enabled": true
+    },
+    "hockey": {
+      "type": "remote",
+      "url": "http://mcp-hockey:8082/mcp",
+      "enabled": true
+    },
+    "wikijs": {
+      "type": "remote",
+      "url": "http://wikijs-mcp:8000/mcp",
+      "enabled": true
+    },
+    "memory": {
+      "type": "remote",
+      "url": "http://mcp-memory:8000/mcp",
+      "enabled": true
+    }
+  },
+  "permission": {
+    "*": "deny",
+    "assistant_*": "allow",
+    "hockey_*": "allow",
+    "wikijs_*": "allow",
+    "memory_*": "allow"
+  }
+}

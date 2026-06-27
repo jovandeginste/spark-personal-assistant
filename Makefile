@@ -42,15 +42,14 @@ run-hockey:
 run-assistant:
 	go run ./cmd/spark-mcp-assistant/
 
-build-docker: build-docker-spark build-docker-mcp
+build-docker:
+	docker compose build
 
 build-docker-spark:
-	docker build --target spark -t spark-personal-assistant --pull .
+	docker compose build mcp-assistant
 
 build-docker-mcp:
-	docker build --target spark-mcp-assistant -t spark-mcp-assistant --pull .
+	docker compose build mcp-assistant mcp-hockey
 
 run-docker: build-docker
-	-docker rm -v -f spark-mcp-assistant
-	docker run -d --rm --name spark-mcp-assistant --network host -v ./mcp-config.yaml:/mcp-config.yaml -v ./data:/data -w / spark-mcp-assistant
-	docker run --rm --name spark-personal-assistant --network host -v ./spark.yaml:/spark.yaml -v ./data:/data -w / spark-personal-assistant router
+	docker compose up -d --remove-orphans

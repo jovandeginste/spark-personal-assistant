@@ -1,0 +1,146 @@
+---
+services:
+  mcp-assistant:
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: spark-mcp-assistant
+    container_name: spark-mcp-assistant
+    environment:
+      MCP_PORT: :8081
+    volumes:
+      - ./data:/data
+      - ./mcp-config.yaml:/data/mcp-config.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8081"]
+      interval: 60s
+      timeout: 3s
+      retries: 6
+      start_period: 3s
+    ports:
+      - "${LOCAL_MCP_PORT:-8081}:8081"
+    restart: unless-stopped
+
+  mcp-hockey:
+    env_file:
+      - .env
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: spark-mcp-hockey
+    container_name: spark-mcp-hockey
+    environment:
+      HOCKEY_PORT: :8082
+    volumes:
+      - ./data:/data
+      - ./mcp-hockey.yaml:/data/mcp-hockey.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8082"]
+      interval: 60s
+      timeout: 3s
+      retries: 6
+      start_period: 3s
+    ports:
+      - "${LOCAL_MCP_HOCKEY_PORT:-8082}:8082"
+    restart: unless-stopped
+
+  wikijs-mcp:
+    env_file:
+      - .env
+    image: hub2rock/wiki-js-mcp-server:latest
+    container_name: wikijs-mcp
+    environment:
+      WIKIJS_URL: ${WIKIJS_URL}
+      WIKIJS_API_KEY: ${WIKIJS_API_KEY}
+      MCP_TRANSPORT: http
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8000
+      WIKIJS_MCP_DB: /app/data/wikijs_mappings.db
+      LOG_FILE: /app/data/wikijs_mcp.log
+      LOG_LEVEL: ${WIKIJS_MCP_LOG_LEVEL:-INFO}
+    volumes:
+      - ./data/wikijs-mcp:/app/data
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 8000"]
+      interval: 60s
+      timeout: 3s
+      retries: 6
+      start_period: 15s
+    ports:
+      - "${LOCAL_MCP_WIKIJS_PORT:-8080}:8000"
+    restart: unless-stopped
+
+  mcp-memory:
+    env_file:
+      - .env
+    image: doobidoo/mcp-memory-service:10-slim
+    restart: "on-failure:5"
+    environment:
+      MCP_ALLOW_ANONYMOUS_ACCESS: true
+      MCP_MODE: http
+      MCP_MEMORY_STORAGE_BACKEND: sqlite_vec
+      MCP_SSE_PORT: 8000
+      MCP_SSE_HOST: 0.0.0.0
+      MCP_MEMORY_SQLITE_PATH: /app/data/sqlite_vec.db
+      MCP_MEMORY_BACKUPS_PATH: /app/data/backups
+    volumes:
+      - ./data/memory/data/:/app/data
+      - ./data/memory/cache/:/root
+    ports:
+      - "${LOCAL_MCP_MEMORY_PORT:-8000}:8000"
+
+  opencode-web:
+    env_file:
+      - .env
+    image: ghcr.io/anomalyco/opencode:latest
+    container_name: opencode-web
+    depends_on:
+      - mcp-assistant
+      - mcp-hockey
+      - wikijs-mcp
+      - mcp-memory
+    command:
+      - web
+      - --hostname
+      - 0.0.0.0
+      - --port
+      - "4096"
+    environment:
+      HOME: /root
+      OPENCODE_CONFIG: /workspace/mcp-test.json
+      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD}
+    volumes:
+      - ./mcp-test.json:/workspace/mcp-test.json:ro
+      - ./tmp/opencode:/root/.local/share/opencode
+      - ${HOME}/.local/share/opencode/auth.json:/root/.local/share/opencode/auth.json:ro
+    working_dir: /workspace
+    ports:
+      - "4096:4096"
+    restart: unless-stopped
+
+  mcp-inspector:
+    env_file:
+      - .env
+    image: ghcr.io/modelcontextprotocol/inspector:latest
+    container_name: mcp-inspector
+    depends_on:
+      - mcp-assistant
+      - mcp-hockey
+      - wikijs-mcp
+      - mcp-memory
+    command:
+      - --
+      - --config
+      - /workspace/mcp-inspector.json
+    environment:
+      HOST: 0.0.0.0
+      MCP_AUTO_OPEN_ENABLED: "false"
+      MCP_PROXY_AUTH_TOKEN: ${MCP_INSPECTOR_PROXY_AUTH_TOKEN:-fcf574dc4f42d54dbd9f19ab1b899af5523e2b073081bdc8bcab65b120b5695b}
+    volumes:
+      - ./mcp-inspector.json:/workspace/mcp-inspector.json:ro
+    ports:
+      - "6274:6274"
+      - "6277:6277"
+    restart: unless-stopped
