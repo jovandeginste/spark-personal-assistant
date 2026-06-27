@@ -19,8 +19,6 @@ services:
       timeout: 3s
       retries: 6
       start_period: 3s
-    ports:
-      - "${LOCAL_MCP_PORT:-8081}:8081"
     restart: unless-stopped
 
   mcp-hockey:
@@ -42,8 +40,6 @@ services:
       timeout: 3s
       retries: 6
       start_period: 3s
-    ports:
-      - "${LOCAL_MCP_HOCKEY_PORT:-8082}:8082"
     restart: unless-stopped
 
   wikijs-mcp:
@@ -68,8 +64,6 @@ services:
       timeout: 3s
       retries: 6
       start_period: 15s
-    ports:
-      - "${LOCAL_MCP_WIKIJS_PORT:-8080}:8000"
     restart: unless-stopped
 
   mcp-memory:
@@ -88,8 +82,6 @@ services:
     volumes:
       - ./data/memory/data/:/app/data
       - ./data/memory/cache/:/root
-    ports:
-      - "${LOCAL_MCP_MEMORY_PORT:-8000}:8000"
 
   opencode-web:
     env_file:
@@ -110,7 +102,6 @@ services:
     environment:
       HOME: /root
       OPENCODE_CONFIG: /workspace/mcp-test.json
-      OPENCODE_SERVER_PASSWORD: ${OPENCODE_SERVER_PASSWORD}
     volumes:
       - ./mcp-test.json:/workspace/mcp-test.json:ro
       - ./tmp/opencode:/root/.local/share/opencode
@@ -137,7 +128,6 @@ services:
     environment:
       HOST: 0.0.0.0
       MCP_AUTO_OPEN_ENABLED: "false"
-      MCP_PROXY_AUTH_TOKEN: ${MCP_INSPECTOR_PROXY_AUTH_TOKEN:-fcf574dc4f42d54dbd9f19ab1b899af5523e2b073081bdc8bcab65b120b5695b}
     volumes:
       - ./mcp-inspector.json:/workspace/mcp-inspector.json:ro
     ports:
