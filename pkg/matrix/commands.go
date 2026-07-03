@@ -136,7 +136,7 @@ func (mc *MatrixConfig) parseInput(input, roomID string) (string, error) {
 	input = strings.TrimPrefix(input, "!")
 	cmd := strings.SplitN(input, " ", 2)
 
-	switch cmd[0] {
+	switch strings.ToLower(cmd[0]) {
 	case "reset":
 		return mc.performCommandReset(roomID)
 	case "shutdown":

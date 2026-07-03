@@ -173,7 +173,7 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, eventID id.EventID, sende
 		mc.Client.UserTyping(context.Background(), roomID, false, 0)
 	}()
 
-	input = strings.ToLower(strings.TrimSpace(input))
+	input = strings.TrimSpace(input)
 	if input == "" {
 		return nil
 	}
