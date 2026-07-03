@@ -1,4 +1,4 @@
-.PHONY: all vendor
+.PHONY: all vendor down-docker
 all: test lint build
 vendor:
 	go mod tidy
@@ -53,3 +53,6 @@ build-docker-mcp:
 
 run-docker: build-docker
 	docker compose up -d --remove-orphans
+
+down-docker:
+	docker compose down --remove-orphans
