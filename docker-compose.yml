@@ -2,7 +2,7 @@
 services:
   mcp-assistant:
     env_file:
-      - .env
+      - .env.mcp-assistant
     build:
       context: .
       dockerfile: Dockerfile
@@ -23,7 +23,7 @@ services:
 
   mcp-hockey:
     env_file:
-      - .env
+      - .env.mcp-hockey
     build:
       context: .
       dockerfile: Dockerfile
@@ -44,7 +44,7 @@ services:
 
   wikijs-mcp:
     env_file:
-      - .env
+      - .env.wikijs-mcp
     image: hub2rock/wiki-js-mcp-server:latest
     container_name: wikijs-mcp
     environment:
@@ -68,7 +68,7 @@ services:
 
   mcp-memory:
     env_file:
-      - .env
+      - .env.mcp-memory
     image: doobidoo/mcp-memory-service:10-slim
     restart: "on-failure:5"
     environment:
@@ -83,9 +83,16 @@ services:
       - ./data/memory/data/:/app/data
       - ./data/memory/cache/:/root
 
+  paperless-mcp:
+    env_file:
+      - .env.paperless-mcp
+    image: ghcr.io/baruchiro/paperless-mcp:latest
+    container_name: paperless-mcp
+    restart: unless-stopped
+
   opencode-web:
     env_file:
-      - .env
+      - .env.opencode-web
     image: ghcr.io/anomalyco/opencode:latest
     container_name: opencode-web
     depends_on:
@@ -93,6 +100,7 @@ services:
       - mcp-hockey
       - wikijs-mcp
       - mcp-memory
+      - paperless-mcp
     command:
       - web
       - --hostname
@@ -113,7 +121,7 @@ services:
 
   mcp-inspector:
     env_file:
-      - .env
+      - .env.mcp-inspector
     image: ghcr.io/modelcontextprotocol/inspector:latest
     container_name: mcp-inspector
     depends_on:
@@ -121,6 +129,7 @@ services:
       - mcp-hockey
       - wikijs-mcp
       - mcp-memory
+      - paperless-mcp
     command:
       - --
       - --config

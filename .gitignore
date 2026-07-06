@@ -13,3 +13,5 @@ mcp-hockey.yaml
 drillster-token.json
 tmp
 .env
+.env.*
+!.env.example

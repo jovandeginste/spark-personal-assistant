@@ -21,6 +21,11 @@
       "type": "remote",
       "url": "http://mcp-memory:8000/mcp",
       "enabled": true
+    },
+    "paperless": {
+      "type": "remote",
+      "url": "http://paperless-mcp:3000/mcp",
+      "enabled": true
     }
   },
   "permission": {
@@ -28,6 +33,7 @@
     "assistant_*": "allow",
     "hockey_*": "allow",
     "wikijs_*": "allow",
-    "memory_*": "allow"
+    "memory_*": "allow",
+    "paperless_*": "allow"
   }
 }
