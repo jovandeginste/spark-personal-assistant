@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
 
 	"github.com/google/go-querystring/query"
@@ -135,12 +136,17 @@ func queryFor(location string) (*openMeteoParams, error) {
 		return nil, fmt.Errorf("no location found for %q", location)
 	}
 
+	timezone := os.Getenv("TZ")
+	if timezone == "" {
+		timezone = "GMT"
+	}
+
 	q := openMeteoParams{
 		Latitude:  addr[0].Lat,
 		Longitude: addr[0].Lon,
 		Daily:     strings.Join(attributesDaily, ","),
 		Hourly:    strings.Join(attributesHourly, ","),
-		Timezone:  "GMT+1",
+		Timezone:  timezone,
 	}
 
 	return &q, nil

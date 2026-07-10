@@ -2,6 +2,7 @@ package weather
 
 import (
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
@@ -97,4 +98,30 @@ func TestEnabled(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestQueryForTimezone(t *testing.T) {
+	originalSearchLocations := searchLocationsFunc
+	defer func() { searchLocationsFunc = originalSearchLocations }()
+
+	searchLocationsFunc = func(query string) ([]geocoder.Result, error) {
+		return []geocoder.Result{{Lat: "40.7128", Lon: "-74.0060"}}, nil
+	}
+
+	origTZ, hasTZ := os.LookupEnv("TZ")
+	if hasTZ {
+		defer os.Setenv("TZ", origTZ)
+	} else {
+		defer os.Unsetenv("TZ")
+	}
+
+	os.Unsetenv("TZ")
+	params, err := queryFor("New York")
+	assert.NoError(t, err)
+	assert.Equal(t, "GMT", params.Timezone)
+
+	os.Setenv("TZ", "America/New_York")
+	params, err = queryFor("New York")
+	assert.NoError(t, err)
+	assert.Equal(t, "America/New_York", params.Timezone)
 }
