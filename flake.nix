@@ -21,7 +21,7 @@
       devShell = pkgs.mkShell {
         name = "spark-dev";
         buildInputs = with pkgs; [
-          go_1_25
+          go_1_26
           git
           gnumake
           direnv

@@ -7,8 +7,7 @@ from the codebase and repo configuration.
 ## Project type / overview
 
 - Go command-line application (main at `cmd/spark/main.go:9-16`).
-- Uses Go modules (see `go.mod`) and targets Go 1.24.x (go 1.24.1, toolchain
-  go1.24.2 in `go.mod`).
+- Uses Go modules (see `go.mod`) and targets Go 1.26.x (go 1.26.0 in `go.mod`).
 - The binary is a CLI called `spark` (see README examples).
 - Supports LLM backends (Gemini, OpenAI, Ollama) via `pkg/ai`.
 - Optional Matrix chat integration in `pkg/matrix`.
