@@ -99,7 +99,7 @@ func main() {
 
 		return server
 	}, &sdk.StreamableHTTPOptions{
-		Stateless: false,
+		Stateless: true,
 	})
 
 	logger.Info("Starting server on " + config.Port)
