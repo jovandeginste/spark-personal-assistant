@@ -1,4 +1,4 @@
-data/
+/data/
 spark.yaml
 mcp-config.yaml
 mcp-hockey.yaml
