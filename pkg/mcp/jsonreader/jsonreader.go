@@ -141,7 +141,7 @@ func (m *Module) loadAllEvents(config Config) []Event {
 }
 
 func (m *Module) filterEventsByDate(events []Event, params dateParams) []Event {
-	var results []Event
+	results := make([]Event, 0, len(events))
 
 	// Parse parameters
 	startStr, endStr := params.GetDateRange()

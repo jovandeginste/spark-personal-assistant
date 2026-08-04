@@ -16,7 +16,6 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
-	"unsafe"
 
 	"go.starlark.net/internal/compile"
 	"go.starlark.net/internal/spell"
@@ -60,7 +59,7 @@ type Thread struct {
 	Steps, maxSteps uint64
 
 	// cancelReason records the reason from the first call to Cancel.
-	cancelReason *string
+	cancelReason atomic.Pointer[string]
 
 	// locals holds arbitrary "thread-local" Go values belonging to the client.
 	// They are accessible to the client but not to any Starlark program.
@@ -89,7 +88,7 @@ func (thread *Thread) SetMaxExecutionSteps(max uint64) {
 // Unlike most methods of Thread, it is safe to call Uncancel from any
 // goroutine, even if the thread is actively executing.
 func (thread *Thread) Uncancel() {
-	atomic.StorePointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil)
+	thread.cancelReason.Store(nil)
 }
 
 // Cancel causes execution of Starlark code in the specified thread to
@@ -103,7 +102,7 @@ func (thread *Thread) Uncancel() {
 // goroutine, even if the thread is actively executing.
 func (thread *Thread) Cancel(reason string) {
 	// Atomically set cancelReason, preserving earlier reason if any.
-	atomic.CompareAndSwapPointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason)), nil, unsafe.Pointer(&reason))
+	thread.cancelReason.CompareAndSwap(nil, &reason)
 }
 
 // SetLocal sets the thread-local value associated with the specified key.
@@ -666,7 +665,7 @@ func getAttr(x Value, name string) (Value, error) {
 func setField(x Value, name string, y Value) error {
 	if x, ok := x.(HasSetField); ok {
 		err := x.SetField(name, y)
-		if _, ok := err.(NoSuchAttrError); ok {
+		if is[NoSuchAttrError](err) {
 			// No such field: check spelling.
 			if n := spell.Nearest(name, x.AttrNames()); n != "" {
 				err = fmt.Errorf("%s (did you mean .%s?)", err, n)
@@ -1244,10 +1243,8 @@ func Call(thread *Thread, fn Value, args Tuple, kwargs []Tuple) (Value, error) {
 	}
 
 	// Always return an EvalError with an accurate frame.
-	if err != nil {
-		if _, ok := err.(*EvalError); !ok {
-			err = thread.evalError(err)
-		}
+	if err != nil && !is[*EvalError](err) {
+		err = thread.evalError(err)
 	}
 
 	return result, err
@@ -1486,7 +1483,7 @@ func setArgs(locals []Value, fn *Function, args Tuple, kwargs []Tuple) error {
 		for ; i < nparams; i++ {
 			if locals[i] == nil {
 				dflt := fn.defaults[i-m]
-				if _, ok := dflt.(mandatory); ok {
+				if is[mandatory](dflt) {
 					missing = append(missing, paramIdents[i].Name)
 					continue
 				}

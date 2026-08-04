@@ -1,9 +1,9 @@
 package message
 
 import (
-	"bytes"
 	"fmt"
 	"io"
+	"math"
 
 	"maunium.net/go/mautrix/crypto/goolm/aessha2"
 	"maunium.net/go/mautrix/crypto/goolm/crypto"
@@ -33,8 +33,8 @@ func (r *Message) Decode(input []byte) (err error) {
 	r.Counter = 0
 	r.RatchetKey = nil
 	r.Ciphertext = nil
-	if len(input) == 0 {
-		return nil
+	if len(input) < countMACBytesMessage {
+		return fmt.Errorf("%w (%d bytes)", olm.ErrInputToSmall, len(input))
 	}
 
 	decoder := NewDecoder(input[:len(input)-countMACBytesMessage])
@@ -59,6 +59,10 @@ func (r *Message) Decode(input []byte) (err error) {
 			if value, err := decoder.ReadVarInt(); err != nil {
 				return err
 			} else if curKey == counterTag {
+				// TODO add support for 64-bit counters like vodozemac
+				if value > math.MaxUint32 {
+					return fmt.Errorf("Message.Decode: counter value %d exceeds uint32 limit", value)
+				}
 				r.Counter = uint32(value)
 				r.HasCounter = true
 			}
@@ -71,6 +75,8 @@ func (r *Message) Decode(input []byte) (err error) {
 			} else if curKey == cipherTextKeyTag {
 				r.Ciphertext = value
 			}
+		} else {
+			return fmt.Errorf("Message.Decode: unexpected proto key %d", curKey)
 		}
 	}
 }
@@ -90,17 +96,8 @@ func (r *Message) EncodeAndMAC(cipher aessha2.AESSHA2) ([]byte, error) {
 	return append(encoder.Bytes(), mac[:countMACBytesMessage]...), err
 }
 
-// VerifyMAC verifies the givenMAC to the calculated MAC of the message.
-func (r *Message) VerifyMAC(key []byte, cipher aessha2.AESSHA2, ciphertext, givenMAC []byte) (bool, error) {
-	checkMAC, err := cipher.MAC(ciphertext)
-	if err != nil {
-		return false, err
-	}
-	return bytes.Equal(checkMAC[:countMACBytesMessage], givenMAC), nil
-}
-
 // VerifyMACInline verifies the MAC taken from the message to the calculated MAC of the message.
-func (r *Message) VerifyMACInline(key []byte, cipher aessha2.AESSHA2, message []byte) (bool, error) {
+func (r *Message) VerifyMACInline(cipher aessha2.AESSHA2, message []byte) (bool, error) {
 	givenMAC := message[len(message)-countMACBytesMessage:]
-	return r.VerifyMAC(key, cipher, message[:len(message)-countMACBytesMessage], givenMAC)
+	return cipher.VerifyMAC(message[:len(message)-countMACBytesMessage], givenMAC, countMACBytesMessage)
 }

@@ -12,6 +12,114 @@ Originally based on [robfig/cron](https://github.com/robfig/cron).
 ### Planned for v2
 - Context-aware Job interface with graceful shutdown support
 
+## [0.15.1] - 2026-07-28
+
+Documentation-only release. No library code changed; it exists so that
+pkg.go.dev, which renders the latest tagged version, picks up the corrected
+day-of-week documentation.
+
+### Documentation
+- **Day-of-week accepts `7` for Sunday** ([PR#390]): The day-of-week field is now
+  documented as `0-7` rather than `0-6`, with an explicit note that Sunday can be
+  written as either `0` or `7`. The parser has always normalized `7` to `0`
+  (`parser.go`), so this corrects the documentation, not the behavior. Updated in
+  `doc.go`, README, `docs/ARCHITECTURE.md`, and `docs/PROJECT_INDEX.md`. Thanks to
+  [@hxl9654] for the contribution!
+- **Concurrency model and invariants** ([PR#385]): AGENTS.md now describes which
+  goroutine owns mutable scheduling state, lists the channels that serialize
+  external access, and records the three invariants contributors must preserve
+  (channel-routed mutations, mutex held across channel ops, deep-copied `Entry`
+  fields).
+- **Go Report Card badge removed** ([PR#391]): The service is sunset.
+
+### Changed
+- **CI: sync with `netresearch/.github` go-lib templates** ([PR#384], [PR#387],
+  [PR#388]): Dependabot grouping, labeler and auto-merge-deps configuration
+  realigned with the template; CodeQL gained the `merge_group` trigger.
+
+[PR#384]: https://github.com/netresearch/go-cron/pull/384
+[PR#385]: https://github.com/netresearch/go-cron/pull/385
+[PR#387]: https://github.com/netresearch/go-cron/pull/387
+[PR#388]: https://github.com/netresearch/go-cron/pull/388
+[PR#390]: https://github.com/netresearch/go-cron/pull/390
+[PR#391]: https://github.com/netresearch/go-cron/pull/391
+[@hxl9654]: https://github.com/hxl9654
+
+## [0.15.0] - 2026-06-02
+
+### Added
+- **`DrainAndUpsertJob`** ([PR#381]): windowless variant of `UpsertJob` for graceful
+  reschedule. Pauses the named entry, drains any in-flight invocation, swaps the
+  schedule and job, then restores the entry's prior paused state — closing the
+  narrow window in which the two-step `WaitForJobByName` → `UpsertJob` sequence
+  could let the old schedule fire once more between the wait and the
+  replacement. Composes existing serialized methods, so the drain never holds a
+  cron lock. Motivated by the
+  [weaviate object-TTL scheduler](https://github.com/weaviate/weaviate/pull/10477);
+  see [ADR-022](docs/adr/ADR-022-drain-and-upsert.md).
+
+## [0.14.0] - 2026-04-16
+
+### Added
+- **`RunJob` helper** ([#355], [PR#356]): Exported `RunJob(ctx, job)` dispatches to
+  `JobWithContext.RunWithContext(ctx)` or `Job.Run()` automatically. Intended for
+  custom `JobWrapper` implementations so they don't need to reimplement the
+  type-switch. The internal `startJobWithExecution` in `cron.go` now uses `RunJob`
+  to consolidate the duplicated dispatch logic.
+
+### Fixed
+- **FakeClock `BlockUntil` missed-wakeup race** ([#357], [PR#358]): The channel-based
+  waiter list had a classic missed-wakeup race — if a timer was created between the
+  mutex unlock and channel receive in `BlockUntil`, the notification was lost and the
+  caller hung indefinitely. Replaced with `sync.Cond` where `Wait()` atomically
+  releases the mutex and sleeps, guaranteeing no missed broadcasts. Also removed the
+  redundant `fired` field from `fakeTimer`.
+
+### Changed
+- **CI: org workflow references** ([PR#359]): Reusable workflows from
+  `netresearch/.github` now reference `@main` instead of SHA-pinned commits,
+  so upstream improvements propagate automatically.
+- **Toolchain** ([PR#360]): Updated from `go1.25.5` to `go1.26.2` (minimum `go 1.25`
+  unchanged).
+- **DST documentation** ([PR#354]): Added industry context and references (POSIX,
+  ISC cron, systemd, Kubernetes CronJob) to DST handling docs.
+
+[#355]: https://github.com/netresearch/go-cron/issues/355
+[PR#356]: https://github.com/netresearch/go-cron/pull/356
+[#357]: https://github.com/netresearch/go-cron/issues/357
+[PR#358]: https://github.com/netresearch/go-cron/pull/358
+[PR#359]: https://github.com/netresearch/go-cron/pull/359
+[PR#360]: https://github.com/netresearch/go-cron/pull/360
+[PR#354]: https://github.com/netresearch/go-cron/pull/354
+
+## [0.13.4] - 2026-04-02
+
+### Fixed
+- **DST fall-back duplicate execution** ([#349], [PR#350]): Jobs scheduled during DST
+  fall-back transitions (when wall-clock time repeats) no longer fire twice. The
+  scheduler detects when `Next()` returns the second occurrence of the same wall-clock
+  time and skips it, consistent with ISC cron behavior and ADR-016.
+- **Hash expression false positive on day names** ([PR#347]): Day-of-week names
+  containing "H" (e.g., `THU`) no longer incorrectly trigger hash expression
+  validation, which previously caused valid expressions like `0 0 * * THU` to fail.
+- **SLSA provenance format** ([PR#345]): Fixed provenance subject format and flaky
+  example test.
+- **Supply chain hardening** ([PR#348]): SHA-pinned all GitHub Actions and added
+  Dependabot for actions updates.
+- **Release attestation** ([PR#353]): Migrated to shared reusable workflows; fixed
+  broken attestation by removing unpinned transitive dependency.
+
+### Changed
+- Rebranded from "maintained fork" to standalone project ([PR#344]).
+
+[#349]: https://github.com/netresearch/go-cron/issues/349
+[PR#350]: https://github.com/netresearch/go-cron/pull/350
+[PR#347]: https://github.com/netresearch/go-cron/pull/347
+[PR#345]: https://github.com/netresearch/go-cron/pull/345
+[PR#348]: https://github.com/netresearch/go-cron/pull/348
+[PR#353]: https://github.com/netresearch/go-cron/pull/353
+[PR#344]: https://github.com/netresearch/go-cron/pull/344
+
 ## [0.13.1] - 2026-03-08
 
 ### Fixed
@@ -341,6 +449,7 @@ Originally based on [robfig/cron](https://github.com/robfig/cron).
 [PR#259]: https://github.com/netresearch/go-cron/pull/259
 [PR#260]: https://github.com/netresearch/go-cron/pull/260
 [PR#261]: https://github.com/netresearch/go-cron/pull/261
+[PR#381]: https://github.com/netresearch/go-cron/pull/381
 [ADR-007]: docs/adr/ADR-007-nw-skip-invalid-days.md
 [ADRs]: docs/adr/
 [COOKBOOK]: docs/COOKBOOK.md
@@ -502,7 +611,11 @@ This fork includes all features from robfig/cron v3 plus:
    _, err := cron.ParseStandard("*/60 * * * *") // Error: step (60) must be less than range size (60)
    ```
 
-[Unreleased]: https://github.com/netresearch/go-cron/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/netresearch/go-cron/compare/v0.15.1...HEAD
+[0.15.1]: https://github.com/netresearch/go-cron/compare/v0.15.0...v0.15.1
+[0.15.0]: https://github.com/netresearch/go-cron/compare/v0.14.0...v0.15.0
+[0.14.0]: https://github.com/netresearch/go-cron/compare/v0.13.4...v0.14.0
+[0.13.4]: https://github.com/netresearch/go-cron/compare/v0.13.1...v0.13.4
 [0.13.1]: https://github.com/netresearch/go-cron/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/netresearch/go-cron/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/netresearch/go-cron/compare/v0.11.0...v0.12.0

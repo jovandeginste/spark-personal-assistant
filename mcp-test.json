@@ -26,6 +26,11 @@
       "type": "remote",
       "url": "http://paperless-mcp:3000/mcp",
       "enabled": true
+    },
+    "news": {
+      "type": "remote",
+      "url": "https://gateway.pipeworx.io/mcp",
+      "enabled": true
     }
   },
   "permission": {
@@ -34,6 +39,7 @@
     "hockey_*": "allow",
     "wikijs_*": "allow",
     "memory_*": "allow",
-    "paperless_*": "allow"
+    "paperless_*": "allow",
+    "news_*": "allow"
   }
 }

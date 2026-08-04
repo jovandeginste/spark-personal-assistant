@@ -35,58 +35,55 @@ linters:
 
   disable:
     - errcheck
-  settings:
-    depguard:
-      rules:
-        main:
-          deny:
-            - pkg: io/ioutil
-              desc: The io/ioutil package has been deprecated, see https://go.dev/doc/go1.16#ioutil
-    gocyclo:
-      min-complexity: 25
-    govet:
-      enable:
-        - shadow
-      settings:
-        shadow:
-          strict: true
-    lll:
-      line-length: 230
-
-    staticcheck:
-      checks:
-        - -QF1008
-
-    revive:
-      rules:
-        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#import-shadowing
-        - name: import-shadowing
-          severity: warning
-          disabled: false
-        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-block
-        - name: empty-block
-          severity: warning
-          disabled: false
-        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
-        - name: empty-lines
-          severity: warning
-          disabled: false
-        # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#use-any
-        - name: use-any
-          severity: warning
-          disabled: false
-    gosec:
-      excludes:
-        - G104
-        - G115
-        - G301
-        - G304
-
-  exclusions:
+linters-settings:
+  depguard:
     rules:
-      - linters:
-          - govet
-        text: 'shadow: declaration of "(err|ok)" shadows declaration'
+      main:
+        deny:
+          - pkg: io/ioutil
+            desc: The io/ioutil package has been deprecated, see https://go.dev/doc/go1.16#ioutil
+  gocyclo:
+    min-complexity: 25
+  govet:
+    enable:
+      - shadow
+    settings:
+      shadow:
+        strict: true
+  lll:
+    line-length: 230
+
+  staticcheck:
+    checks:
+      - -QF1008
+
+  revive:
+    rules:
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#import-shadowing
+      - name: import-shadowing
+        severity: warning
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-block
+      - name: empty-block
+        severity: warning
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#empty-lines
+      - name: empty-lines
+        severity: warning
+        disabled: false
+      # https://github.com/mgechev/revive/blob/master/RULES_DESCRIPTIONS.md#use-any
+      - name: use-any
+        severity: warning
+        disabled: false
+      # Disable noisy unused-parameter rule
+      - name: unused-parameter
+        disabled: true
+  gosec:
+    excludes:
+      - G104
+      - G115
+      - G301
+      - G304
 
 formatters:
   enable:
@@ -102,3 +99,8 @@ issues:
 
   # Maximum count of issues with the same text. Set to 0 to disable. Default is 3.
   max-same-issues: 0
+
+  exclude-rules:
+    - linters:
+        - govet
+      text: 'shadow: declaration of "(err|ok)" shadows declaration'

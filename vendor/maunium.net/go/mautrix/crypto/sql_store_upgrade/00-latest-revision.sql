@@ -1,5 +1,5 @@
--- v0 -> v19 (compatible with v15+): Latest revision
-CREATE TABLE IF NOT EXISTS crypto_account (
+-- v0 -> v20 (compatible with v20+): Latest revision
+CREATE TABLE crypto_account (
 	account_id         TEXT    PRIMARY KEY,
 	device_id          TEXT    NOT NULL,
 	shared             BOOLEAN NOT NULL,
@@ -8,21 +8,20 @@ CREATE TABLE IF NOT EXISTS crypto_account (
 	key_backup_version TEXT    NOT NULL DEFAULT ''
 );
 
-CREATE TABLE IF NOT EXISTS crypto_message_index (
-	sender_key CHAR(43),
+CREATE TABLE crypto_message_index (
 	session_id CHAR(43),
 	"index"    INTEGER,
 	event_id   TEXT   NOT NULL,
 	timestamp  BIGINT NOT NULL,
-	PRIMARY KEY (sender_key, session_id, "index")
+	PRIMARY KEY (session_id, "index")
 );
 
-CREATE TABLE IF NOT EXISTS crypto_tracked_user (
+CREATE TABLE crypto_tracked_user (
 	user_id          TEXT PRIMARY KEY,
 	devices_outdated BOOLEAN NOT NULL DEFAULT FALSE
 );
 
-CREATE TABLE IF NOT EXISTS crypto_device (
+CREATE TABLE crypto_device (
 	user_id      TEXT,
 	device_id    TEXT,
 	identity_key CHAR(43) NOT NULL,
@@ -33,7 +32,7 @@ CREATE TABLE IF NOT EXISTS crypto_device (
 	PRIMARY KEY (user_id, device_id)
 );
 
-CREATE TABLE IF NOT EXISTS crypto_olm_session (
+CREATE TABLE crypto_olm_session (
 	account_id     TEXT,
 	session_id     CHAR(43),
 	sender_key     CHAR(43)  NOT NULL,
@@ -55,7 +54,7 @@ CREATE TABLE crypto_olm_message_hash (
 );
 CREATE INDEX crypto_olm_message_hash_account_idx ON crypto_olm_message_hash (account_id);
 
-CREATE TABLE IF NOT EXISTS crypto_megolm_inbound_session (
+CREATE TABLE crypto_megolm_inbound_session (
 	account_id         TEXT,
 	session_id         CHAR(43),
 	sender_key         CHAR(43) NOT NULL,
@@ -77,7 +76,7 @@ CREATE TABLE IF NOT EXISTS crypto_megolm_inbound_session (
 -- Useful index to find keys that need backing up
 CREATE INDEX crypto_megolm_inbound_session_backup_idx ON crypto_megolm_inbound_session(account_id, key_backup_version) WHERE session IS NOT NULL;
 
-CREATE TABLE IF NOT EXISTS crypto_megolm_outbound_session (
+CREATE TABLE crypto_megolm_outbound_session (
 	account_id    TEXT,
 	room_id       TEXT,
 	session_id    CHAR(43)  NOT NULL UNIQUE,
@@ -91,7 +90,7 @@ CREATE TABLE IF NOT EXISTS crypto_megolm_outbound_session (
 	PRIMARY KEY (account_id, room_id)
 );
 
-CREATE TABLE IF NOT EXISTS crypto_megolm_outbound_session_shared (
+CREATE TABLE crypto_megolm_outbound_session_shared (
 	user_id      TEXT     NOT NULL,
 	identity_key CHAR(43) NOT NULL,
 	session_id   CHAR(43) NOT NULL,
@@ -99,7 +98,7 @@ CREATE TABLE IF NOT EXISTS crypto_megolm_outbound_session_shared (
 	PRIMARY KEY (user_id, identity_key, session_id)
 );
 
-CREATE TABLE IF NOT EXISTS crypto_cross_signing_keys (
+CREATE TABLE crypto_cross_signing_keys (
 	user_id TEXT,
 	usage   TEXT,
 	key     CHAR(43) NOT NULL,
@@ -109,7 +108,7 @@ CREATE TABLE IF NOT EXISTS crypto_cross_signing_keys (
 	PRIMARY KEY (user_id, usage)
 );
 
-CREATE TABLE IF NOT EXISTS crypto_cross_signing_signatures (
+CREATE TABLE crypto_cross_signing_signatures (
 	signed_user_id TEXT,
 	signed_key     TEXT,
 	signer_user_id TEXT,
@@ -118,7 +117,7 @@ CREATE TABLE IF NOT EXISTS crypto_cross_signing_signatures (
 	PRIMARY KEY (signed_user_id, signed_key, signer_user_id, signer_key)
 );
 
-CREATE TABLE IF NOT EXISTS crypto_secrets (
+CREATE TABLE crypto_secrets (
 	account_id TEXT  NOT NULL,
 	name       TEXT  NOT NULL,
 	secret     bytea NOT NULL,

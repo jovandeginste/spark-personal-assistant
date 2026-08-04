@@ -161,7 +161,7 @@ func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
 		done <- c.Fetch(seqset, items, messages)
 	}()
 
-	var results []Message
+	results := make([]Message, 0, len(uids))
 	for msg := range messages {
 		if msg == nil {
 			continue

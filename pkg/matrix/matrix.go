@@ -59,7 +59,7 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 
 	body := evt.Content.AsMessage().Body
 
-	history, _ := mc.AIData.ChatHistory[evt.RoomID.String()]
+	history := mc.AIData.ChatHistory[evt.RoomID.String()]
 	mc.App.Logger().Info(
 		"Received message",
 		"sender", evt.Sender.String(),

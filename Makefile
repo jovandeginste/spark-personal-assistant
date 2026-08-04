@@ -1,3 +1,5 @@
+export GOTOOLCHAIN=go1.26.2
+
 .PHONY: all vendor down-docker
 all: test lint build
 vendor:
@@ -13,7 +15,7 @@ test:
 	CGO_ENABLED=0 go test -short -count 1 -tags "goolm,sqlite_foreign_keys" -mod vendor -covermode=atomic -gcflags=all=-l ./...
 
 lint:
-	CGO_ENABLED=0 golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --build-tags="goolm,sqlite_foreign_keys"
+	CGO_ENABLED=0 go tool golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --build-tags="goolm,sqlite_foreign_keys"
 
 install-hooks:
 	printf "#!/bin/sh\nset -e\n\necho 'Running tests...'\nmake test\n\necho 'Running linter...'\nmake lint\n" > .git/hooks/pre-commit

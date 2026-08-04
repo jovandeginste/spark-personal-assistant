@@ -4,7 +4,6 @@
 [![CodeQL](https://img.shields.io/github/actions/workflow/status/netresearch/go-cron/codeql.yml?label=CodeQL)](https://github.com/netresearch/go-cron/security/code-scanning)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/netresearch/go-cron/badge)](https://scorecard.dev/viewer/?uri=github.com/netresearch/go-cron)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/11696/badge)](https://www.bestpractices.dev/projects/11696)
-[![Go Report Card](https://goreportcard.com/badge/github.com/netresearch/go-cron)](https://goreportcard.com/report/github.com/netresearch/go-cron)
 [![Go Version](https://img.shields.io/github/go-mod/go-version/netresearch/go-cron)](go.mod)
 [![Latest Release](https://img.shields.io/github/v/release/netresearch/go-cron)](https://github.com/netresearch/go-cron/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -12,6 +11,9 @@
 [![SLSA 3](https://slsa.dev/images/gh-badge-level3.svg)](https://slsa.dev)
 
 # go-cron
+
+[![Template Drift](https://github.com/netresearch/go-cron/actions/workflows/check-template-drift.yml/badge.svg)](https://github.com/netresearch/go-cron/actions/workflows/check-template-drift.yml)
+[![managed by netresearch/.github templates](https://img.shields.io/badge/template-netresearch%2F.github-2F99A4?logo=github)](https://github.com/netresearch/.github/tree/main/templates/go-app)
 
 A production-grade cron job scheduler for Go — drop-in replacement for [robfig/cron](https://github.com/robfig/cron) with runtime schedule updates, per-entry context, resilience middleware (retry, circuit breaker, rate limiting), and active maintenance.
 
@@ -114,7 +116,9 @@ Standard 5-field cron format (minute-first):
 | Hours | Yes | 0-23 | `* / , -` |
 | Day of month | Yes | 1-31 | `* / , - ?` |
 | Month | Yes | 1-12 or JAN-DEC | `* / , -` |
-| Day of week | Yes | 0-6 or SUN-SAT | `* / , - ?` |
+| Day of week | Yes | 0-7 or SUN-SAT | `* / , - ?` |
+
+Note: Sunday can be represented by both 0 and 7.
 
 ### Predefined Schedules
 
@@ -258,6 +262,15 @@ For graceful replacement of long-running jobs:
 ```go
 c.WaitForJobByName("my-job")  // Block until current execution finishes
 c.UpsertJob(newSpec, newJob, cron.WithName("my-job"))
+```
+
+These two calls are not atomic — the old schedule can fire once in the gap
+between them. For a windowless reschedule, use `DrainAndUpsertJob`, which pauses
+the entry, drains the in-flight invocation, swaps schedule and job, and restores
+the prior paused state in one call:
+
+```go
+c.DrainAndUpsertJob(newSpec, newJob, cron.WithName("my-job"))
 ```
 
 ## Pause/Resume

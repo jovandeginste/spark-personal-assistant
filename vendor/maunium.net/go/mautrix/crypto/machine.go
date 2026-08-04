@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.mau.fi/util/exsync"
 	"go.mau.fi/util/ptr"
 
 	"go.mau.fi/util/exzerolog"
@@ -38,12 +39,14 @@ type OlmMachine struct {
 	backgroundCtx       context.Context
 	cancelBackgroundCtx context.CancelFunc
 
-	PlaintextMentions   bool
-	MSC4392Relations    bool
-	AllowEncryptedState bool
+	PlaintextMentions      bool
+	MSC4392Relations       bool
+	AllowEncryptedState    bool
+	AllowBeeperRoomReroute bool
 
 	// Never ask the server for keys automatically as a side effect during Megolm decryption.
 	DisableDecryptKeyFetching bool
+	keyFetchAttempted         *exsync.Set[userSenderKeyTuple]
 
 	// Don't mark outbound Olm sessions as shared for devices they were initially sent to.
 	DisableSharedGroupSessionTracking bool
@@ -86,6 +89,7 @@ type OlmMachine struct {
 	crossSigningPubkeys *CrossSigningPublicKeysCache
 
 	crossSigningPubkeysFetched bool
+	ownDeviceKeysCache         atomic.Pointer[mautrix.DeviceKeys]
 
 	DeleteOutboundKeysOnAck      bool
 	DontStoreOutboundKeys        bool
@@ -135,6 +139,8 @@ func NewOlmMachine(client *mautrix.Client, log *zerolog.Logger, cryptoStore Stor
 		devicesToUnwedge: make(map[id.IdentityKey]bool),
 		recentlyUnwedged: make(map[id.IdentityKey]time.Time),
 		secretListeners:  make(map[string]chan<- string),
+
+		keyFetchAttempted: exsync.NewSet[userSenderKeyTuple](),
 	}
 	mach.backgroundCtx, mach.cancelBackgroundCtx = context.WithCancel(context.Background())
 	mach.AllowKeyShare = mach.defaultAllowKeyShare
@@ -346,7 +352,7 @@ func (mach *OlmMachine) ProcessSyncResponse(ctx context.Context, resp *mautrix.R
 
 // HandleMemberEvent handles a single membership event.
 //
-// Currently this is not automatically called, so you must add a listener yourself:
+// Currently, this is not automatically called, so you must add a listener yourself:
 //
 //	client.Syncer.(mautrix.ExtensibleSyncer).OnEventType(event.StateMember, c.crypto.HandleMemberEvent)
 func (mach *OlmMachine) HandleMemberEvent(ctx context.Context, evt *event.Event) {
@@ -375,6 +381,7 @@ func (mach *OlmMachine) HandleMemberEvent(ctx context.Context, evt *event.Event)
 		(prevContent.Membership == event.MembershipLeave && content.Membership == event.MembershipBan) {
 		return
 	}
+	// TODO on joins and invites, it would be enough to mark the session as needing re-sharing to that user instead of deleting it
 	mach.Log.Trace().
 		Str("room_id", evt.RoomID.String()).
 		Str("user_id", evt.GetStateKey()).
@@ -388,8 +395,12 @@ func (mach *OlmMachine) HandleMemberEvent(ctx context.Context, evt *event.Event)
 }
 
 func (mach *OlmMachine) HandleEncryptedEvent(ctx context.Context, evt *event.Event) *DecryptedOlmEvent {
-	if _, ok := evt.Content.Parsed.(*event.EncryptedEventContent); !ok {
+	content, ok := evt.Content.Parsed.(*event.EncryptedEventContent)
+	if !ok {
 		mach.machOrContextLog(ctx).Warn().Msg("Passed invalid event to encrypted handler")
+		return nil
+	} else if content.Algorithm == id.AlgorithmBeeperStreamV1 {
+		mach.machOrContextLog(ctx).Debug().Msg("Skipping beeper stream encrypted to-device event in Olm machine")
 		return nil
 	}
 
@@ -401,8 +412,8 @@ func (mach *OlmMachine) HandleEncryptedEvent(ctx context.Context, evt *event.Eve
 
 	log := mach.machOrContextLog(ctx).With().
 		Str("decrypted_type", decryptedEvt.Type.Type).
-		Str("sender_device", decryptedEvt.SenderDevice.String()).
-		Str("sender_signing_key", decryptedEvt.Keys.Ed25519.String()).
+		Stringer("sender_device", ptr.Val(decryptedEvt.SenderDevice).DeviceID).
+		Stringer("sender_signing_key", decryptedEvt.Keys.Ed25519).
 		Logger()
 	log.Trace().Msg("Successfully decrypted to-device event")
 
@@ -718,6 +729,32 @@ func (mach *OlmMachine) HandleRoomKeyWithheld(ctx context.Context, content *even
 	if err != nil {
 		zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to save room key withheld event")
 	}
+}
+
+func (mach *OlmMachine) getKeysForOlmMessage(ctx context.Context) *mautrix.DeviceKeys {
+	if keys := mach.ownDeviceKeysCache.Load(); keys != nil {
+		return keys
+	}
+	keys := mach.account.getInitialKeys(mach.Client.UserID, mach.Client.DeviceID)
+	csKeys, err := mach.GetOwnCrossSigningPublicKeys(ctx)
+	if err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to get own cross signing keys")
+		return keys
+	} else if csKeys == nil {
+		mach.ownDeviceKeysCache.Store(keys)
+		return keys
+	}
+	sigs, err := mach.CryptoStore.GetSignaturesForKeyBy(ctx, mach.Client.UserID, keys.Keys.GetEd25519(mach.Client.DeviceID), mach.Client.UserID)
+	if err != nil {
+		zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to get signatures for own device keys")
+		return keys
+	}
+	selfSig, ok := sigs[csKeys.SelfSigningKey]
+	if ok {
+		keys.Signatures[mach.Client.UserID][id.NewKeyID(id.KeyAlgorithmEd25519, csKeys.SelfSigningKey.String())] = selfSig
+	}
+	mach.ownDeviceKeysCache.Store(keys)
+	return keys
 }
 
 // ShareKeys uploads necessary keys to the server.

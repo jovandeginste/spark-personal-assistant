@@ -13,7 +13,7 @@ import "C"
 
 import (
 	"crypto/rand"
-	"encoding/json"
+	"fmt"
 	"runtime"
 	"unsafe"
 
@@ -124,13 +124,18 @@ func (p *PKSigning) Sign(message []byte) ([]byte, error) {
 
 // SignJSON creates a signature for the given object after encoding it to canonical JSON.
 func (p *PKSigning) SignJSON(obj interface{}) (string, error) {
-	objJSON, err := json.Marshal(obj)
+	objJSON, err := canonicaljson.Marshal(obj)
 	if err != nil {
 		return "", err
 	}
 	objJSON, _ = sjson.DeleteBytes(objJSON, "unsigned")
 	objJSON, _ = sjson.DeleteBytes(objJSON, "signatures")
-	signature, err := p.Sign(canonicaljson.CanonicalJSONAssumeValid(objJSON))
+	// This is probably not necessary
+	err = canonicaljson.Canonicalize(&objJSON)
+	if err != nil {
+		return "", fmt.Errorf("failed to canonicalize JSON after deleting unsigned and signatures: %w", err)
+	}
+	signature, err := p.Sign(objJSON)
 	if err != nil {
 		return "", err
 	}
@@ -141,86 +146,4 @@ func (p *PKSigning) SignJSON(obj interface{}) (string, error) {
 // [PKSigning] object.
 func (p *PKSigning) lastError() error {
 	return convertError(C.GoString(C.olm_pk_signing_last_error((*C.OlmPkSigning)(p.int))))
-}
-
-type PKDecryption struct {
-	int       *C.OlmPkDecryption
-	mem       []byte
-	publicKey []byte
-}
-
-func pkDecryptionSize() uint {
-	return uint(C.olm_pk_decryption_size())
-}
-
-func pkDecryptionPublicKeySize() uint {
-	return uint(C.olm_pk_key_length())
-}
-
-func NewPkDecryption(privateKey []byte) (*PKDecryption, error) {
-	memory := make([]byte, pkDecryptionSize())
-	p := &PKDecryption{
-		int: C.olm_pk_decryption(unsafe.Pointer(unsafe.SliceData(memory))),
-		mem: memory,
-	}
-	p.clear()
-	pubKey := make([]byte, pkDecryptionPublicKeySize())
-
-	r := C.olm_pk_key_from_private(
-		(*C.OlmPkDecryption)(p.int),
-		unsafe.Pointer(unsafe.SliceData(pubKey)),
-		C.size_t(len(pubKey)),
-		unsafe.Pointer(unsafe.SliceData(privateKey)),
-		C.size_t(len(privateKey)),
-	)
-	runtime.KeepAlive(privateKey)
-	if r == errorVal() {
-		return nil, p.lastError()
-	}
-	p.publicKey = pubKey
-
-	return p, nil
-}
-
-func (p *PKDecryption) PublicKey() id.Curve25519 {
-	return id.Curve25519(p.publicKey)
-}
-
-func (p *PKDecryption) Decrypt(ephemeralKey []byte, mac []byte, ciphertext []byte) ([]byte, error) {
-	maxPlaintextLength := uint(C.olm_pk_max_plaintext_length(
-		(*C.OlmPkDecryption)(p.int),
-		C.size_t(len(ciphertext)),
-	))
-	plaintext := make([]byte, maxPlaintextLength)
-
-	size := C.olm_pk_decrypt(
-		(*C.OlmPkDecryption)(p.int),
-		unsafe.Pointer(unsafe.SliceData(ephemeralKey)),
-		C.size_t(len(ephemeralKey)),
-		unsafe.Pointer(unsafe.SliceData(mac)),
-		C.size_t(len(mac)),
-		unsafe.Pointer(unsafe.SliceData(ciphertext)),
-		C.size_t(len(ciphertext)),
-		unsafe.Pointer(unsafe.SliceData(plaintext)),
-		C.size_t(len(plaintext)),
-	)
-	runtime.KeepAlive(ephemeralKey)
-	runtime.KeepAlive(mac)
-	runtime.KeepAlive(ciphertext)
-	if size == errorVal() {
-		return nil, p.lastError()
-	}
-
-	return plaintext[:size], nil
-}
-
-// Clear clears the underlying memory of a PkDecryption object.
-func (p *PKDecryption) clear() {
-	C.olm_clear_pk_decryption((*C.OlmPkDecryption)(p.int))
-}
-
-// lastError returns the last error that happened in relation to this
-// [PKDecryption] object.
-func (p *PKDecryption) lastError() error {
-	return convertError(C.GoString(C.olm_pk_decryption_last_error((*C.OlmPkDecryption)(p.int))))
 }

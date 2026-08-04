@@ -288,7 +288,7 @@ func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) 
 	rangeStart := time.Date(start.Year(), start.Month(), start.Day(), 0, 0, 0, 0, start.Location())
 	rangeEnd := time.Date(end.Year(), end.Month(), end.Day(), 0, 0, 0, 0, end.Location()).Add(24 * time.Hour)
 
-	var results []Event
+	results := make([]Event, 0, len(parser.Events))
 	for _, e := range parser.Events {
 		eventStart := e.Start
 		eventEnd := e.End
@@ -358,7 +358,7 @@ func (m *Module) searchEvents(cal Calendar, query []string, startDateStr, endDat
 		}
 	}
 
-	var results []Event
+	results := make([]Event, 0, len(parser.Events))
 
 	for _, e := range parser.Events {
 		if e.Start == nil || e.End == nil {

@@ -43,6 +43,15 @@ func (r chainKey) PickleLibOlm(encoder *libolmpickle.Encoder) {
 	encoder.WriteUInt32(r.Index)
 }
 
+func (r chainKey) createMessageKeys() messageKey {
+	hash := hmac.New(sha256.New, r.Key)
+	hash.Write([]byte{messageKeySeed})
+	return messageKey{
+		Key:   hash.Sum(nil),
+		Index: r.Index,
+	}
+}
+
 // senderChain is a chain for sending messages
 type senderChain struct {
 	RKey  crypto.Curve25519KeyPair `json:"ratchet_key"`
@@ -161,10 +170,9 @@ func (m *messageKey) UnpickleLibOlm(decoder *libolmpickle.Decoder) (err error) {
 
 // PickleLibOlm pickles the message key into the encoder.
 func (m messageKey) PickleLibOlm(encoder *libolmpickle.Encoder) {
-	if len(m.Key) == messageKeyLength {
-		encoder.Write(m.Key)
-	} else {
-		encoder.WriteEmptyBytes(messageKeyLength)
+	if len(m.Key) != messageKeyLength {
+		panic("messageKey.PickleLibOlm: key length is not 32 bytes")
 	}
+	encoder.Write(m.Key)
 	encoder.WriteUInt32(m.Index)
 }

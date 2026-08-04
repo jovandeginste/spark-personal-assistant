@@ -20,6 +20,7 @@ import (
 	"go.mau.fi/util/exerrors"
 	"go.mau.fi/util/ptr"
 
+	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/goolm/account"
 	"maunium.net/go/mautrix/event"
 	"maunium.net/go/mautrix/id"
@@ -32,6 +33,8 @@ var (
 	ErrDecryptionFailedWithMatchingSession = errors.New("decryption failed with matching session")
 	ErrDecryptionFailedForNormalMessage    = errors.New("decryption failed for normal message")
 	ErrSenderMismatch                      = errors.New("mismatched sender in olm payload")
+	ErrSenderKeyMismatch                   = errors.New("mismatched sender key in olm payload")
+	ErrSigningKeyMismatch                  = errors.New("mismatched signing key in olm payload and device info")
 	ErrRecipientMismatch                   = errors.New("mismatched recipient in olm payload")
 	ErrRecipientKeyMismatch                = errors.New("mismatched recipient key in olm payload")
 	ErrDuplicateMessage                    = errors.New("duplicate olm message")
@@ -53,13 +56,17 @@ var (
 type DecryptedOlmEvent struct {
 	Source *event.Event `json:"-"`
 
-	SenderKey id.SenderKey `json:"-"`
+	SenderKey    id.SenderKey `json:"-"`
+	SenderDevice *id.Device   `json:"-"`
 
-	Sender        id.UserID    `json:"sender"`
-	SenderDevice  id.DeviceID  `json:"sender_device"`
-	Keys          OlmEventKeys `json:"keys"`
-	Recipient     id.UserID    `json:"recipient"`
-	RecipientKeys OlmEventKeys `json:"recipient_keys"`
+	Sender           id.UserID           `json:"sender"`
+	SenderDeviceKeys *mautrix.DeviceKeys `json:"sender_device_keys,omitempty"`
+	Keys             OlmEventKeys        `json:"keys"`
+	Recipient        id.UserID           `json:"recipient"`
+	RecipientKeys    OlmEventKeys        `json:"recipient_keys"`
+
+	// Deprecated: not a real field, do not use
+	SenderDeviceID id.DeviceID `json:"sender_device"`
 
 	Type    event.Type    `json:"type"`
 	Content event.Content `json:"content"`
@@ -86,6 +93,11 @@ func (mach *OlmMachine) decryptOlmEvent(ctx context.Context, evt *event.Event) (
 
 type OlmEventKeys struct {
 	Ed25519 id.Ed25519 `json:"ed25519"`
+}
+
+type userSenderKeyTuple struct {
+	UserID    id.UserID
+	SenderKey id.SenderKey
 }
 
 func (mach *OlmMachine) decryptAndParseOlmCiphertext(ctx context.Context, evt *event.Event, senderKey id.SenderKey, olmType id.OlmMsgType, ciphertext string) (*DecryptedOlmEvent, error) {
@@ -120,6 +132,35 @@ func (mach *OlmMachine) decryptAndParseOlmCiphertext(ctx context.Context, evt *e
 	} else if mach.account.SigningKey() != olmEvt.RecipientKeys.Ed25519 {
 		return nil, ErrRecipientKeyMismatch
 	}
+	device, err := mach.CryptoStore.FindDeviceByKey(ctx, evt.Sender, senderKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find device for sender key: %w", err)
+	}
+	if olmEvt.SenderDeviceKeys != nil {
+		if olmEvt.SenderDeviceKeys.UserID != olmEvt.Sender {
+			return nil, fmt.Errorf("sender_device_keys: %w", ErrSenderMismatch)
+		} else if olmEvt.SenderDeviceKeys.Keys.GetCurve25519(olmEvt.SenderDeviceKeys.DeviceID) != senderKey {
+			return nil, fmt.Errorf("sender_device_keys: %w", ErrSenderKeyMismatch)
+		} else if device, err = mach.validateDevice(evt.Sender, olmEvt.SenderDeviceKeys.DeviceID, *olmEvt.SenderDeviceKeys, device); err != nil {
+			return nil, fmt.Errorf("sender_device_keys: %w", err)
+		}
+	} else if device == nil && !mach.DisableDecryptKeyFetching && mach.keyFetchAttempted.Add(userSenderKeyTuple{evt.Sender, senderKey}) {
+		log.Warn().Msg("Olm sender device not found in store or event, fetching from server")
+		devices := mach.LoadDevices(ctx, evt.Sender)
+		for _, d := range devices {
+			if d.IdentityKey == senderKey {
+				device = d
+				break
+			}
+		}
+	}
+	if device == nil {
+		// TODO: drop these events in the future (allowed temporarily until all clients send sender_device_keys)
+		log.Warn().Msg("Olm sender device not found in store or event, but fetching is disabled or already attempted")
+	}
+	if device != nil && device.SigningKey != olmEvt.Keys.Ed25519 {
+		return nil, ErrSigningKeyMismatch
+	}
 
 	if len(olmEvt.Content.VeryRaw) > 0 {
 		err = olmEvt.Content.ParseRaw(olmEvt.Type)
@@ -128,6 +169,7 @@ func (mach *OlmMachine) decryptAndParseOlmCiphertext(ctx context.Context, evt *e
 		}
 	}
 
+	olmEvt.SenderDevice = device
 	olmEvt.SenderKey = senderKey
 
 	return &olmEvt, nil
@@ -190,7 +232,7 @@ func (mach *OlmMachine) tryDecryptOlmCiphertext(ctx context.Context, sender id.U
 	accountBackup, _ := mach.account.Internal.Pickle([]byte("tmp"))
 	log.Trace().Msg("Trying to create inbound session")
 	endTimeTrace = mach.timeTrace(ctx, "creating inbound olm session", time.Second)
-	session, err := mach.createInboundSession(ctx, senderKey, ciphertext)
+	session, err := mach.account.NewInboundSessionFrom(senderKey, ciphertext)
 	endTimeTrace()
 	if err != nil {
 		go mach.unwedgeDevice(log, sender, senderKey)
@@ -225,16 +267,20 @@ func (mach *OlmMachine) tryDecryptOlmCiphertext(ctx context.Context, sender id.U
 		return nil, fmt.Errorf("failed to decrypt olm event with session created from prekey message: %w", err)
 	}
 
-	endTimeTrace = mach.timeTrace(ctx, "updating new session in database", time.Second)
+	endTimeTrace = mach.timeTrace(ctx, "saving new session in database", time.Second)
 	err = mach.CryptoStore.PutOlmHash(ctx, ciphertextHash, time.Now())
 	if err != nil {
 		log.Warn().Err(err).Msg("Failed to store olm message hash after decrypting")
 	}
-	err = mach.CryptoStore.UpdateSession(ctx, senderKey, session)
-	endTimeTrace()
+	err = mach.CryptoStore.AddSession(ctx, senderKey, session)
 	if err != nil {
-		log.Warn().Err(err).Msg("Failed to update new olm session in crypto store after decrypting")
+		log.Warn().Err(err).Msg("Failed to save new olm session in crypto store after decrypting")
+	} else if err = mach.account.Internal.RemoveOneTimeKeys(session.Internal); err != nil {
+		log.Warn().Err(err).Msg("Failed to remove one time keys from olm account after creating new session")
+	} else {
+		mach.saveAccount(ctx)
 	}
+	endTimeTrace()
 	return plaintext, nil
 }
 
@@ -338,19 +384,6 @@ func (mach *OlmMachine) tryDecryptOlmCiphertextWithExistingSession(
 		}
 	}
 	return nil, nil
-}
-
-func (mach *OlmMachine) createInboundSession(ctx context.Context, senderKey id.SenderKey, ciphertext string) (*OlmSession, error) {
-	session, err := mach.account.NewInboundSessionFrom(senderKey, ciphertext)
-	if err != nil {
-		return nil, err
-	}
-	mach.saveAccount(ctx)
-	err = mach.CryptoStore.AddSession(ctx, senderKey, session)
-	if err != nil {
-		zerolog.Ctx(ctx).Error().Err(err).Msg("Failed to store created inbound session")
-	}
-	return session, nil
 }
 
 const MinUnwedgeInterval = 1 * time.Hour

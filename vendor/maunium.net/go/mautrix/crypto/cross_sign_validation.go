@@ -9,6 +9,7 @@ package crypto
 
 import (
 	"context"
+	"fmt"
 
 	"maunium.net/go/mautrix/id"
 )
@@ -40,6 +41,23 @@ func (mach *OlmMachine) ResolveTrustContext(ctx context.Context, device *id.Devi
 			Msg("Master key of user not found")
 		return id.TrustStateUnset, nil
 	}
+	if device.UserID == mach.Client.UserID {
+		ownKeys, err := mach.GetOwnCrossSigningPublicKeys(ctx)
+		if err != nil {
+			mach.machOrContextLog(ctx).Err(err).
+				Str("user_id", device.UserID.String()).
+				Msg("Error retrieving own cross-signing keys from database")
+			return id.TrustStateUnset, err
+		} else if ownKeys != nil && ownKeys.MasterKey != theirMSK.Key {
+			mach.machOrContextLog(ctx).Error().
+				Str("user_id", device.UserID.String()).
+				Stringer("new_master_key", theirMSK.Key).
+				Stringer("first_seen_master_key", theirMSK.First).
+				Stringer("cached_master_key", ownKeys.MasterKey).
+				Msg("Own master key has changed")
+			return id.TrustStateUnset, nil
+		}
+	}
 	theirSSK, ok := theirKeys[id.XSUsageSelfSigning]
 	if !ok {
 		mach.machOrContextLog(ctx).Error().
@@ -69,7 +87,7 @@ func (mach *OlmMachine) ResolveTrustContext(ctx context.Context, device *id.Devi
 		return id.TrustStateUnset, err
 	}
 	if deviceSigExists {
-		if trusted, err := mach.IsUserTrusted(ctx, device.UserID); !trusted {
+		if trusted, err := mach.IsUserTrusted(ctx, device.UserID); trusted {
 			return id.TrustStateCrossSignedVerified, err
 		} else if theirMSK.Key == theirMSK.First {
 			return id.TrustStateCrossSignedTOFU, nil
@@ -96,20 +114,24 @@ func (mach *OlmMachine) IsDeviceTrusted(ctx context.Context, device *id.Device) 
 // IsUserTrusted returns whether a user has been determined to be trusted by our user-signing key having signed their master key.
 // In the case the user ID is our own and we have successfully retrieved our cross-signing keys, we trust our own user.
 func (mach *OlmMachine) IsUserTrusted(ctx context.Context, userID id.UserID) (bool, error) {
-	csPubkeys := mach.GetOwnCrossSigningPublicKeys(ctx)
-	if csPubkeys == nil {
+	csPubkeys, err := mach.GetOwnCrossSigningPublicKeys(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to get own cross-signing public keys: %w", err)
+	} else if csPubkeys == nil {
+		return false, nil
+	}
+	mkTrusted, selfSigningTrusted, userSigningTrusted, err := mach.GetOwnCrossSigningVerificationStatus(ctx)
+	if err != nil {
+		return false, fmt.Errorf("failed to check if own cross-signing keys are trusted: %w", err)
+	} else if !mkTrusted || !userSigningTrusted {
+		mach.machOrContextLog(ctx).Warn().
+			Bool("mk_trusted", mkTrusted).
+			Bool("usk_trusted", userSigningTrusted).
+			Msg("Own cross-signing keys are not fully trusted, treating other users as untrusted")
 		return false, nil
 	}
 	if userID == mach.Client.UserID {
-		return true, nil
-	}
-	// first we verify our user-signing key
-	ourUserSigningKeyTrusted, err := mach.CryptoStore.IsKeySignedBy(ctx, mach.Client.UserID, csPubkeys.UserSigningKey, mach.Client.UserID, csPubkeys.MasterKey)
-	if err != nil {
-		mach.machOrContextLog(ctx).Error().Err(err).Msg("Error retrieving our self-signing key signatures from database")
-		return false, err
-	} else if !ourUserSigningKeyTrusted {
-		return false, nil
+		return selfSigningTrusted, nil
 	}
 	theirKeys, err := mach.CryptoStore.GetCrossSigningKeys(ctx, userID)
 	if err != nil {

@@ -5,8 +5,7 @@ package starlark
 import (
 	"fmt"
 	"os"
-	"sync/atomic"
-	"unsafe"
+	"slices"
 
 	"go.starlark.net/internal/compile"
 	"go.starlark.net/internal/spell"
@@ -115,8 +114,8 @@ loop:
 				thread.Cancel("too many steps")
 			}
 		}
-		if reason := atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&thread.cancelReason))); reason != nil {
-			err = fmt.Errorf("Starlark computation cancelled: %s", *(*string)(reason))
+		if reason := thread.cancelReason.Load(); reason != nil {
+			err = fmt.Errorf("Starlark computation cancelled: %s", *reason)
 			break loop
 		}
 
@@ -327,7 +326,7 @@ loop:
 				}
 				items := dict.Items()
 				for _, item := range items {
-					if _, ok := item[0].(String); !ok {
+					if !is[String](item[0]) {
 						err = fmt.Errorf("keywords must be strings, not %s", item[0].Type())
 						break loop
 					}
@@ -348,8 +347,8 @@ loop:
 				// Copy positional arguments into a new array,
 				// unless the callee is another Starlark function,
 				// in which case it can be trusted not to mutate them.
-				if _, ok := stack[sp-1].(*Function); !ok || args != nil {
-					positional = append(Tuple(nil), positional...)
+				if !is[*Function](stack[sp-1]) || args != nil {
+					positional = slices.Clone(positional)
 				}
 			}
 			if args != nil {
