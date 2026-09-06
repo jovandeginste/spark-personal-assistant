@@ -16,6 +16,7 @@ import (
 	idle "github.com/emersion/go-imap-idle"
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-message/charset"
+	"github.com/gomarkdown/markdown"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
 )
 
@@ -280,8 +281,35 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 		subject = "Response from Spark Assistant"
 	}
 
-	msgBytes := []byte(fmt.Sprintf("From: %s\r\nTo: %s\r\nSubject: %s\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n%s",
-		cfg.Username, strings.Join(to, ", "), subject, msg.Content))
+	// Convert markdown content to HTML using github.com/gomarkdown/markdown
+	htmlContent := markdown.ToHTML([]byte(msg.Content), nil, nil)
+
+	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
+
+	var msgBuilder strings.Builder
+	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", cfg.Username))
+	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
+	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msgBuilder.WriteString("MIME-Version: 1.0\r\n")
+	msgBuilder.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
+
+	// Plain text part
+	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	msgBuilder.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	msgBuilder.WriteString(msg.Content)
+	msgBuilder.WriteString("\r\n\r\n")
+
+	// HTML part
+	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	msgBuilder.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	msgBuilder.Write(htmlContent)
+	msgBuilder.WriteString("\r\n\r\n")
+
+	msgBuilder.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+
+	msgBytes := []byte(msgBuilder.String())
 
 	var err error
 	if smtpPort == 465 {

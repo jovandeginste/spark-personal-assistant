@@ -37,7 +37,7 @@ func (c *cli) routerCmd() *cobra.Command {
 					continue
 				}
 
-				mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
+				mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName, Router: r}
 				mc.AIClient = aiClient
 
 				aiData, err := c.app.BuildData()

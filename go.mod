@@ -16,6 +16,7 @@ require (
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-vcard v0.1.0
 	github.com/glebarez/go-sqlite v1.23.0
+	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/google/go-querystring v1.2.0
 	github.com/gosimple/slug v1.15.0
 	github.com/jovandeginste/recycleapp-ics v0.0.0-20260618075648-3183116f4ab7

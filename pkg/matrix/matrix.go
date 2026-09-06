@@ -35,6 +35,7 @@ type MatrixConfig struct {
 	Client       *mautrix.Client
 	App          *app.App
 	CryptoHelper *cryptohelper.CryptoHelper
+	Router       *router.Router
 
 	msges chan msg
 }
@@ -88,6 +89,23 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 	}
 
 	if mc.handleAttachment(ctx, evt) {
+		return
+	}
+
+	// Submit via router if configured/available, otherwise fallback
+	if mc.Router != nil {
+		addrID := mc.InstanceName + "@matrix"
+		_ = mc.Router.SubmitMessage(ctx, addrID, router.Message{
+			Metadata: router.Metadata{
+				To:      []string{"ai"},
+				Subject: "Matrix Message",
+				Extra: map[string]any{
+					"room_id": evt.RoomID.String(),
+				},
+			},
+			OriginalSource: evt.Sender.String(),
+			Content:        body,
+		})
 		return
 	}
 
@@ -371,8 +389,11 @@ func (mc *MatrixConfig) DefaultRoomID() id.RoomID {
 	return id.RoomID(mc.App.Config.Matrix[mc.InstanceName].RoomID)
 }
 
-// Register registers the Matrix instance as an address to the central router.
 func (mc *MatrixConfig) Register(r *router.Router, instanceName string, description string) error {
+	return mc.RegisterRouter(r, instanceName, description)
+}
+
+func (mc *MatrixConfig) RegisterRouter(r *router.Router, instanceName string, description string) error {
 	if instanceName == "" {
 		instanceName = "default"
 	}
