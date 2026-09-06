@@ -30,13 +30,14 @@ type SMTPConfig struct {
 }
 
 type Config struct {
-	IMAP     IMAPConfig
-	SMTP     SMTPConfig
-	To       string
-	Username string
-	Password string
-	Folder   string
-	UseTLS   bool
+	IMAP      IMAPConfig
+	SMTP      SMTPConfig
+	To        string
+	Allowlist []string
+	Username  string
+	Password  string
+	Folder    string
+	UseTLS    bool
 }
 
 type Message struct {
@@ -300,23 +301,57 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 }
 
 func extractRecipients(cfg Config, msg router.Message) []string {
-	if cfg.To != "" {
-		return []string{cfg.To}
+	var candidateRecipients []string
+
+	if msg.OriginalSource != "" && strings.Contains(msg.OriginalSource, "@") {
+		candidateRecipients = append(candidateRecipients, msg.OriginalSource)
 	}
-	var to []string
+
+	// Check message metadata 'to' and 'extra'
 	if len(msg.Metadata.To) > 0 {
 		for _, t := range msg.Metadata.To {
-			if strings.Contains(t, "@") {
-				to = append(to, t)
+			if strings.Contains(t, "@") && !strings.HasSuffix(t, "@mail") && !strings.HasSuffix(t, "@matrix") && !strings.HasSuffix(t, "@web") {
+				candidateRecipients = append(candidateRecipients, t)
 			}
 		}
 	}
-	if len(to) == 0 && msg.Metadata.Extra != nil {
-		if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" {
-			to = append(to, fromAddr)
+	if len(candidateRecipients) == 0 && msg.Metadata.Extra != nil {
+		if extraTo, ok := msg.Metadata.Extra["to"].(string); ok && extraTo != "" && strings.Contains(extraTo, "@") {
+			candidateRecipients = append(candidateRecipients, extraTo)
+		} else if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" && strings.Contains(fromAddr, "@") {
+			candidateRecipients = append(candidateRecipients, fromAddr)
 		}
 	}
-	return to
+
+	// Filter via allowlist if configured
+	var allowed []string
+	if len(cfg.Allowlist) > 0 {
+		for _, cand := range candidateRecipients {
+			allowedMatch := false
+			for _, allowedAddr := range cfg.Allowlist {
+				if strings.EqualFold(cand, allowedAddr) {
+					allowedMatch = true
+					break
+				}
+			}
+			if allowedMatch {
+				allowed = append(allowed, cand)
+			}
+		}
+	} else {
+		allowed = candidateRecipients
+	}
+
+	if len(allowed) > 0 {
+		return allowed
+	}
+
+	// Fallback to default cfg.To if specified
+	if cfg.To != "" {
+		return []string{cfg.To}
+	}
+
+	return nil
 }
 
 func sendSMTPSecure(smtpAddr, smtpHost string, auth smtp.Auth, username string, to []string, msgBytes []byte) error {

@@ -138,10 +138,8 @@ func (c *cli) routerCmd() *cobra.Command {
 								Metadata: router.Metadata{
 									To:      []string{"ai"},
 									Subject: msg.Subject,
-									Extra: map[string]any{
-										"from_address": msg.FromAddress,
-									},
 								},
+								OriginalSource: msg.FromAddress,
 								Content: fmt.Sprintf("I received this email on behalf of my user. Do not reply to the email directly. "+
 									"Your response will be sent to the user via Matrix so they know what you did with it.\n\n"+
 									"Email from: %s\nSubject: %s\nDate: %s\n\n%s", msg.From, msg.Subject, msg.Date, msg.Body),

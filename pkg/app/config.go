@@ -39,14 +39,15 @@ type SMTPConfig struct {
 }
 
 type MailConfig struct {
-	Enabled  *bool      `mapstructure:"enabled"`
-	IMAP     IMAPConfig `mapstructure:"imap"`
-	SMTP     SMTPConfig `mapstructure:"smtp"`
-	To       string     `mapstructure:"to"`
-	Username string     `mapstructure:"username"`
-	Password string     `mapstructure:"password"`
-	Folder   string     `mapstructure:"folder"`
-	UseTLS   bool       `mapstructure:"use_tls"`
+	Enabled   *bool      `mapstructure:"enabled"`
+	IMAP      IMAPConfig `mapstructure:"imap"`
+	SMTP      SMTPConfig `mapstructure:"smtp"`
+	To        string     `mapstructure:"to"`
+	Allowlist []string   `mapstructure:"allowlist"`
+	Username  string     `mapstructure:"username"`
+	Password  string     `mapstructure:"password"`
+	Folder    string     `mapstructure:"folder"`
+	UseTLS    bool       `mapstructure:"use_tls"`
 }
 
 func (c MailConfig) IsEnabled() bool {

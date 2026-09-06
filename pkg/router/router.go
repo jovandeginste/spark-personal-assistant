@@ -21,8 +21,9 @@ type Metadata struct {
 
 // Message represents a message passing through the router.
 type Message struct {
-	Metadata Metadata `json:"metadata"`
-	Content  string   `json:"content"`
+	Metadata       Metadata `json:"metadata"`
+	Content        string   `json:"content"`
+	OriginalSource string   `json:"original_source,omitempty"`
 }
 
 // Address represents a registered system instance address in the router.
@@ -111,6 +112,20 @@ func (r *Router) MCPTools() []ai.Tool {
 			},
 		},
 		{
+			Name:        "router_list_channel_destinations",
+			Description: "List further sub-destinations or channel IDs for a specific system instance (e.g. Matrix room IDs for matrix, allowed email contacts for mail).",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"system": map[string]any{
+						"type":        "string",
+						"description": "The system name (e.g. matrix, mail)",
+					},
+				},
+				"required": []any{"system"},
+			},
+		},
+		{
 			Name:        "router_send_message",
 			Description: "Send a message via the router to one or more destination addresses (instancename@servicename).",
 			InputSchema: map[string]any{
@@ -129,6 +144,10 @@ func (r *Router) MCPTools() []ai.Tool {
 						"type":        "string",
 						"description": "Content/body of the message",
 					},
+					"extra": map[string]any{
+						"type":        "object",
+						"description": "Extra metadata key-value pairs (e.g. specific recipient email address under 'to', target matrix room ID under 'room_id', etc.)",
+					},
 				},
 				"required": []any{"to", "content"},
 			},
@@ -141,11 +160,46 @@ func (r *Router) ExecuteTool(ctx context.Context, name string, args map[string]a
 	switch name {
 	case "router_list_destinations":
 		return r.executeListDestinations(), true, nil
+	case "router_list_channel_destinations":
+		system, _ := args["system"].(string)
+		return r.executeListChannelDestinations(system), true, nil
 	case "router_send_message":
 		res, err := r.executeSendMessage(ctx, originatingMessage, args)
 		return res, true, err
 	}
 	return "", false, nil
+}
+
+func (r *Router) executeListChannelDestinations(system string) string {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Sub-destinations for system %s:\n", system))
+	for _, addr := range r.addresses {
+		if strings.EqualFold(addr.System, system) {
+			sb.WriteString(fmt.Sprintf("- Instance: %s, ID: %s, Description: %s\n", addr.InstanceName, addr.ID, addr.Description))
+			if system == "matrix" {
+				if r.app != nil && r.app.Config.Matrix != nil {
+					if mCfg, ok := r.app.Config.Matrix[addr.InstanceName]; ok && mCfg.RoomID != "" {
+						sb.WriteString(fmt.Sprintf("  Default Room ID: %s\n", mCfg.RoomID))
+					}
+				}
+			} else if system == "mail" || system == "imap" {
+				if r.app != nil && r.app.Config.Mail != nil {
+					if mailCfg, ok := r.app.Config.Mail[addr.InstanceName]; ok {
+						if mailCfg.To != "" {
+							sb.WriteString(fmt.Sprintf("  Configured default recipient: %s\n", mailCfg.To))
+						}
+						if len(mailCfg.Allowlist) > 0 {
+							sb.WriteString(fmt.Sprintf("  Allowed recipients: %s\n", strings.Join(mailCfg.Allowlist, ", ")))
+						}
+					}
+				}
+			}
+		}
+	}
+	return sb.String()
 }
 
 func (r *Router) executeListDestinations() string {
@@ -169,12 +223,22 @@ func (r *Router) executeSendMessage(ctx context.Context, originatingMessage Mess
 	subject, _ := args["subject"].(string)
 	content, _ := args["content"].(string)
 
+	extra := make(map[string]any)
+	for k, v := range originatingMessage.Metadata.Extra {
+		extra[k] = v
+	}
+	if extraArgs, ok := args["extra"].(map[string]any); ok {
+		for k, v := range extraArgs {
+			extra[k] = v
+		}
+	}
+
 	outMsg := Message{
 		Metadata: Metadata{
 			From:    "ai",
 			To:      to,
 			Subject: subject,
-			Extra:   originatingMessage.Metadata.Extra,
+			Extra:   extra,
 		},
 		Content: content,
 	}
@@ -207,6 +271,11 @@ func (r *Router) validateAndSetSource(sourceID string, msg *Message) (Address, e
 	r.mu.RUnlock()
 
 	if !ok {
+		// If sourceID is "ai", we allow it as a virtual system source
+		if sourceID == "ai" {
+			msg.Metadata.From = "ai"
+			return Address{ID: "ai", System: "ai", InstanceName: "ai"}, nil
+		}
 		return Address{}, fmt.Errorf("unknown source address: %s", sourceID)
 	}
 
@@ -216,7 +285,13 @@ func (r *Router) validateAndSetSource(sourceID string, msg *Message) (Address, e
 
 func (r *Router) logMessage(msg *Message) {
 	if r.app != nil && r.app.Logger() != nil {
-		r.app.Logger().Info("Message received by router", "from", msg.Metadata.From, "to", msg.Metadata.To, "subject", msg.Metadata.Subject)
+		r.app.Logger().Info("Message received by router",
+			"from", msg.Metadata.From,
+			"original_source", msg.OriginalSource,
+			"to", msg.Metadata.To,
+			"subject", msg.Metadata.Subject,
+			"metadata", msg.Metadata,
+		)
 	}
 }
 
@@ -296,7 +371,15 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 		r.app.Logger().Error("Failed to build AI data", "error", err)
 	}
 	if aiData != nil {
-		aiData.EmployerQuestion = []string{fmt.Sprintf("From: %s\nSubject: %s\n\n%s", msg.Metadata.From, msg.Metadata.Subject, msg.Content)}
+		senderInfo := msg.Metadata.From
+		if msg.OriginalSource != "" {
+			senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, msg.OriginalSource)
+		} else if msg.Metadata.Extra != nil {
+			if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" {
+				senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, fromAddr)
+			}
+		}
+		aiData.EmployerQuestion = []string{fmt.Sprintf("From: %s\nSubject: %s\n\n%s", senderInfo, msg.Metadata.Subject, msg.Content)}
 	}
 
 	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {

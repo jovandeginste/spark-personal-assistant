@@ -384,7 +384,13 @@ func (mc *MatrixConfig) Register(r *router.Router, instanceName string, descript
 		Description:  description,
 		SendFunc: func(ctx context.Context, msg router.Message) error {
 			mc.App.Logger().Info("Sending message via Matrix", "to", msg.Metadata.To, "content", msg.Content)
-			mc.SendMessage(mc.DefaultRoomID(), msg.Content)
+			targetRoom := mc.DefaultRoomID()
+			if msg.Metadata.Extra != nil {
+				if rID, ok := msg.Metadata.Extra["room_id"].(string); ok && rID != "" {
+					targetRoom = id.RoomID(rID)
+				}
+			}
+			mc.SendMessage(targetRoom, msg.Content)
 			return nil
 		},
 	})
