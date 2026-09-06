@@ -24,9 +24,6 @@ const (
 	AccountManagementActionDeviceView        AccountManagementAction = "org.matrix.device_view"
 	AccountManagementActionDeviceDelete      AccountManagementAction = "org.matrix.device_delete"
 	AccountManagementActionCrossSigningReset AccountManagementAction = "org.matrix.cross_signing_reset"
-	AccountManagementActionSessionList       AccountManagementAction = "org.matrix.sessions_list"
-	AccountManagementActionSessionView       AccountManagementAction = "org.matrix.session_view"
-	AccountManagementActionSessionEnd        AccountManagementAction = "org.matrix.session_end"
 	AccountManagementActionAccountDeactivate AccountManagementAction = "org.matrix.account_deactivate"
 )
 
@@ -138,11 +135,18 @@ type ClientMetadata struct {
 	Extra map[string]any `json:",unknown"`
 }
 
+type ScopeGroup string
+
+func (sg ScopeGroup) Split() []Scope {
+	return exslices.CastToString[Scope](strings.Split(string(sg), " "))
+}
+
 type TokenResponse struct {
 	AccessToken  string           `json:"access_token"`
 	TokenType    string           `json:"token_type"`
 	ExpiresIn    jsontime.Seconds `json:"expires_in"`
 	RefreshToken string           `json:"refresh_token,omitempty"`
+	Scope        ScopeGroup       `json:"scope,omitempty"`
 }
 
 type ScopeList []Scope

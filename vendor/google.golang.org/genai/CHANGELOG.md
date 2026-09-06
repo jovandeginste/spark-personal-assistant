@@ -1,5 +1,49 @@
 # Changelog
 
+## [1.71.0](https://github.com/googleapis/go-genai/compare/v1.70.0...v1.71.0) (2026-08-31)
+
+
+### Features
+
+* Add translation_config SDK support for GEAP. ([83c445d](https://github.com/googleapis/go-genai/commit/83c445da0b4b1a166e4fd10b97674afd53a84852))
+
+## [1.70.0](https://github.com/googleapis/go-genai/compare/v1.69.0...v1.70.0) (2026-08-25)
+
+
+### Features
+
+* Add AudioTranscriptionConfigMode ([e601aac](https://github.com/googleapis/go-genai/commit/e601aac1f2565be602507ff4fc628018fa6ee045))
+
+## [1.69.0](https://github.com/googleapis/go-genai/compare/v1.68.0...v1.69.0) (2026-08-19)
+
+
+### Features
+
+* Add `mode` enum (`VERBATIM`, `SMART`) to `AudioTranscriptionConfig` and `TranscriptionConfig`. ([5ca93e0](https://github.com/googleapis/go-genai/commit/5ca93e08f43c1065f44ac9b69df4ed7ccc548113))
+* Add enable_data_retention to ToolParallelAiSearch, Add step_count to ReinforcementTuningHyperParameters, Add BidiGenerateContentSetup ([600a8cf](https://github.com/googleapis/go-genai/commit/600a8cfe12bf70aa40cf39dc0653d7a6603df1d9))
+* Add IDLE state to live connection status enum and mark REQUIRES_ACTION as deprecated. ([2bbd248](https://github.com/googleapis/go-genai/commit/2bbd2486c8d318048b30c7a515aa9b98e8f76313))
+
+## [1.68.0](https://github.com/googleapis/go-genai/compare/v1.67.0...v1.68.0) (2026-08-12)
+
+
+### Features
+
+* Add interaction_status to LiveServerContent ([b701130](https://github.com/googleapis/go-genai/commit/b701130e4472242891c3a1109d99bae5faf69d6d))
+
+## [1.67.0](https://github.com/googleapis/go-genai/compare/v1.66.0...v1.67.0) (2026-08-06)
+
+
+### Features
+
+* Add TOO_MANY_TOOL_CALLS to FinishReason enum. ([e5a3783](https://github.com/googleapis/go-genai/commit/e5a37838b1cc6ae9f342cfdbe4ed8431df75bcb4))
+* Support GoogleMaps Tool grounding_types places and routing ([d76fedf](https://github.com/googleapis/go-genai/commit/d76fedf5d327c331bcdcfaab36fda5073f28247a))
+* Support HTTP retries in the Go GenAI SDK. ([45c6782](https://github.com/googleapis/go-genai/commit/45c6782d25105748bd750004df921f067e527c80))
+
+
+### Bug Fixes
+
+* Add propertyOrdering auto-population for ResponseSchema and ResponseJsonSchema for Dotnet SDK ([1e113a5](https://github.com/googleapis/go-genai/commit/1e113a5572ddacb0794cbd10dcec828ae21052ec))
+
 ## [1.66.0](https://github.com/googleapis/go-genai/compare/v1.65.0...v1.66.0) (2026-07-28)
 
 

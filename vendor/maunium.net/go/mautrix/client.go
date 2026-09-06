@@ -926,13 +926,13 @@ func (cli *Client) executeCompiledRequest(
 		return cli.doRetry(
 			origCtx, req, fmt.Errorf("HTTP %d", res.StatusCode), retries, backoff, responseJSON, handler, dontReadResponse, sizeLimit, client,
 		)
-	} else if res.StatusCode == 401 && cli.shouldRetryWithRefreshedToken(origCtx, token) {
-		_, err = ParseErrorResponse(attemptReq, res)
-		return cli.doRetry(
-			origCtx, req, err, retries, backoff, responseJSON, handler, dontReadResponse, sizeLimit, client,
-		)
 	} else if res.StatusCode < 200 || res.StatusCode >= 300 {
 		body, err = ParseErrorResponse(attemptReq, res)
+		if errors.Is(err, MUnknownToken) && cli.shouldRetryWithRefreshedToken(origCtx, token) {
+			return cli.doRetry(
+				origCtx, req, err, retries, backoff, responseJSON, handler, dontReadResponse, sizeLimit, client,
+			)
+		}
 		cli.LogRequestDone(attemptReq, res, nil, nil, len(body), duration)
 	} else {
 		body, err = handler(attemptReq, res, responseJSON, sizeLimit)
@@ -2012,16 +2012,24 @@ func (cli *Client) UploadLink(ctx context.Context, link string) (*RespMediaUploa
 	return cli.Upload(ctx, res.Body, res.Header.Get("Content-Type"), res.ContentLength)
 }
 
-func (cli *Client) Download(ctx context.Context, mxcURL id.ContentURI) (*http.Response, error) {
+type DownloadExtra struct {
+	Query map[string]string
+}
+
+func (cli *Client) DownloadWithParams(ctx context.Context, mxcURL id.ContentURI, params DownloadExtra) (*http.Response, error) {
 	if mxcURL.IsEmpty() {
 		return nil, fmt.Errorf("empty mxc uri provided to Download")
 	}
 	_, resp, err := cli.MakeFullRequestWithResp(ctx, FullRequest{
 		Method:           http.MethodGet,
-		URL:              cli.BuildClientURL("v1", "media", "download", mxcURL.Homeserver, mxcURL.FileID),
+		URL:              cli.BuildURLWithQuery(ClientURLPath{"v1", "media", "download", mxcURL.Homeserver, mxcURL.FileID}, params.Query),
 		DontReadResponse: true,
 	})
 	return resp, err
+}
+
+func (cli *Client) Download(ctx context.Context, mxcURL id.ContentURI) (*http.Response, error) {
+	return cli.DownloadWithParams(ctx, mxcURL, DownloadExtra{})
 }
 
 type DownloadThumbnailExtra struct {
@@ -2581,6 +2589,19 @@ func (cli *Client) SetTags(ctx context.Context, roomID id.RoomID, tags event.Tag
 // See https://spec.matrix.org/v1.2/client-server-api/#get_matrixclientv3voipturnserver
 func (cli *Client) TurnServer(ctx context.Context) (resp *RespTurnServer, err error) {
 	urlPath := cli.BuildClientURL("v3", "voip", "turnServer")
+	_, err = cli.MakeRequest(ctx, http.MethodGet, urlPath, nil, &resp)
+	return
+}
+
+func (cli *Client) RTCTransports(ctx context.Context) (resp *RespRTCTransports, err error) {
+	var urlPath string
+	if cli.SpecVersions.Supports(FeatureUnstableMatrixRTC) {
+		urlPath = cli.BuildClientURL("unstable", "org.matrix.msc4143", "rtc", "transports")
+	} else if cli.SpecVersions.Supports(FeatureStableMatrixRTC) {
+		urlPath = cli.BuildClientURL("v1", "rtc", "transports")
+	} else {
+		return nil, fmt.Errorf("server does not advertise MatrixRTC support")
+	}
 	_, err = cli.MakeRequest(ctx, http.MethodGet, urlPath, nil, &resp)
 	return
 }

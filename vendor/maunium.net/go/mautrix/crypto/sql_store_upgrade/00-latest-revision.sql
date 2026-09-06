@@ -1,4 +1,4 @@
--- v0 -> v20 (compatible with v20+): Latest revision
+-- v0 -> v21 (compatible with v20+): Latest revision
 CREATE TABLE crypto_account (
 	account_id         TEXT    PRIMARY KEY,
 	device_id          TEXT    NOT NULL,
@@ -62,6 +62,7 @@ CREATE TABLE crypto_megolm_inbound_session (
 	room_id            TEXT     NOT NULL,
 	session            bytea,
 	forwarding_chains  bytea,
+	shared_history     BOOLEAN,
 	withheld_code      TEXT,
 	withheld_reason    TEXT,
 	ratchet_safety     jsonb,
@@ -71,22 +72,24 @@ CREATE TABLE crypto_megolm_inbound_session (
 	is_scheduled       BOOLEAN NOT NULL DEFAULT false,
 	key_backup_version TEXT NOT NULL DEFAULT '',
 	key_source         TEXT NOT NULL DEFAULT '',
+	source_user        TEXT NOT NULL DEFAULT '',
 	PRIMARY KEY (account_id, session_id)
 );
 -- Useful index to find keys that need backing up
 CREATE INDEX crypto_megolm_inbound_session_backup_idx ON crypto_megolm_inbound_session(account_id, key_backup_version) WHERE session IS NOT NULL;
 
 CREATE TABLE crypto_megolm_outbound_session (
-	account_id    TEXT,
-	room_id       TEXT,
-	session_id    CHAR(43)  NOT NULL UNIQUE,
-	session       bytea     NOT NULL,
-	shared        BOOLEAN   NOT NULL,
-	max_messages  INTEGER   NOT NULL,
-	message_count INTEGER   NOT NULL,
-	max_age       BIGINT    NOT NULL,
-	created_at    timestamp NOT NULL,
-	last_used     timestamp NOT NULL,
+	account_id     TEXT,
+	room_id        TEXT,
+	session_id     CHAR(43)  NOT NULL UNIQUE,
+	session        bytea     NOT NULL,
+	shared         BOOLEAN   NOT NULL,
+	max_messages   INTEGER   NOT NULL,
+	message_count  INTEGER   NOT NULL,
+	max_age        BIGINT    NOT NULL,
+	shared_history BOOLEAN,
+	created_at     timestamp NOT NULL,
+	last_used      timestamp NOT NULL,
 	PRIMARY KEY (account_id, room_id)
 );
 
