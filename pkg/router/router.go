@@ -283,11 +283,32 @@ func (r *Router) SubmitMessage(ctx context.Context, sourceID string, msg Message
 		return err
 	}
 
+	if err := r.validateRegisteredTargets(msg.Metadata.To); err != nil {
+		return err
+	}
+
 	r.logMessage(&msg)
 	r.handleAIRequirement(ctx, &msg)
 	r.dispatchToTargets(ctx, &msg)
 
 	_ = sourceAddr
+	return nil
+}
+
+func (r *Router) validateRegisteredTargets(targets []string) error {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	for _, targetID := range targets {
+		if isAITarget(targetID) {
+			continue
+		}
+
+		if _, ok := r.addresses[targetID]; !ok {
+			return fmt.Errorf("unknown target address: %s", targetID)
+		}
+	}
+
 	return nil
 }
 

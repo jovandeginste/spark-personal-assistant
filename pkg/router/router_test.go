@@ -16,9 +16,9 @@ type mockAIClient struct {
 	err      error
 }
 
-func (m *mockAIClient) APIKey() string                       { return "test" }
-func (m *mockAIClient) Model() string                        { return "test" }
-func (m *mockAIClient) Logger() *slog.Logger                 { return slog.Default() }
+func (m *mockAIClient) APIKey() string       { return "test" }
+func (m *mockAIClient) Model() string        { return "test" }
+func (m *mockAIClient) Logger() *slog.Logger { return slog.Default() }
 func (m *mockAIClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
 	return m.response, m.err
 }
@@ -169,4 +169,43 @@ func TestRouter_UnknownSource(t *testing.T) {
 
 	err := r.SubmitMessage(ctx, "unknown", Message{Content: "test"})
 	assert.Error(t, err)
+}
+
+func TestRouter_UnknownTargetReturnsError(t *testing.T) {
+	ctx := context.Background()
+	r := NewRouter(nil, nil)
+
+	sourceAddr := Address{
+		ID:           "room1@matrix",
+		InstanceName: "room1",
+		System:       "matrix",
+		Description:  "Source Matrix Room",
+	}
+	require.NoError(t, r.RegisterAddress(sourceAddr))
+
+	err := r.SubmitMessage(ctx, "room1@matrix", Message{
+		Metadata: Metadata{To: []string{"mail:jo@dwarfy.be"}},
+		Content:  "hello",
+	})
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "unknown target address: mail:jo@dwarfy.be")
+}
+
+func TestRouter_AIOnlyTargetAllowed(t *testing.T) {
+	ctx := context.Background()
+	r := NewRouter(nil, nil)
+
+	sourceAddr := Address{
+		ID:           "room1@matrix",
+		InstanceName: "room1",
+		System:       "matrix",
+		Description:  "Source Matrix Room",
+	}
+	require.NoError(t, r.RegisterAddress(sourceAddr))
+
+	err := r.SubmitMessage(ctx, "room1@matrix", Message{
+		Metadata: Metadata{To: []string{"ai"}},
+		Content:  "hello ai",
+	})
+	require.NoError(t, err)
 }
