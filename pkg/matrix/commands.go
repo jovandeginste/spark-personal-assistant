@@ -51,9 +51,9 @@ func (mc *MatrixConfig) performCommandResetRecovery() (string, error) {
 			},
 			Identifier: mautrix.UserIdentifier{
 				Type: mautrix.IdentifierTypeUser,
-				User: mc.App.Config.Matrix.Username, // Use Username instead of UserID (typically "@user:hs.tld") for identifier
+				User: mc.App.Config.Matrix[mc.InstanceName].Username,
 			},
-			Password: mc.App.Config.Matrix.Password,
+			Password: mc.App.Config.Matrix[mc.InstanceName].Password,
 		}
 	}, "")
 	if err != nil {

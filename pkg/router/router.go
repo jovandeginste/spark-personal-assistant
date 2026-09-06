@@ -2,94 +2,283 @@ package router
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 )
 
-type Router struct {
-	aiClient ai.Client
-	app      *app.App
-
-	// Map of backend channels
-	backends map[string]Backend
+// Metadata represents message headers similar to email.
+type Metadata struct {
+	From    string         `json:"from"`
+	To      []string       `json:"to"`
+	Subject string         `json:"subject"`
+	Extra   map[string]any `json:"extra,omitempty"`
 }
 
+// Message represents a message passing through the router.
 type Message struct {
-	Source    string
-	Target    string
-	Content   string
-	ReplyToID string
-	// Any metadata context (like room ID, user ID, sender info)
-	Metadata map[string]any
+	Metadata Metadata `json:"metadata"`
+	Content  string   `json:"content"`
 }
 
-type Backend struct {
-	Incoming chan Message
-	Outgoing chan Message
+// Address represents a registered system instance address in the router.
+type Address struct {
+	ID           string                                      `json:"id"`
+	InstanceName string                                      `json:"instance_name"`
+	System       string                                      `json:"system"`
+	Description  string                                      `json:"description"`
+	SendFunc     func(ctx context.Context, msg Message) error `json:"-"`
 }
 
+// Router is the central message router connecting all in- and output systems.
+type Router struct {
+	mu        sync.RWMutex
+	addresses map[string]Address
+	inbound   chan Message
+	aiClient  ai.Client
+	app       *app.App
+}
+
+// NewRouter creates a new central message router.
 func NewRouter(aiClient ai.Client, a *app.App) *Router {
 	return &Router{
-		aiClient: aiClient,
-		app:      a,
-		backends: make(map[string]Backend),
+		addresses: make(map[string]Address),
+		inbound:   make(chan Message, 1000),
+		aiClient:  aiClient,
+		app:       a,
 	}
 }
 
-// RegisterBackend registers a new backend with the router
-func (r *Router) RegisterBackend(name string, incoming chan Message, outgoing chan Message) {
-	r.backends[name] = Backend{
-		Incoming: incoming,
-		Outgoing: outgoing,
+// RegisterAddress registers an address in the router, ensuring instancename@servicename format.
+func (r *Router) RegisterAddress(addr Address) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if addr.ID == "" {
+		return errors.New("address ID cannot be empty")
+	}
+	if addr.System == "" {
+		return errors.New("address system cannot be empty")
+	}
+
+	expectedID := fmt.Sprintf("%s@%s", addr.InstanceName, addr.System)
+	if addr.InstanceName == "" {
+		return errors.New("address instance name cannot be empty")
+	}
+	if addr.ID != expectedID {
+		return fmt.Errorf("invalid address ID format: got %q, expected %q (instancename@servicename)", addr.ID, expectedID)
+	}
+
+	r.addresses[addr.ID] = addr
+	if r.app != nil && r.app.Logger() != nil {
+		r.app.Logger().Info("Registered address", "id", addr.ID, "system", addr.System, "instance", addr.InstanceName)
+	}
+	return nil
+}
+
+// GetAddress returns a registered address by ID.
+func (r *Router) GetAddress(id string) (Address, bool) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	addr, ok := r.addresses[id]
+	return addr, ok
+}
+
+// ListAddresses returns all registered addresses.
+func (r *Router) ListAddresses() []Address {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	addrs := make([]Address, 0, len(r.addresses))
+	for _, addr := range r.addresses {
+		addrs = append(addrs, addr)
+	}
+	return addrs
+}
+
+// MCPTools returns the router tools to be exposed to the LLM via MCP / tool executor.
+func (r *Router) MCPTools() []ai.Tool {
+	return []ai.Tool{
+		{
+			Name:        "router_list_destinations",
+			Description: "List all available message destinations/addresses registered in the router (in format instancename@servicename).",
+			InputSchema: map[string]any{
+				"type":       "object",
+				"properties": map[string]any{},
+			},
+		},
+		{
+			Name:        "router_send_message",
+			Description: "Send a message via the router to one or more destination addresses (instancename@servicename).",
+			InputSchema: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"to": map[string]any{
+						"type":        "array",
+						"items":       map[string]any{"type": "string"},
+						"description": "List of destination address IDs (instancename@servicename)",
+					},
+					"subject": map[string]any{
+						"type":        "string",
+						"description": "Subject of the message",
+					},
+					"content": map[string]any{
+						"type":        "string",
+						"description": "Content/body of the message",
+					},
+				},
+				"required": []any{"to", "content"},
+			},
+		},
 	}
 }
 
-// SubmitMessage allows interfaces to send messages to the router
-func (r *Router) SubmitMessage(msg Message) {
-	if backend, ok := r.backends[msg.Source]; ok {
-		backend.Incoming <- msg
+// ExecuteTool executes router MCP tools. Returns (result string, handled bool, err error).
+func (r *Router) ExecuteTool(ctx context.Context, name string, args map[string]any, originatingMessage Message) (string, bool, error) {
+	switch name {
+	case "router_list_destinations":
+		return r.executeListDestinations(), true, nil
+	case "router_send_message":
+		res, err := r.executeSendMessage(ctx, originatingMessage, args)
+		return res, true, err
+	}
+	return "", false, nil
+}
+
+func (r *Router) executeListDestinations() string {
+	addrs := r.ListAddresses()
+	var sb strings.Builder
+	sb.WriteString("Available destinations:\n")
+	for _, a := range addrs {
+		sb.WriteString(fmt.Sprintf("- ID: %s, System: %s, Description: %s\n", a.ID, a.System, a.Description))
+	}
+	return sb.String()
+}
+
+func (r *Router) executeSendMessage(ctx context.Context, originatingMessage Message, args map[string]any) (string, error) {
+	toRaw, _ := args["to"].([]any)
+	var to []string
+	for _, t := range toRaw {
+		if str, ok := t.(string); ok {
+			to = append(to, str)
+		}
+	}
+	subject, _ := args["subject"].(string)
+	content, _ := args["content"].(string)
+
+	outMsg := Message{
+		Metadata: Metadata{
+			From:    "ai",
+			To:      to,
+			Subject: subject,
+			Extra:   originatingMessage.Metadata.Extra,
+		},
+		Content: content,
+	}
+
+	err := r.SubmitMessage(ctx, "ai", outMsg)
+	if err != nil {
+		return "", err
+	}
+	return "Message successfully sent to " + strings.Join(to, ", "), nil
+}
+
+// SubmitMessage receives an incoming message from any system instance, sets the "from" address, and routes it.
+func (r *Router) SubmitMessage(ctx context.Context, sourceID string, msg Message) error {
+	sourceAddr, err := r.validateAndSetSource(sourceID, &msg)
+	if err != nil {
+		return err
+	}
+
+	r.logMessage(&msg)
+	r.handleAIRequirement(ctx, &msg)
+	r.dispatchToTargets(ctx, &msg)
+
+	_ = sourceAddr
+	return nil
+}
+
+func (r *Router) validateAndSetSource(sourceID string, msg *Message) (Address, error) {
+	r.mu.RLock()
+	sourceAddr, ok := r.addresses[sourceID]
+	r.mu.RUnlock()
+
+	if !ok {
+		return Address{}, fmt.Errorf("unknown source address: %s", sourceID)
+	}
+
+	msg.Metadata.From = sourceAddr.ID
+	return sourceAddr, nil
+}
+
+func (r *Router) logMessage(msg *Message) {
+	if r.app != nil && r.app.Logger() != nil {
+		r.app.Logger().Info("Message received by router", "from", msg.Metadata.From, "to", msg.Metadata.To, "subject", msg.Metadata.Subject)
 	}
 }
 
-// Start begins processing messages in the background
-func (r *Router) Start(ctx context.Context) {
-	for name, backend := range r.backends {
-		go r.processBackend(ctx, name, backend)
+func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
+	needsAI := false
+	for _, target := range msg.Metadata.To {
+		if isAITarget(target) {
+			needsAI = true
+			break
+		}
+	}
+	if len(msg.Metadata.To) == 0 && !isAIAsync(msg.Metadata.From) {
+		needsAI = true
+		msg.Metadata.To = []string{"ai"}
+	}
+
+	if needsAI && r.aiClient != nil {
+		go r.routeToAI(ctx, *msg)
 	}
 }
 
-func (r *Router) processBackend(ctx context.Context, name string, backend Backend) {
-	for {
-		select {
-		case <-ctx.Done():
-			r.app.Logger().Info("Router backend stopped", "name", name)
-			return
-		case msg := <-backend.Incoming:
-			r.handleMessage(ctx, msg)
+func isAITarget(target string) bool {
+	return target == "ai" || target == "LLM" || target == "llm" || target == "AI"
+}
+
+func isAIAsync(from string) bool {
+	return from == "ai" || from == "LLM" || from == "llm" || from == "AI"
+}
+
+func (r *Router) dispatchToTargets(ctx context.Context, msg *Message) {
+	for _, targetID := range msg.Metadata.To {
+		if isAITarget(targetID) {
+			continue
+		}
+
+		r.mu.RLock()
+		targetAddr, ok := r.addresses[targetID]
+		r.mu.RUnlock()
+
+		if !ok {
+			if r.app != nil && r.app.Logger() != nil {
+				r.app.Logger().Warn("Unknown target address", "target", targetID)
+			}
+			continue
+		}
+
+		if targetAddr.SendFunc != nil {
+			if err := targetAddr.SendFunc(ctx, *msg); err != nil && r.app != nil && r.app.Logger() != nil {
+				r.app.Logger().Error("Failed to send message to address", "target", targetAddr.ID, "error", err)
+			}
 		}
 	}
 }
 
-func (r *Router) handleMessage(ctx context.Context, msg Message) {
-	r.app.Logger().Info("Routing message", "source", msg.Source, "target", msg.Target)
-
-	if msg.Target == "ai" {
-		r.routeToAI(ctx, msg)
-	} else if backend, ok := r.backends[msg.Target]; ok {
-		backend.Outgoing <- msg
-	} else {
-		r.app.Logger().Warn("Unknown target backend", "target", msg.Target)
-	}
-}
-
 func (r *Router) routeToAI(ctx context.Context, msg Message) {
-	// Simple route using GenerateWithTools to have parity with Matrix handler
+	if r.app == nil || r.aiClient == nil {
+		return
+	}
+
 	roomID := ""
-	if msg.Metadata != nil {
-		if rID, ok := msg.Metadata["room_id"].(string); ok {
+	if msg.Metadata.Extra != nil {
+		if rID, ok := msg.Metadata.Extra["room_id"].(string); ok {
 			roomID = rID
 		}
 	}
@@ -99,115 +288,55 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 		r.app.Logger().Error("Failed to get MCP tools", "error", err)
 	}
 
-	backendNames := make([]string, 0, len(r.backends))
-	for name := range r.backends {
-		backendNames = append(backendNames, name)
-	}
-
-	// Add special purpose tool for AI to send messages
-	tools = append(tools, ai.Tool{
-		Name:        "send_message",
-		Description: fmt.Sprintf("Send a message to a specific backend (%s). Important: Messages sent by the AI will be logged to the source channel so the user knows what was sent.", strings.Join(backendNames, ", ")),
-		InputSchema: map[string]any{
-			"type": "object",
-			"properties": map[string]any{
-				"target": map[string]any{
-					"type":        "string",
-					"description": "The backend to send the message to",
-				},
-				"content": map[string]any{
-					"type":        "string",
-					"description": "The content of the message",
-				},
-				"address": map[string]any{
-					"type":        "string",
-					"description": "The intended target address (e.g., email address for imap)",
-				},
-				"subject": map[string]any{
-					"type":        "string",
-					"description": "The intended subject (e.g., email subject for imap)",
-				},
-			},
-			"required": []any{"target", "content"},
-		},
-	})
-
-	r.app.Logger().Info("Using tools in router", "count", len(tools))
+	// Append router MCP tools
+	tools = append(tools, r.MCPTools()...)
 
 	aiData, err := r.app.BuildData()
 	if err != nil {
 		r.app.Logger().Error("Failed to build AI data", "error", err)
 	}
 	if aiData != nil {
-		aiData.EmployerQuestion = []string{msg.Content}
+		aiData.EmployerQuestion = []string{fmt.Sprintf("From: %s\nSubject: %s\n\n%s", msg.Metadata.From, msg.Metadata.Subject, msg.Content)}
 	}
 
 	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		if name == "send_message" {
-			target, _ := args["target"].(string)
-			content, _ := args["content"].(string)
-			address, _ := args["address"].(string)
-			subject, _ := args["subject"].(string)
-
-			// Send to intended target
-			if backend, ok := r.backends[target]; ok {
-				outMsg := Message{
-					Source:   "ai",
-					Target:   target,
-					Content:  content,
-					Metadata: make(map[string]any),
-				}
-				for k, v := range msg.Metadata {
-					outMsg.Metadata[k] = v
-				}
-				if address != "" {
-					outMsg.Metadata["target_address"] = address
-				}
-				if subject != "" {
-					outMsg.Metadata["target_subject"] = subject
-				}
-				backend.Outgoing <- outMsg
-			}
-
-			// Log to source channel
-			if sourceBackend, ok := r.backends[msg.Source]; ok && msg.Source != target {
-				metaStr := ""
-				if address != "" {
-					metaStr += "\nTo: " + address
-				}
-				if subject != "" {
-					metaStr += "\nSubject: " + subject
-				}
-				sourceBackend.Outgoing <- Message{
-					Source:   "ai",
-					Target:   msg.Source,
-					Content:  "I have sent the following message to " + target + metaStr + ":\n\n" + content,
-					Metadata: msg.Metadata,
-				}
-			}
-			return "Message sent to " + target + " successfully.", nil
+		if res, handled, err := r.ExecuteTool(ctx, name, args, msg); handled {
+			return res, err
 		}
 		return r.app.ExecuteMCPTool(ctx, name, args, roomID)
 	}, nil)
+
 	if err != nil {
 		r.app.Logger().Error("Failed to get AI response", "error", err)
-		if backend, ok := r.backends[msg.Source]; ok {
-			backend.Outgoing <- Message{
-				Source:   "ai",
-				Target:   msg.Source,
-				Content:  "Sorry, I encountered an error processing your request.",
-				Metadata: msg.Metadata,
-			}
-		}
+		r.sendReply(ctx, msg.Metadata.From, "Sorry, I encountered an error processing your request.", msg.Metadata.Subject, msg.Metadata.Extra)
 		return
 	}
 
-	if backend, ok := r.backends[msg.Source]; ok {
-		backend.Outgoing <- Message{
-			Source:   "ai",
-			Target:   msg.Source,
-			Content:  response,
-			Metadata: msg.Metadata,
-		}
+	if response != "" {
+		r.sendReply(ctx, msg.Metadata.From, response, msg.Metadata.Subject, msg.Metadata.Extra)
+	}
+}
+
+func (r *Router) sendReply(ctx context.Context, targetID, content, subject string, extra map[string]any) {
+	r.mu.RLock()
+	targetAddr, ok := r.addresses[targetID]
+	r.mu.RUnlock()
+
+	if !ok {
+		return
+	}
+
+	msg := Message{
+		Metadata: Metadata{
+			From:    "ai",
+			To:      []string{targetID},
+			Subject: subject,
+			Extra:   extra,
+		},
+		Content: content,
+	}
+
+	if targetAddr.SendFunc != nil {
+		_ = targetAddr.SendFunc(ctx, msg)
 	}
 }

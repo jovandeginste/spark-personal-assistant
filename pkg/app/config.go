@@ -21,21 +21,39 @@ type Config struct {
 
 	AssistantFileCLI string                     `mapstructure:"-"`
 	Assistant        ai.AssistantConfig         `mapstructure:"assistant"`
-	Matrix           MatrixConfig               `mapstructure:"matrix"`
-	Webserver        WebserverConfig            `mapstructure:"webserver"`
-	IMAP             IMAPConfig                 `mapstructure:"imap"`
+	Matrix           map[string]MatrixConfig    `mapstructure:"matrix"`
+	Webserver        map[string]WebserverConfig `mapstructure:"webserver"`
+	Mail             map[string]MailConfig      `mapstructure:"mail"`
 	MCPServers       map[string]MCPServerConfig `mapstructure:"mcp_servers"`
 	Prompts          map[string]string          `mapstructure:"prompts"`
 }
 
 type IMAPConfig struct {
-	Enabled  bool   `mapstructure:"enabled"`
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	Username string `mapstructure:"username"`
-	Password string `mapstructure:"password"`
-	Folder   string `mapstructure:"folder"`
-	UseTLS   bool   `mapstructure:"use_tls"`
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+type SMTPConfig struct {
+	Host string `mapstructure:"host"`
+	Port int    `mapstructure:"port"`
+}
+
+type MailConfig struct {
+	Enabled  *bool      `mapstructure:"enabled"`
+	IMAP     IMAPConfig `mapstructure:"imap"`
+	SMTP     SMTPConfig `mapstructure:"smtp"`
+	To       string     `mapstructure:"to"`
+	Username string     `mapstructure:"username"`
+	Password string     `mapstructure:"password"`
+	Folder   string     `mapstructure:"folder"`
+	UseTLS   bool       `mapstructure:"use_tls"`
+}
+
+func (c MailConfig) IsEnabled() bool {
+	if c.Enabled == nil {
+		return true // default enabled
+	}
+	return *c.Enabled
 }
 
 type MCPServerConfig struct {
@@ -48,6 +66,7 @@ type MCPServerConfig struct {
 }
 
 type MatrixConfig struct {
+	Enabled       *bool    `mapstructure:"enabled"`
 	Homeserver    string   `mapstructure:"homeserver"`
 	Username      string   `mapstructure:"username"`
 	Password      string   `mapstructure:"password"`
@@ -57,9 +76,23 @@ type MatrixConfig struct {
 	ThreadedTools bool     `mapstructure:"threaded_tools"`
 }
 
+func (c MatrixConfig) IsEnabled() bool {
+	if c.Enabled == nil {
+		return true // default enabled
+	}
+	return *c.Enabled
+}
+
 type WebserverConfig struct {
-	Enabled bool   `mapstructure:"enabled"`
+	Enabled *bool  `mapstructure:"enabled"`
 	Bind    string `mapstructure:"bind"`
+}
+
+func (c WebserverConfig) IsEnabled() bool {
+	if c.Enabled == nil {
+		return true // default enabled
+	}
+	return *c.Enabled
 }
 
 type UserData struct {
@@ -128,17 +161,18 @@ func (a *App) configureAssistant() error {
 }
 
 func (a *App) setMatrixCryptoStorePath() error {
-	if a.Config.Matrix.CryptoStore == "" || strings.HasPrefix(a.Config.Matrix.CryptoStore, "/") {
-		return nil
-	}
-
 	absPath, err := filepath.Abs(a.ConfigFile)
 	if err != nil {
 		return err
 	}
-
 	dirname := filepath.Dir(absPath)
-	a.Config.Matrix.CryptoStore = filepath.Clean(filepath.Join(dirname, a.Config.Matrix.CryptoStore))
+
+	for k, mc := range a.Config.Matrix {
+		if mc.CryptoStore != "" && !strings.HasPrefix(mc.CryptoStore, "/") {
+			mc.CryptoStore = filepath.Clean(filepath.Join(dirname, mc.CryptoStore))
+			a.Config.Matrix[k] = mc
+		}
+	}
 
 	return nil
 }
@@ -186,19 +220,25 @@ func readPersona(persona string) *ai.AssistantConfig {
 }
 
 func (a *App) SetDefaults() {
-	if a.Config.Webserver.Bind == "" {
-		a.Config.Webserver.Bind = ":8080"
+	for k, wb := range a.Config.Webserver {
+		if wb.Bind == "" {
+			wb.Bind = ":8080"
+			a.Config.Webserver[k] = wb
+		}
 	}
 
 	if a.Config.Assistant.Language == "" {
 		a.Config.Assistant.Language = "English"
 	}
 
-	if a.Config.IMAP.Port == 0 {
-		if a.Config.IMAP.UseTLS {
-			a.Config.IMAP.Port = 993
-		} else {
-			a.Config.IMAP.Port = 143
+	for k, mailCfg := range a.Config.Mail {
+		if mailCfg.IMAP.Port == 0 {
+			if mailCfg.UseTLS {
+				mailCfg.IMAP.Port = 993
+			} else {
+				mailCfg.IMAP.Port = 143
+			}
+			a.Config.Mail[k] = mailCfg
 		}
 	}
 

@@ -14,6 +14,7 @@ import (
 	"github.com/glebarez/go-sqlite"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
 	"maunium.net/go/mautrix"
 	"maunium.net/go/mautrix/crypto/cryptohelper"
 	"maunium.net/go/mautrix/event"
@@ -28,6 +29,7 @@ func init() {
 }
 
 type MatrixConfig struct {
+	InstanceName string
 	AIData       *app.AIData
 	AIClient     ai.Client
 	Client       *mautrix.Client
@@ -79,7 +81,7 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		return
 	}
 
-	knownUser := slices.Contains(mc.App.Config.Matrix.Users, evt.Sender.String())
+	knownUser := slices.Contains(mc.App.Config.Matrix[mc.InstanceName].Users, evt.Sender.String())
 	if !knownUser {
 		mc.App.Logger().Info("Unknown user - skipping", "user_id", evt.Sender.String())
 		return
@@ -215,7 +217,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		if mc.App.Config.Matrix.ThreadedTools {
+		if mc.App.Config.Matrix[mc.InstanceName].ThreadedTools {
 			argsStr := ""
 			if len(args) > 0 {
 				var argList []string
@@ -278,7 +280,8 @@ func (mc *MatrixConfig) syncFunc(ctx context.Context, evt *event.Event) {
 }
 
 func (mc *MatrixConfig) InitClient() error {
-	client, err := mautrix.NewClient(mc.App.Config.Matrix.Homeserver, "", "")
+	cfg := mc.App.Config.Matrix[mc.InstanceName]
+	client, err := mautrix.NewClient(cfg.Homeserver, "", "")
 	if err != nil {
 		return err
 	}
@@ -289,15 +292,16 @@ func (mc *MatrixConfig) InitClient() error {
 }
 
 func (mc *MatrixConfig) ConfigureCryptoHelper() error {
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), mc.App.Config.Matrix.CryptoStore)
+	cfg := mc.App.Config.Matrix[mc.InstanceName]
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), cfg.CryptoStore)
 	if err != nil {
 		return err
 	}
 
 	cryptoHelper.LoginAs = &mautrix.ReqLogin{
 		Type:       mautrix.AuthTypePassword,
-		Identifier: mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: mc.App.Config.Matrix.Username},
-		Password:   mc.App.Config.Matrix.Password,
+		Identifier: mautrix.UserIdentifier{Type: mautrix.IdentifierTypeUser, User: cfg.Username},
+		Password:   cfg.Password,
 	}
 
 	if err := cryptoHelper.Init(context.TODO()); err != nil {
@@ -364,5 +368,24 @@ func (mc *MatrixConfig) Greet() error {
 }
 
 func (mc *MatrixConfig) DefaultRoomID() id.RoomID {
-	return id.RoomID(mc.App.Config.Matrix.RoomID)
+	return id.RoomID(mc.App.Config.Matrix[mc.InstanceName].RoomID)
+}
+
+// Register registers the Matrix instance as an address to the central router.
+func (mc *MatrixConfig) Register(r *router.Router, instanceName string, description string) error {
+	if instanceName == "" {
+		instanceName = "default"
+	}
+	addrID := instanceName + "@matrix"
+	return r.RegisterAddress(router.Address{
+		ID:           addrID,
+		InstanceName: instanceName,
+		System:       "matrix",
+		Description:  description,
+		SendFunc: func(ctx context.Context, msg router.Message) error {
+			mc.App.Logger().Info("Sending message via Matrix", "to", msg.Metadata.To, "content", msg.Content)
+			mc.SendMessage(mc.DefaultRoomID(), msg.Content)
+			return nil
+		},
+	})
 }

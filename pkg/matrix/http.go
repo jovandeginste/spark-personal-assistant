@@ -11,7 +11,7 @@ import (
 	slogecho "github.com/samber/slog-echo"
 )
 
-func (mc *MatrixConfig) ServeHTTP() {
+func (mc *MatrixConfig) ServeHTTP(instanceName string) {
 	// Echo instance
 	e := echo.New()
 
@@ -30,14 +30,19 @@ func (mc *MatrixConfig) ServeHTTP() {
 	e.GET("/persona", mc.switchPersona)
 	e.GET("/update", mc.update)
 
+	bind := mc.App.Config.Webserver[instanceName].Bind
+	if bind == "" {
+		bind = ":8080"
+	}
+
 	go func() {
 		// Start server
-		if err := e.Start(mc.App.Config.Webserver.Bind); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := e.Start(bind); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			mc.App.Logger().Error("failed to start server", "error", err)
 		}
 	}()
 
-	mc.App.Logger().Info("HTTP server started", "bind", mc.App.Config.Webserver.Bind)
+	mc.App.Logger().Info("HTTP server started", "bind", bind, "instance", instanceName)
 }
 
 // Handler

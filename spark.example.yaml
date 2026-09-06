@@ -14,6 +14,32 @@ context: |
 llm:
   model: gemma3:1b
   base_url: http://localhost:11434/v1/
+matrix:
+  default:
+    homeserver: https://matrix.org
+    username: spark-bot
+    password: secretpassword
+    room_id: "!roomid:matrix.org"
+webserver:
+  default:
+    enabled: true
+    bind: ":8080"
+mail:
+  default:
+mail:
+  default:
+    enabled: false
+    imap:
+      host: imap.example.com
+      port: 993
+    smtp:
+      host: smtp.example.com
+      port: 587
+    to: recipient@example.com
+    username: user@example.com
+    password: secretpassword
+    folder: INBOX
+    use_tls: true
 prompts:
   my_prompt: |
     This is a custom prompt.

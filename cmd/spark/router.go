@@ -9,7 +9,7 @@ import (
 	"syscall"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/imap"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mail"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/matrix"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
 	"github.com/spf13/cobra"
@@ -30,139 +30,133 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			r := router.NewRouter(aiClient, c.app)
 
-			matrixBackend := router.Backend{
-				Incoming: make(chan router.Message, 100),
-				Outgoing: make(chan router.Message, 100),
-			}
-			r.RegisterBackend("matrix", matrixBackend.Incoming, matrixBackend.Outgoing)
-
-			imapBackend := router.Backend{
-				Incoming: make(chan router.Message, 100),
-				Outgoing: make(chan router.Message, 100),
-			}
-			r.RegisterBackend("imap", imapBackend.Incoming, imapBackend.Outgoing)
-
-			httpBackend := router.Backend{
-				Incoming: make(chan router.Message, 100),
-				Outgoing: make(chan router.Message, 100),
-			}
-			r.RegisterBackend("http", httpBackend.Incoming, httpBackend.Outgoing)
-
-			// Initialize Matrix client
-			mc := matrix.MatrixConfig{App: c.app}
-			mc.AIClient = aiClient
-
-			aiData, err := c.app.BuildData()
-			if err != nil {
-				return err
-			}
-			mc.AIData = aiData
-
-			if err := mc.InitClient(); err != nil {
-				return err
-			}
-			mc.ConfigureSyncer()
-			if err := mc.ConfigureCryptoHelper(); err != nil {
-				return err
-			}
-			mc.InitChat()
-			if err := mc.Greet(); err != nil {
-				return err
-			}
-
-			go func() {
-				if err := mc.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
-					c.app.Logger().Error("Failed to sync matrix", "error", err)
+			// Initialize Matrix clients
+			for instanceName, mCfg := range c.app.Config.Matrix {
+				if !mCfg.IsEnabled() {
+					c.app.Logger().Info("Matrix client is disabled in config", "instance", instanceName)
+					continue
 				}
-			}()
 
-			// Initialize Web server
-			if c.app.Config.Webserver.Enabled {
-				c.app.Logger().Info("Initializing Web server...")
-				mc.ServeHTTP() // TODO: Web server should probably use httpBackend
-			} else {
-				c.app.Logger().Info("Web server is disabled in config")
+				mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
+				mc.AIClient = aiClient
+
+				aiData, err := c.app.BuildData()
+				if err != nil {
+					return err
+				}
+				mc.AIData = aiData
+
+				if err := mc.InitClient(); err != nil {
+					return err
+				}
+				mc.ConfigureSyncer()
+				if err := mc.ConfigureCryptoHelper(); err != nil {
+					return err
+				}
+				mc.InitChat()
+				if err := mc.Greet(); err != nil {
+					return err
+				}
+
+				if err := mc.Register(r, instanceName, "Matrix Room ("+instanceName+")"); err != nil {
+					return err
+				}
+
+				go func(client *matrix.MatrixConfig) {
+					if err := client.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
+						c.app.Logger().Error("Failed to sync matrix", "error", err)
+					}
+				}(&mc)
 			}
 
-			// Initialize IMAP client
-			if c.app.Config.IMAP.Enabled {
-				c.app.Logger().Info("Initializing IMAP client...", "host", c.app.Config.IMAP.Host, "port", c.app.Config.IMAP.Port)
-				go func() {
-					msgChan := make(chan imap.Message, 10)
+			// Initialize Web servers
+			for instanceName, wCfg := range c.app.Config.Webserver {
+				if wCfg.IsEnabled() {
+					c.app.Logger().Info("Initializing Web server...", "instance", instanceName)
+					for range c.app.Config.Matrix {
+						mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
+						mc.AIClient = aiClient
+						aiData, _ := c.app.BuildData()
+						mc.AIData = aiData
+						mc.ServeHTTP(instanceName)
+						break
+					}
+
+					if err := r.RegisterAddress(router.Address{
+						ID:           instanceName + "@web",
+						InstanceName: instanceName,
+						System:       "web",
+						Description:  "Web Server Interface (" + instanceName + ")",
+						SendFunc: func(ctx context.Context, msg router.Message) error {
+							c.app.Logger().Warn("Web sending not yet supported", "content", msg.Content)
+							return nil
+						},
+					}); err != nil {
+						return err
+					}
+				} else {
+					c.app.Logger().Info("Web server is disabled in config", "instance", instanceName)
+				}
+			}
+
+			// Initialize Mail clients
+			for instanceName, mailCfg := range c.app.Config.Mail {
+				if !mailCfg.IsEnabled() {
+					c.app.Logger().Info("Mail client is disabled in config", "instance", instanceName)
+					continue
+				}
+
+				c.app.Logger().Info("Initializing Mail client...", "instance", instanceName, "host", mailCfg.IMAP.Host, "port", mailCfg.IMAP.Port)
+				mailAddrID := instanceName + "@mail"
+
+				mc := mail.Config{
+					IMAP: mail.IMAPConfig{
+						Host: mailCfg.IMAP.Host,
+						Port: mailCfg.IMAP.Port,
+					},
+					SMTP: mail.SMTPConfig{
+						Host: mailCfg.SMTP.Host,
+						Port: mailCfg.SMTP.Port,
+					},
+					To:       mailCfg.To,
+					Username: mailCfg.Username,
+					Password: mailCfg.Password,
+					Folder:   mailCfg.Folder,
+					UseTLS:   mailCfg.UseTLS,
+				}
+
+				if err := mail.Register(r, mc, instanceName, "Mail Account ("+instanceName+")", c.app.Logger()); err != nil {
+					return err
+				}
+
+				go func(cfg mail.Config, addrID string, instName string) {
+					msgChan := make(chan mail.Message, 10)
 					go func() {
 						for msg := range msgChan {
-							c.app.Logger().Info("Received email via IMAP", "subject", msg.Subject, "from", msg.From)
-							r.SubmitMessage(router.Message{
-								Source: "imap",
-								Target: "ai",
+							c.app.Logger().Info("Received email via mail", "instance", instName, "subject", msg.Subject, "from", msg.From)
+							_ = r.SubmitMessage(ctx, addrID, router.Message{
+								Metadata: router.Metadata{
+									To:      []string{"ai"},
+									Subject: msg.Subject,
+									Extra: map[string]any{
+										"from_address": msg.FromAddress,
+									},
+								},
 								Content: fmt.Sprintf("I received this email on behalf of my user. Do not reply to the email directly. "+
 									"Your response will be sent to the user via Matrix so they know what you did with it.\n\n"+
 									"Email from: %s\nSubject: %s\nDate: %s\n\n%s", msg.From, msg.Subject, msg.Date, msg.Body),
-								Metadata: map[string]any{
-									"from":    msg.FromAddress,
-									"room_id": string(mc.DefaultRoomID()),
-									"subject": msg.Subject,
-								},
 							})
 						}
 					}()
 
-					c.app.Logger().Info("Starting IMAP idle connection...")
-					if err := imap.ConnectAndIdle(imap.Config{
-						Host:     c.app.Config.IMAP.Host,
-						Port:     c.app.Config.IMAP.Port,
-						Username: c.app.Config.IMAP.Username,
-						Password: c.app.Config.IMAP.Password,
-						Folder:   c.app.Config.IMAP.Folder,
-						UseTLS:   c.app.Config.IMAP.UseTLS,
-					}, msgChan, c.app.Logger()); err != nil {
-						c.app.Logger().Error("IMAP connection failed", "error", err)
+					c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
+					if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
+						c.app.Logger().Error("Mail connection failed", "instance", instName, "error", err)
 					}
-				}()
-			} else {
-				c.app.Logger().Info("IMAP client is disabled in config")
+				}(mc, mailAddrID, instanceName)
 			}
 
-			r.Start(ctx)
 			c.app.Logger().Info("Router started")
-
-			// Consume outgoing messages and route them to Matrix if needed
-			go func() {
-				for msg := range matrixBackend.Outgoing {
-					c.app.Logger().Info("Received outgoing message for Matrix", "source", msg.Source)
-					c.app.Logger().Info("Forwarding response to Matrix", "content", msg.Content)
-					mc.SendMessage(mc.DefaultRoomID(), msg.Content)
-				}
-			}()
-
-			go func() {
-				for msg := range imapBackend.Outgoing {
-					c.app.Logger().Info("Received outgoing message for IMAP", "source", msg.Source)
-					// Currently no way to send email out, but keeping the channel ready
-					c.app.Logger().Warn("IMAP sending not yet implemented", "content", msg.Content)
-					metaStr := ""
-					if addr, ok := msg.Metadata["target_address"].(string); ok && addr != "" {
-						metaStr += "\nTo: " + addr
-					}
-					if subj, ok := msg.Metadata["target_subject"].(string); ok && subj != "" {
-						metaStr += "\nSubject: " + subj
-					}
-					mc.SendMessage(mc.DefaultRoomID(), "I tried to send an email via IMAP"+metaStr+"\n\nHowever, sending via IMAP is not yet supported. The content was:\n\n"+msg.Content)
-				}
-			}()
-
-			go func() {
-				for msg := range httpBackend.Outgoing {
-					c.app.Logger().Info("Received outgoing message for HTTP", "source", msg.Source)
-					// Currently no way to send HTTP push out, but keeping the channel ready
-					c.app.Logger().Warn("HTTP sending not yet implemented", "content", msg.Content)
-					metaStr := ""
-					if addr, ok := msg.Metadata["target_address"].(string); ok && addr != "" {
-						metaStr += "\nTo: " + addr
-					}
-					mc.SendMessage(mc.DefaultRoomID(), "I tried to send a message via HTTP"+metaStr+"\n\nHowever, sending via HTTP is not yet supported. The content was:\n\n"+msg.Content)
-				}
-			}()
 
 			// Wait for interrupt
 			sigChan := make(chan os.Signal, 1)
