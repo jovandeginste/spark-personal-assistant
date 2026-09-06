@@ -452,11 +452,11 @@ func (mc *MatrixConfig) RegisterRouter(r *router.Router, instanceName string, de
 				if rID, ok := msg.Metadata.Extra["room_id"].(string); ok && rID != "" {
 					targetRoom = id.RoomID(rID)
 				}
-				if eID, ok := msg.Metadata.Extra["event_id"].(string); ok && eID != "" {
-					threadEvent = id.EventID(eID)
-				}
 				if mt, ok := msg.Metadata.Extra["msgtype"].(string); ok && mt == "notice" {
 					msgType = event.MsgNotice
+					if eID, ok := msg.Metadata.Extra["event_id"].(string); ok && eID != "" {
+						threadEvent = id.EventID(eID)
+					}
 				}
 			}
 			mc.send(targetRoom, threadEvent, msgType, msg.Content)
