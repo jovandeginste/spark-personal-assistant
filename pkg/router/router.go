@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync"
 
@@ -39,7 +40,6 @@ type Address struct {
 type Router struct {
 	mu        sync.RWMutex
 	addresses map[string]Address
-	inbound   chan Message
 	aiClient  ai.Client
 	app       *app.App
 }
@@ -88,7 +88,6 @@ var (
 func NewRouter(aiClient ai.Client, a *app.App) *Router {
 	return &Router{
 		addresses: make(map[string]Address),
-		inbound:   make(chan Message, 1000),
 		aiClient:  aiClient,
 		app:       a,
 	}
@@ -185,47 +184,24 @@ func (r *Router) executeListChannelDestinations(system string) string {
 	for _, addr := range r.addresses {
 		if strings.EqualFold(addr.System, system) {
 			sb.WriteString(fmt.Sprintf("- Instance: %s, ID: %s, Description: %s\n", addr.InstanceName, addr.ID, addr.Description))
-			r.appendChannelSystemDetails(&sb, system, addr.InstanceName)
+			if strings.EqualFold(system, "matrix") && r.app != nil {
+				if mCfg, ok := r.app.Config.Matrix[addr.InstanceName]; ok && mCfg.RoomID != "" {
+					sb.WriteString(fmt.Sprintf("  Default Room ID: %s\n", mCfg.RoomID))
+				}
+			}
+			if (strings.EqualFold(system, "mail") || strings.EqualFold(system, "imap")) && r.app != nil {
+				if mailCfg, ok := r.app.Config.Mail[addr.InstanceName]; ok {
+					if mailCfg.To != "" {
+						sb.WriteString(fmt.Sprintf("  Configured default recipient: %s\n", mailCfg.To))
+					}
+					if len(mailCfg.Allowlist) > 0 {
+						sb.WriteString(fmt.Sprintf("  Allowed recipients: %s\n", strings.Join(mailCfg.Allowlist, ", ")))
+					}
+				}
+			}
 		}
 	}
 	return sb.String()
-}
-
-func (r *Router) appendChannelSystemDetails(sb *strings.Builder, system, instanceName string) {
-	switch {
-	case strings.EqualFold(system, "matrix"):
-		r.appendMatrixChannelDetails(sb, instanceName)
-	case strings.EqualFold(system, "mail"), strings.EqualFold(system, "imap"):
-		r.appendMailChannelDetails(sb, instanceName)
-	}
-}
-
-func (r *Router) appendMatrixChannelDetails(sb *strings.Builder, instanceName string) {
-	if r.app == nil || r.app.Config.Matrix == nil {
-		return
-	}
-
-	if mCfg, ok := r.app.Config.Matrix[instanceName]; ok && mCfg.RoomID != "" {
-		sb.WriteString(fmt.Sprintf("  Default Room ID: %s\n", mCfg.RoomID))
-	}
-}
-
-func (r *Router) appendMailChannelDetails(sb *strings.Builder, instanceName string) {
-	if r.app == nil || r.app.Config.Mail == nil {
-		return
-	}
-
-	mailCfg, ok := r.app.Config.Mail[instanceName]
-	if !ok {
-		return
-	}
-
-	if mailCfg.To != "" {
-		sb.WriteString(fmt.Sprintf("  Configured default recipient: %s\n", mailCfg.To))
-	}
-	if len(mailCfg.Allowlist) > 0 {
-		sb.WriteString(fmt.Sprintf("  Allowed recipients: %s\n", strings.Join(mailCfg.Allowlist, ", ")))
-	}
 }
 
 func (r *Router) executeListDestinations() string {
@@ -278,11 +254,9 @@ func (r *Router) executeSendMessage(ctx context.Context, originatingMessage Mess
 
 // SubmitMessage receives an incoming message from any system instance, sets the "from" address, and routes it.
 func (r *Router) SubmitMessage(ctx context.Context, sourceID string, msg Message) error {
-	sourceAddr, err := r.validateAndSetSource(sourceID, &msg)
-	if err != nil {
+	if err := r.validateAndSetSource(sourceID, &msg); err != nil {
 		return err
 	}
-
 	if err := r.validateRegisteredTargets(msg.Metadata.To); err != nil {
 		return err
 	}
@@ -291,7 +265,6 @@ func (r *Router) SubmitMessage(ctx context.Context, sourceID string, msg Message
 	r.handleAIRequirement(ctx, &msg)
 	r.dispatchToTargets(ctx, &msg)
 
-	_ = sourceAddr
 	return nil
 }
 
@@ -300,7 +273,7 @@ func (r *Router) validateRegisteredTargets(targets []string) error {
 	defer r.mu.RUnlock()
 
 	for _, targetID := range targets {
-		if isAITarget(targetID) {
+		if isAIIdentifier(targetID) {
 			continue
 		}
 
@@ -312,7 +285,7 @@ func (r *Router) validateRegisteredTargets(targets []string) error {
 	return nil
 }
 
-func (r *Router) validateAndSetSource(sourceID string, msg *Message) (Address, error) {
+func (r *Router) validateAndSetSource(sourceID string, msg *Message) error {
 	r.mu.RLock()
 	sourceAddr, ok := r.addresses[sourceID]
 	r.mu.RUnlock()
@@ -321,13 +294,13 @@ func (r *Router) validateAndSetSource(sourceID string, msg *Message) (Address, e
 		// If sourceID is "ai", we allow it as a virtual system source
 		if sourceID == "ai" {
 			msg.Metadata.From = "ai"
-			return Address{ID: "ai", System: "ai", InstanceName: "ai"}, nil
+			return nil
 		}
-		return Address{}, fmt.Errorf("unknown source address: %s", sourceID)
+		return fmt.Errorf("unknown source address: %s", sourceID)
 	}
 
 	msg.Metadata.From = sourceAddr.ID
-	return sourceAddr, nil
+	return nil
 }
 
 func (r *Router) logMessage(msg *Message) {
@@ -343,14 +316,8 @@ func (r *Router) logMessage(msg *Message) {
 }
 
 func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
-	needsAI := false
-	for _, target := range msg.Metadata.To {
-		if isAITarget(target) {
-			needsAI = true
-			break
-		}
-	}
-	if len(msg.Metadata.To) == 0 && !isAIAsync(msg.Metadata.From) {
+	needsAI := slices.ContainsFunc(msg.Metadata.To, isAIIdentifier)
+	if len(msg.Metadata.To) == 0 && !isAIIdentifier(msg.Metadata.From) {
 		needsAI = true
 		msg.Metadata.To = []string{"ai"}
 	}
@@ -360,21 +327,13 @@ func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
 	}
 }
 
-func isAITarget(target string) bool {
-	return isAIIdentifier(target)
-}
-
-func isAIAsync(from string) bool {
-	return isAIIdentifier(from)
-}
-
 func isAIIdentifier(value string) bool {
 	return strings.EqualFold(value, "ai") || strings.EqualFold(value, "llm")
 }
 
 func (r *Router) dispatchToTargets(ctx context.Context, msg *Message) {
 	for _, targetID := range msg.Metadata.To {
-		if isAITarget(targetID) {
+		if isAIIdentifier(targetID) {
 			continue
 		}
 

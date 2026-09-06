@@ -258,14 +258,30 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 		return errors.New("no valid recipient email address found in 'to' or 'from_address'")
 	}
 
-	smtpCfg := resolveSMTPSettings(cfg)
-	msgBytes := buildMultipartMessage(cfg.Username, to, defaultSubject(msg.Metadata.Subject), msg.Content)
+	smtpHost := cfg.SMTP.Host
+	if smtpHost == "" {
+		smtpHost = cfg.IMAP.Host
+	}
+	smtpPort := cfg.SMTP.Port
+	if smtpPort == 0 {
+		smtpPort = 587
+		if cfg.IMAP.Port == 993 || cfg.IMAP.Port == 465 {
+			smtpPort = 465
+		}
+	}
+	auth := smtp.Auth(nil)
+	if cfg.Username != "" && cfg.Password != "" {
+		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, smtpHost)
+	}
+
+	msgBytes := buildMultipartMessage(cfg.Username, to, msg.Metadata.Subject, msg.Content)
+	smtpAddr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
 
 	var err error
-	if smtpCfg.port == 465 {
-		err = sendSMTPSecure(smtpCfg.addr, smtpCfg.host, smtpCfg.auth, cfg.Username, to, msgBytes)
+	if smtpPort == 465 {
+		err = sendSMTPSecure(smtpAddr, smtpHost, auth, cfg.Username, to, msgBytes)
 	} else {
-		err = smtp.SendMail(smtpCfg.addr, smtpCfg.auth, cfg.Username, to, msgBytes)
+		err = smtp.SendMail(smtpAddr, auth, cfg.Username, to, msgBytes)
 	}
 
 	if err != nil {
@@ -294,49 +310,11 @@ func extractRecipients(cfg Config, msg router.Message) []string {
 	return nil
 }
 
-type smtpSettings struct {
-	host string
-	port int
-	addr string
-	auth smtp.Auth
-}
-
-func resolveSMTPSettings(cfg Config) smtpSettings {
-	host := cfg.SMTP.Host
-	if host == "" {
-		host = cfg.IMAP.Host
-	}
-
-	port := cfg.SMTP.Port
-	if port == 0 {
-		port = 587
-		if cfg.IMAP.Port == 993 || cfg.IMAP.Port == 465 {
-			port = 465
-		}
-	}
-
-	settings := smtpSettings{
-		host: host,
-		port: port,
-		addr: fmt.Sprintf("%s:%d", host, port),
-	}
-
-	if cfg.Username != "" && cfg.Password != "" {
-		settings.auth = smtp.PlainAuth("", cfg.Username, cfg.Password, host)
-	}
-
-	return settings
-}
-
-func defaultSubject(subject string) string {
-	if subject != "" {
-		return subject
-	}
-
-	return "Response from Spark Assistant"
-}
-
 func buildMultipartMessage(from string, to []string, subject, plainText string) []byte {
+	if subject == "" {
+		subject = "Response from Spark Assistant"
+	}
+
 	htmlContent := markdown.ToHTML([]byte(plainText), nil, nil)
 	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
 
