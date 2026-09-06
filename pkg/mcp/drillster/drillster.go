@@ -187,27 +187,13 @@ func (d *Drillster) login() error {
 func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult, any, error) {
 	if d.token == "" {
 		if err := d.login(); err != nil {
-			return &sdk.CallToolResult{
-				Content: []sdk.Content{
-					&sdk.TextContent{
-						Text: fmt.Sprintf("Error logging in: %v", err),
-					},
-				},
-				IsError: true,
-			}, nil, nil
+			return d.textResult(fmt.Sprintf("Error logging in: %v", err), true), nil, nil
 		}
 	}
 
 	req, err := http.NewRequest(method, requestURL, nil)
 	if err != nil {
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: fmt.Sprintf("Error creating request: %v", err),
-				},
-			},
-			IsError: true,
-		}, nil, nil
+		return d.textResult(fmt.Sprintf("Error creating request: %v", err), true), nil, nil
 	}
 
 	req.Header.Set("Authorization", "Bearer "+d.token)
@@ -215,14 +201,7 @@ func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult,
 
 	resp, err := d.client.Do(req)
 	if err != nil {
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: fmt.Sprintf("Error executing request: %v", err),
-				},
-			},
-			IsError: true,
-		}, nil, nil
+		return d.textResult(fmt.Sprintf("Error executing request: %v", err), true), nil, nil
 	}
 	defer resp.Body.Close()
 
@@ -238,35 +217,24 @@ func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult,
 				defer resp.Body.Close()
 			} else {
 				// Retry failed
-				return &sdk.CallToolResult{
-					Content: []sdk.Content{
-						&sdk.TextContent{
-							Text: fmt.Sprintf("Error executing request after re-login: %v", err),
-						},
-					},
-					IsError: true,
-				}, nil, nil
+				return d.textResult(fmt.Sprintf("Error executing request after re-login: %v", err), true), nil, nil
 			}
 		}
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: fmt.Sprintf("Error reading response body: %v", err),
-				},
-			},
-			IsError: true,
-		}, nil, nil
+		return d.textResult(fmt.Sprintf("Error reading response body: %v", err), true), nil, nil
 	}
 
+	return d.textResult(string(body), false), nil, nil
+}
+
+func (d *Drillster) textResult(text string, isError bool) *sdk.CallToolResult {
 	return &sdk.CallToolResult{
 		Content: []sdk.Content{
-			&sdk.TextContent{
-				Text: string(body),
-			},
+			&sdk.TextContent{Text: text},
 		},
-	}, nil, nil
+		IsError: isError,
+	}
 }

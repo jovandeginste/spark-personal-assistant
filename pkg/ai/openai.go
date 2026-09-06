@@ -59,15 +59,7 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 		return "", err
 	}
 
-	opts := []option.RequestOption{
-		option.WithAPIKey(c.APIKey()),
-	}
-
-	if c.baseURL != "" {
-		opts = append(opts, option.WithBaseURL(c.baseURL))
-	}
-
-	client := openai.NewClient(opts...)
+	client := c.newOpenAIClient()
 
 	for i := range 10 {
 		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
@@ -104,15 +96,7 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 		return "", err
 	}
 
-	opts := []option.RequestOption{
-		option.WithAPIKey(c.APIKey()),
-	}
-
-	if c.baseURL != "" {
-		opts = append(opts, option.WithBaseURL(c.baseURL))
-	}
-
-	client := openai.NewClient(opts...)
+	client := c.newOpenAIClient()
 
 	openaiTools := make([]openai.ChatCompletionToolParam, 0, len(tools))
 	for _, t := range tools {
@@ -180,4 +164,16 @@ func (c openaiClient) ListFiles(ctx context.Context) ([]string, error) {
 
 func (c openaiClient) DeleteFile(ctx context.Context, name string) error {
 	return errors.New("not implemented")
+}
+
+func (c openaiClient) newOpenAIClient() openai.Client {
+	opts := []option.RequestOption{
+		option.WithAPIKey(c.APIKey()),
+	}
+
+	if c.baseURL != "" {
+		opts = append(opts, option.WithBaseURL(c.baseURL))
+	}
+
+	return openai.NewClient(opts...)
 }

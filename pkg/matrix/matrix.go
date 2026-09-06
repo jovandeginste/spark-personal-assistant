@@ -53,14 +53,13 @@ func (mc *MatrixConfig) ConfigureSyncer() {
 }
 
 func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
-	if evt.RoomID != mc.DefaultRoomID() {
-		mc.App.Logger().Info("Ignoring message from non-default room", "room_id", evt.RoomID.String())
+	if !mc.isDefaultRoom(evt.RoomID) {
 		return
 	}
 
 	mc.AIData.CleanHistory(evt.RoomID.String())
-
-	body := evt.Content.AsMessage().Body
+	message := evt.Content.AsMessage()
+	body := message.Body
 
 	history := mc.AIData.ChatHistory[evt.RoomID.String()]
 	mc.App.Logger().Info(
@@ -78,12 +77,11 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		mc.App.Logger().Error("Failed to mark message as read", "error", err)
 	}
 
-	if evt.Sender.String() == mc.Client.UserID.String() {
+	if mc.isOwnMessage(evt) {
 		return
 	}
 
-	knownUser := slices.Contains(mc.App.Config.Matrix[mc.InstanceName].Users, evt.Sender.String())
-	if !knownUser {
+	if !mc.isAllowedUser(evt) {
 		mc.App.Logger().Info("Unknown user - skipping", "user_id", evt.Sender.String())
 		return
 	}
@@ -93,19 +91,7 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 	}
 
 	// Submit via router if configured/available, otherwise fallback
-	if mc.Router != nil {
-		addrID := mc.InstanceName + "@matrix"
-		_ = mc.Router.SubmitMessage(ctx, addrID, router.Message{
-			Metadata: router.Metadata{
-				To:      []string{"ai"},
-				Subject: "Matrix Message",
-				Extra: map[string]any{
-					"room_id": evt.RoomID.String(),
-				},
-			},
-			OriginalSource: evt.Sender.String(),
-			Content:        body,
-		})
+	if mc.submitToRouter(ctx, evt, body) {
 		return
 	}
 
@@ -116,20 +102,18 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 }
 
 func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) bool {
-	msgType := evt.Content.AsMessage().MsgType
+	message := evt.Content.AsMessage()
+	msgType := message.MsgType
 	if msgType == event.MsgText || msgType == event.MsgEmote {
 		return false
 	}
 
-	mc.App.Logger().Info("Received attachment", "type", msgType, "filename", evt.Content.AsMessage().Body)
+	mc.App.Logger().Info("Received attachment", "type", msgType, "filename", message.Body)
 
-	fileURL := evt.Content.AsMessage().URL
-	if fileURL == "" {
-		fileURL = evt.Content.AsMessage().File.URL
-	}
+	fileURL := extractAttachmentURL(message)
 
 	if fileURL == "" {
-		mc.App.Logger().Warn("Received attachment but no URL found", "body", evt.Content.AsMessage().Body)
+		mc.App.Logger().Warn("Received attachment but no URL found", "body", message.Body)
 		return true
 	}
 
@@ -142,48 +126,48 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 	file, err := mc.Client.DownloadBytes(ctx, uri)
 	if err != nil {
 		mc.App.Logger().Error("Failed to download file", "error", err)
-		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to download file %s: %v", evt.Content.AsMessage().Body, err))
+		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to download file %s: %v", message.Body, err))
 		return true
 	}
 
-	if encryptedFile := evt.Content.AsMessage().File; encryptedFile != nil {
+	if encryptedFile := message.File; encryptedFile != nil {
 		err = encryptedFile.DecryptInPlace(file)
 		if err != nil {
 			mc.App.Logger().Error("Failed to decrypt file", "error", err)
-			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to decrypt file %s: %v", evt.Content.AsMessage().Body, err))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to decrypt file %s: %v", message.Body, err))
 			return true
 		}
 	}
 
 	if len(file) == 0 {
-		mc.App.Logger().Error("Downloaded file is empty", "filename", evt.Content.AsMessage().Body)
-		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s: file is empty", evt.Content.AsMessage().Body))
+		mc.App.Logger().Error("Downloaded file is empty", "filename", message.Body)
+		mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s: file is empty", message.Body))
 		return true
 	}
 
 	// Check for PDF signature if mime type is application/pdf
-	if evt.Content.AsMessage().Info.MimeType == "application/pdf" {
+	if message.Info.MimeType == "application/pdf" {
 		// PDF magic number is %PDF
 		if len(file) < 4 || string(file[:4]) != "%PDF" {
 			mc.App.Logger().Warn("File has PDF mime type but missing PDF header", "header", string(file[:min(4, len(file))]))
 		}
 	}
 
-	mc.App.Logger().Info("Uploading file to AI", "size", len(file), "mime", evt.Content.AsMessage().Info.MimeType, "header", hex.EncodeToString(file[:min(10, len(file))]))
+	mc.App.Logger().Info("Uploading file to AI", "size", len(file), "mime", message.Info.MimeType, "header", hex.EncodeToString(file[:min(10, len(file))]))
 
-	aiURI, err := mc.AIClient.UploadFile(ctx, evt.Content.AsMessage().Body, file, evt.Content.AsMessage().Info.MimeType)
+	aiURI, err := mc.AIClient.UploadFile(ctx, message.Body, file, message.Info.MimeType)
 	if err != nil {
 		if strings.Contains(err.Error(), "The document has no pages") {
-			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("AI rejected the file %s: The document appears to be empty or corrupted (Gemini error: document has no pages).", evt.Content.AsMessage().Body))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("AI rejected the file %s: The document appears to be empty or corrupted (Gemini error: document has no pages).", message.Body))
 		} else {
-			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s to AI: %v", evt.Content.AsMessage().Body, err))
+			mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Failed to upload file %s to AI: %v", message.Body, err))
 		}
 		mc.App.Logger().Error("Failed to upload file to AI", "error", err)
 		return true
 	}
 
 	mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
-	mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Received file %s and uploaded to AI", evt.Content.AsMessage().Body))
+	mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Received file %s and uploaded to AI", message.Body))
 	return true
 }
 
@@ -236,22 +220,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		if mc.App.Config.Matrix[mc.InstanceName].ThreadedTools {
-			argsStr := ""
-			if len(args) > 0 {
-				var argList []string
-				for k, v := range args {
-					n := fmt.Sprintf("%v", v)
-					if len(n) > maxToolArgLengthLog {
-						n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
-					} else {
-						n = fmt.Sprintf("%q", n)
-					}
-
-					argList = append(argList, fmt.Sprintf("%s: %v", k, n))
-				}
-
-				argsStr = "(" + strings.Join(argList, ", ") + ")"
-			}
+			argsStr := formatToolArgs(args)
 			mc.sendNotice(roomID, eventID, fmt.Sprintf("> Using tool: `%s%s`", name, argsStr))
 		}
 		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
@@ -267,6 +236,76 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 	mc.AIData.FileURIs = nil
 
 	return md, nil
+}
+
+func (mc *MatrixConfig) isDefaultRoom(roomID id.RoomID) bool {
+	if roomID == mc.DefaultRoomID() {
+		return true
+	}
+
+	mc.App.Logger().Info("Ignoring message from non-default room", "room_id", roomID.String())
+	return false
+}
+
+func (mc *MatrixConfig) isOwnMessage(evt *event.Event) bool {
+	return evt.Sender.String() == mc.Client.UserID.String()
+}
+
+func (mc *MatrixConfig) isAllowedUser(evt *event.Event) bool {
+	return slices.Contains(mc.App.Config.Matrix[mc.InstanceName].Users, evt.Sender.String())
+}
+
+func (mc *MatrixConfig) submitToRouter(ctx context.Context, evt *event.Event, body string) bool {
+	if mc.Router == nil {
+		return false
+	}
+
+	addrID := mc.InstanceName + "@matrix"
+	_ = mc.Router.SubmitMessage(ctx, addrID, router.Message{
+		Metadata: router.Metadata{
+			To:      []string{"ai"},
+			Subject: "Matrix Message",
+			Extra: map[string]any{
+				"room_id": evt.RoomID.String(),
+			},
+		},
+		OriginalSource: evt.Sender.String(),
+		Content:        body,
+	})
+
+	return true
+}
+
+func extractAttachmentURL(message *event.MessageEventContent) id.ContentURIString {
+	if message.URL != "" {
+		return message.URL
+	}
+
+	if message.File != nil {
+		return message.File.URL
+	}
+
+	return ""
+}
+
+func formatToolArgs(args map[string]any) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	argList := make([]string, 0, len(args))
+	for k, v := range args {
+		n := fmt.Sprintf("%v", v)
+		if len(n) > maxToolArgLengthLog {
+			n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
+		} else {
+			n = fmt.Sprintf("%q", n)
+		}
+
+		argList = append(argList, fmt.Sprintf("%s: %v", k, n))
+	}
+
+	return "(" + strings.Join(argList, ", ") + ")"
 }
 
 func (mc *MatrixConfig) syncFunc(ctx context.Context, evt *event.Event) {

@@ -60,7 +60,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 
 	c.Logger().Info("Prompt", "prompt", prompt)
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	client, err := c.newGeminiClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -109,7 +109,7 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 		return "", err
 	}
 
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	client, err := c.newGeminiClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -289,7 +289,7 @@ func sanitizeSchema(data any) {
 }
 
 func (c geminiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	client, err := c.newGeminiClient(ctx)
 	if err != nil {
 		return "", err
 	}
@@ -307,7 +307,7 @@ func (c geminiClient) UploadFile(ctx context.Context, name string, content []byt
 }
 
 func (c geminiClient) ListFiles(ctx context.Context) ([]string, error) {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	client, err := c.newGeminiClient(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -335,7 +335,7 @@ func (c geminiClient) ListFiles(ctx context.Context) ([]string, error) {
 }
 
 func (c geminiClient) DeleteFile(ctx context.Context, name string) error {
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	client, err := c.newGeminiClient(ctx)
 	if err != nil {
 		return err
 	}
@@ -343,4 +343,8 @@ func (c geminiClient) DeleteFile(ctx context.Context, name string) error {
 	// Changed from client.Models.DeleteFile to client.Files.Delete
 	_, err = client.Files.Delete(ctx, name, nil)
 	return err
+}
+
+func (c geminiClient) newGeminiClient(ctx context.Context) (*genai.Client, error) {
+	return genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
 }

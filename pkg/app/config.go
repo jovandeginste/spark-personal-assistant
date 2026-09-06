@@ -51,10 +51,7 @@ type MailConfig struct {
 }
 
 func (c MailConfig) IsEnabled() bool {
-	if c.Enabled == nil {
-		return true // default enabled
-	}
-	return *c.Enabled
+	return enabledDefaultTrue(c.Enabled)
 }
 
 type MCPServerConfig struct {
@@ -78,10 +75,7 @@ type MatrixConfig struct {
 }
 
 func (c MatrixConfig) IsEnabled() bool {
-	if c.Enabled == nil {
-		return true // default enabled
-	}
-	return *c.Enabled
+	return enabledDefaultTrue(c.Enabled)
 }
 
 type WebserverConfig struct {
@@ -90,10 +84,15 @@ type WebserverConfig struct {
 }
 
 func (c WebserverConfig) IsEnabled() bool {
-	if c.Enabled == nil {
-		return true // default enabled
+	return enabledDefaultTrue(c.Enabled)
+}
+
+func enabledDefaultTrue(enabled *bool) bool {
+	if enabled == nil {
+		return true
 	}
-	return *c.Enabled
+
+	return *enabled
 }
 
 type UserData struct {
@@ -145,18 +144,8 @@ func (a *App) configureAssistant() error {
 	if err != nil {
 		return err
 	}
-
-	if a.Config.Assistant.Name == "" {
-		a.Config.Assistant.Name = assistantFromFile.Name
-	}
-
-	if a.Config.Assistant.Language == "" {
-		a.Config.Assistant.Language = assistantFromFile.Language
-	}
-
-	if a.Config.Assistant.Style == "" {
-		a.Config.Assistant.Style = string(rest)
-	}
+	assistantFromFile.Style = string(rest)
+	applyAssistantConfig(&a.Config.Assistant, &assistantFromFile, false)
 
 	return nil
 }
@@ -252,13 +241,7 @@ func (a *App) setDefaultPersona() {
 		return
 	}
 
-	if a.Config.Assistant.Name == "" {
-		a.Config.Assistant.Name = dp.Name
-	}
-
-	if a.Config.Assistant.Style == "" {
-		a.Config.Assistant.Style = dp.Style
-	}
+	applyAssistantConfig(&a.Config.Assistant, dp, false)
 }
 
 func (a *App) SetPersona(persona string) {
@@ -267,6 +250,23 @@ func (a *App) SetPersona(persona string) {
 		return
 	}
 
-	a.Config.Assistant.Name = dp.Name
-	a.Config.Assistant.Style = dp.Style
+	applyAssistantConfig(&a.Config.Assistant, dp, true)
+}
+
+func applyAssistantConfig(target *ai.AssistantConfig, source *ai.AssistantConfig, overwrite bool) {
+	if source == nil {
+		return
+	}
+
+	if overwrite || target.Name == "" {
+		target.Name = source.Name
+	}
+
+	if overwrite || target.Language == "" {
+		target.Language = source.Language
+	}
+
+	if overwrite || target.Style == "" {
+		target.Style = source.Style
+	}
 }

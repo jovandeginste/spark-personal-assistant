@@ -221,99 +221,122 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetSubscriptionByFormIdParams) (*sdk.CallToolResult, any, error) {
-		// 1. POST to /v2/ajax/form/{formID}/entry/query
-		queryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry/query", params.FormID)
-		queryData := url.Values{}
-		queryData.Set("filter[created-after]", "")
-		queryData.Set("filter[created-before]", "")
-		queryData.Set("incomplete", "0")
-
-		result, _, err := t.makeRequest("POST", queryURL, queryData)
+		entries, err := t.fetchSubscriptionEntries(params.FormID)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to query entries: %w", err)
+			return nil, nil, err
 		}
 
-		if len(result.Content) == 0 {
-			return nil, nil, errors.New("empty response from Twizzit query")
-		}
-
-		textContent, ok := result.Content[0].(*sdk.TextContent)
-		if !ok {
-			return nil, nil, errors.New("unexpected content type from Twizzit query")
-		}
-
-		var queryResponse struct {
-			SearchResultID string `json:"searchResultId"`
-		}
-		if err := json.Unmarshal([]byte(textContent.Text), &queryResponse); err != nil {
-			return nil, nil, fmt.Errorf("failed to unmarshal query response: %w", err)
-		}
-
-		if queryResponse.SearchResultID == "" {
-			return nil, nil, errors.New("no searchResultId found in response")
-		}
-
-		// 2. GET to /v2/ajax/form/{formID}/entry/box?searchResultId=...
-		boxURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry/box?searchResultId=%s", params.FormID, queryResponse.SearchResultID)
-		result, _, err = t.makeRequest("GET", boxURL)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to get entry box: %w", err)
-		}
-
-		if len(result.Content) == 0 {
-			return nil, nil, errors.New("empty response from Twizzit entry box")
-		}
-		textContent, ok = result.Content[0].(*sdk.TextContent)
-		if !ok {
-			return nil, nil, errors.New("unexpected content type from Twizzit entry box")
-		}
-
-		entryIDs, err := parseEntryIDs(textContent.Text)
-		if err != nil {
-			return nil, nil, fmt.Errorf("failed to parse entry IDs: %w", err)
-		}
-
-		// 4. Loop through IDs and fetch details
-		var finalEntries []FormEntry
-		for _, id := range entryIDs {
-			// URL: /v2/ajax/form/{formID}/entry?entryId={entryID}
-			entryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry?entryId=%d", params.FormID, id)
-
-			// We need to fetch the content. The makeRequest method handles the GET.
-			entryResult, _, err := t.makeRequest("GET", entryURL)
-			if err != nil {
-				// We can log this error if we had the logger easily accessible, or just skip.
-				continue
-			}
-
-			if len(entryResult.Content) > 0 {
-				if tc, ok := entryResult.Content[0].(*sdk.TextContent); ok {
-					// 5. Sanitize HTML
-					stripped := stripHTML(tc.Text)
-					finalEntries = append(finalEntries, FormEntry{
-						EntryID: id,
-						Content: stripped,
-					})
-				}
-			}
-		}
-
-		// 6. Return JSON list
-		entriesJSON, err := json.Marshal(finalEntries)
+		entriesJSON, err := json.Marshal(entries)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to marshal entries: %w", err)
 		}
 
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: string(entriesJSON),
-				},
-			},
-		}, nil, nil
+		return textResult(string(entriesJSON), false), nil, nil
 	}
 
 	sdk.AddTool(server, tool, handler)
+}
+
+func (t *Twizzit) fetchSubscriptionEntries(formID int) ([]FormEntry, error) {
+	searchResultID, err := t.fetchSearchResultID(formID)
+	if err != nil {
+		return nil, err
+	}
+
+	entryIDs, err := t.fetchEntryIDs(formID, searchResultID)
+	if err != nil {
+		return nil, err
+	}
+
+	return t.fetchEntryDetails(formID, entryIDs), nil
+}
+
+func (t *Twizzit) fetchSearchResultID(formID int) (string, error) {
+	queryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry/query", formID)
+	queryData := url.Values{}
+	queryData.Set("filter[created-after]", "")
+	queryData.Set("filter[created-before]", "")
+	queryData.Set("incomplete", "0")
+
+	result, _, err := t.makeRequest("POST", queryURL, queryData)
+	if err != nil {
+		return "", fmt.Errorf("failed to query entries: %w", err)
+	}
+
+	body, err := getResultText(result)
+	if err != nil {
+		return "", errors.New("empty response from Twizzit query")
+	}
+
+	var queryResponse struct {
+		SearchResultID string `json:"searchResultId"`
+	}
+	if err := json.Unmarshal([]byte(body), &queryResponse); err != nil {
+		return "", fmt.Errorf("failed to unmarshal query response: %w", err)
+	}
+
+	if queryResponse.SearchResultID == "" {
+		return "", errors.New("no searchResultId found in response")
+	}
+
+	return queryResponse.SearchResultID, nil
+}
+
+func (t *Twizzit) fetchEntryIDs(formID int, searchResultID string) ([]int, error) {
+	boxURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry/box?searchResultId=%s", formID, searchResultID)
+	result, _, err := t.makeRequest("GET", boxURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get entry box: %w", err)
+	}
+
+	body, err := getResultText(result)
+	if err != nil {
+		return nil, errors.New("empty response from Twizzit entry box")
+	}
+
+	entryIDs, err := parseEntryIDs(body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse entry IDs: %w", err)
+	}
+
+	return entryIDs, nil
+}
+
+func (t *Twizzit) fetchEntryDetails(formID int, entryIDs []int) []FormEntry {
+	entries := make([]FormEntry, 0, len(entryIDs))
+
+	for _, id := range entryIDs {
+		entryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry?entryId=%d", formID, id)
+		entryResult, _, err := t.makeRequest("GET", entryURL)
+		if err != nil {
+			continue
+		}
+
+		entryText, err := getResultText(entryResult)
+		if err != nil {
+			continue
+		}
+
+		entries = append(entries, FormEntry{
+			EntryID: id,
+			Content: stripHTML(entryText),
+		})
+	}
+
+	return entries
+}
+
+func getResultText(result *sdk.CallToolResult) (string, error) {
+	if len(result.Content) == 0 {
+		return "", errors.New("empty response")
+	}
+
+	textContent, ok := result.Content[0].(*sdk.TextContent)
+	if !ok {
+		return "", errors.New("unexpected content type")
+	}
+
+	return textContent.Text, nil
 }
 
 type GetEventsParams struct {

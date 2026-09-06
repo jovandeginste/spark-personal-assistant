@@ -13,20 +13,9 @@ import (
 
 func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values) (*sdk.CallToolResult, any, error) {
 	t.Logger().Debug("making request to twizzit", "method", method, "url", requestURL)
-
-	var body io.Reader
-	if len(formData) > 0 {
-		body = strings.NewReader(formData[0].Encode())
-	}
-
-	req, err := http.NewRequest(method, requestURL, body)
+	req, err := t.newRequest(method, requestURL, formData...)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	if len(formData) > 0 {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
 	resp, err := t.client.Do(req)
@@ -44,30 +33,13 @@ func (t *Twizzit) makeRequest(method, requestURL string, formData ...url.Values)
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
-
-	return &sdk.CallToolResult{
-		Content: []sdk.Content{
-			&sdk.TextContent{
-				Text: string(respBody),
-			},
-		},
-	}, nil, err
+	return textResult(string(respBody), false), nil, err
 }
 
 func (t *Twizzit) retryRequest(method, requestURL string, formData ...url.Values) (*sdk.CallToolResult, any, error) {
-	var body io.Reader
-	if len(formData) > 0 {
-		body = strings.NewReader(formData[0].Encode())
-	}
-
-	req, err := http.NewRequest(method, requestURL, body)
+	req, err := t.newRequest(method, requestURL, formData...)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	req.Header.Set("X-Requested-With", "XMLHttpRequest")
-	if len(formData) > 0 {
-		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	}
 
 	resp, err := t.client.Do(req)
@@ -81,14 +53,7 @@ func (t *Twizzit) retryRequest(method, requestURL string, formData ...url.Values
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
-
-	return &sdk.CallToolResult{
-		Content: []sdk.Content{
-			&sdk.TextContent{
-				Text: string(respBody),
-			},
-		},
-	}, nil, err
+	return textResult(string(respBody), false), nil, err
 }
 
 func (t *Twizzit) handleAuthError(resp *http.Response) (bool, error) {
@@ -206,4 +171,32 @@ func (t *Twizzit) login() error {
 	}
 
 	return nil
+}
+
+func (t *Twizzit) newRequest(method, requestURL string, formData ...url.Values) (*http.Request, error) {
+	var body io.Reader
+	if len(formData) > 0 {
+		body = strings.NewReader(formData[0].Encode())
+	}
+
+	req, err := http.NewRequest(method, requestURL, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	if len(formData) > 0 {
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	}
+
+	return req, nil
+}
+
+func textResult(text string, isError bool) *sdk.CallToolResult {
+	return &sdk.CallToolResult{
+		Content: []sdk.Content{
+			&sdk.TextContent{Text: text},
+		},
+		IsError: isError,
+	}
 }

@@ -28,10 +28,10 @@ type Message struct {
 
 // Address represents a registered system instance address in the router.
 type Address struct {
-	ID           string                                      `json:"id"`
-	InstanceName string                                      `json:"instance_name"`
-	System       string                                      `json:"system"`
-	Description  string                                      `json:"description"`
+	ID           string                                       `json:"id"`
+	InstanceName string                                       `json:"instance_name"`
+	System       string                                       `json:"system"`
+	Description  string                                       `json:"description"`
 	SendFunc     func(ctx context.Context, msg Message) error `json:"-"`
 }
 
@@ -43,6 +43,46 @@ type Router struct {
 	aiClient  ai.Client
 	app       *app.App
 }
+
+var (
+	listDestinationsSchema = map[string]any{
+		"type":       "object",
+		"properties": map[string]any{},
+	}
+	listChannelDestinationsSchema = map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"system": map[string]any{
+				"type":        "string",
+				"description": "The system name (e.g. matrix, mail)",
+			},
+		},
+		"required": []any{"system"},
+	}
+	sendMessageSchema = map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"to": map[string]any{
+				"type":        "array",
+				"items":       map[string]any{"type": "string"},
+				"description": "List of destination address IDs (instancename@servicename)",
+			},
+			"subject": map[string]any{
+				"type":        "string",
+				"description": "Subject of the message",
+			},
+			"content": map[string]any{
+				"type":        "string",
+				"description": "Content/body of the message",
+			},
+			"extra": map[string]any{
+				"type":        "object",
+				"description": "Extra metadata key-value pairs (e.g. specific recipient email address under 'to', target matrix room ID under 'room_id', etc.)",
+			},
+		},
+		"required": []any{"to", "content"},
+	}
+)
 
 // NewRouter creates a new central message router.
 func NewRouter(aiClient ai.Client, a *app.App) *Router {
@@ -106,51 +146,17 @@ func (r *Router) MCPTools() []ai.Tool {
 		{
 			Name:        "router_list_destinations",
 			Description: "List all available message destinations/addresses registered in the router (in format instancename@servicename).",
-			InputSchema: map[string]any{
-				"type":       "object",
-				"properties": map[string]any{},
-			},
+			InputSchema: listDestinationsSchema,
 		},
 		{
 			Name:        "router_list_channel_destinations",
 			Description: "List further sub-destinations or channel IDs for a specific system instance (e.g. Matrix room IDs for matrix, allowed email contacts for mail).",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"system": map[string]any{
-						"type":        "string",
-						"description": "The system name (e.g. matrix, mail)",
-					},
-				},
-				"required": []any{"system"},
-			},
+			InputSchema: listChannelDestinationsSchema,
 		},
 		{
 			Name:        "router_send_message",
 			Description: "Send a message via the router to one or more destination addresses (instancename@servicename).",
-			InputSchema: map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"to": map[string]any{
-						"type":        "array",
-						"items":       map[string]any{"type": "string"},
-						"description": "List of destination address IDs (instancename@servicename)",
-					},
-					"subject": map[string]any{
-						"type":        "string",
-						"description": "Subject of the message",
-					},
-					"content": map[string]any{
-						"type":        "string",
-						"description": "Content/body of the message",
-					},
-					"extra": map[string]any{
-						"type":        "object",
-						"description": "Extra metadata key-value pairs (e.g. specific recipient email address under 'to', target matrix room ID under 'room_id', etc.)",
-					},
-				},
-				"required": []any{"to", "content"},
-			},
+			InputSchema: sendMessageSchema,
 		},
 	}
 }
@@ -179,27 +185,47 @@ func (r *Router) executeListChannelDestinations(system string) string {
 	for _, addr := range r.addresses {
 		if strings.EqualFold(addr.System, system) {
 			sb.WriteString(fmt.Sprintf("- Instance: %s, ID: %s, Description: %s\n", addr.InstanceName, addr.ID, addr.Description))
-			if system == "matrix" {
-				if r.app != nil && r.app.Config.Matrix != nil {
-					if mCfg, ok := r.app.Config.Matrix[addr.InstanceName]; ok && mCfg.RoomID != "" {
-						sb.WriteString(fmt.Sprintf("  Default Room ID: %s\n", mCfg.RoomID))
-					}
-				}
-			} else if system == "mail" || system == "imap" {
-				if r.app != nil && r.app.Config.Mail != nil {
-					if mailCfg, ok := r.app.Config.Mail[addr.InstanceName]; ok {
-						if mailCfg.To != "" {
-							sb.WriteString(fmt.Sprintf("  Configured default recipient: %s\n", mailCfg.To))
-						}
-						if len(mailCfg.Allowlist) > 0 {
-							sb.WriteString(fmt.Sprintf("  Allowed recipients: %s\n", strings.Join(mailCfg.Allowlist, ", ")))
-						}
-					}
-				}
-			}
+			r.appendChannelSystemDetails(&sb, system, addr.InstanceName)
 		}
 	}
 	return sb.String()
+}
+
+func (r *Router) appendChannelSystemDetails(sb *strings.Builder, system, instanceName string) {
+	switch {
+	case strings.EqualFold(system, "matrix"):
+		r.appendMatrixChannelDetails(sb, instanceName)
+	case strings.EqualFold(system, "mail"), strings.EqualFold(system, "imap"):
+		r.appendMailChannelDetails(sb, instanceName)
+	}
+}
+
+func (r *Router) appendMatrixChannelDetails(sb *strings.Builder, instanceName string) {
+	if r.app == nil || r.app.Config.Matrix == nil {
+		return
+	}
+
+	if mCfg, ok := r.app.Config.Matrix[instanceName]; ok && mCfg.RoomID != "" {
+		sb.WriteString(fmt.Sprintf("  Default Room ID: %s\n", mCfg.RoomID))
+	}
+}
+
+func (r *Router) appendMailChannelDetails(sb *strings.Builder, instanceName string) {
+	if r.app == nil || r.app.Config.Mail == nil {
+		return
+	}
+
+	mailCfg, ok := r.app.Config.Mail[instanceName]
+	if !ok {
+		return
+	}
+
+	if mailCfg.To != "" {
+		sb.WriteString(fmt.Sprintf("  Configured default recipient: %s\n", mailCfg.To))
+	}
+	if len(mailCfg.Allowlist) > 0 {
+		sb.WriteString(fmt.Sprintf("  Allowed recipients: %s\n", strings.Join(mailCfg.Allowlist, ", ")))
+	}
 }
 
 func (r *Router) executeListDestinations() string {
@@ -314,11 +340,15 @@ func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
 }
 
 func isAITarget(target string) bool {
-	return target == "ai" || target == "LLM" || target == "llm" || target == "AI"
+	return isAIIdentifier(target)
 }
 
 func isAIAsync(from string) bool {
-	return from == "ai" || from == "LLM" || from == "llm" || from == "AI"
+	return isAIIdentifier(from)
+}
+
+func isAIIdentifier(value string) bool {
+	return strings.EqualFold(value, "ai") || strings.EqualFold(value, "llm")
 }
 
 func (r *Router) dispatchToTargets(ctx context.Context, msg *Message) {

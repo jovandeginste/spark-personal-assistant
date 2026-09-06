@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"net/mail"
+	stdmail "net/mail"
 	"net/smtp"
 	"strings"
 	"time"
@@ -200,7 +200,7 @@ func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
 
 		r := msg.GetBody(section)
 		if r != nil {
-			parsed, err := mail.ReadMessage(r)
+			parsed, err := stdmail.ReadMessage(r)
 			if err != nil {
 				logger.Error("failed to read message body", "error", err)
 				continue
@@ -258,64 +258,14 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 		return errors.New("no valid recipient email address found in 'to' or 'from_address'")
 	}
 
-	smtpHost := cfg.SMTP.Host
-	if smtpHost == "" {
-		smtpHost = cfg.IMAP.Host
-	}
-	smtpPort := cfg.SMTP.Port
-	if smtpPort == 0 {
-		smtpPort = 587
-		if cfg.IMAP.Port == 993 || cfg.IMAP.Port == 465 {
-			smtpPort = 465
-		}
-	}
-	smtpAddr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
-
-	auth := smtp.Auth(nil)
-	if cfg.Username != "" && cfg.Password != "" {
-		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, smtpHost)
-	}
-
-	subject := msg.Metadata.Subject
-	if subject == "" {
-		subject = "Response from Spark Assistant"
-	}
-
-	// Convert markdown content to HTML using github.com/gomarkdown/markdown
-	htmlContent := markdown.ToHTML([]byte(msg.Content), nil, nil)
-
-	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
-
-	var msgBuilder strings.Builder
-	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", cfg.Username))
-	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
-	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
-	msgBuilder.WriteString("MIME-Version: 1.0\r\n")
-	msgBuilder.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
-
-	// Plain text part
-	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	msgBuilder.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
-	msgBuilder.WriteString(msg.Content)
-	msgBuilder.WriteString("\r\n\r\n")
-
-	// HTML part
-	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	msgBuilder.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
-	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
-	msgBuilder.Write(htmlContent)
-	msgBuilder.WriteString("\r\n\r\n")
-
-	msgBuilder.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
-
-	msgBytes := []byte(msgBuilder.String())
+	smtpCfg := resolveSMTPSettings(cfg)
+	msgBytes := buildMultipartMessage(cfg.Username, to, defaultSubject(msg.Metadata.Subject), msg.Content)
 
 	var err error
-	if smtpPort == 465 {
-		err = sendSMTPSecure(smtpAddr, smtpHost, auth, cfg.Username, to, msgBytes)
+	if smtpCfg.port == 465 {
+		err = sendSMTPSecure(smtpCfg.addr, smtpCfg.host, smtpCfg.auth, cfg.Username, to, msgBytes)
 	} else {
-		err = smtp.SendMail(smtpAddr, auth, cfg.Username, to, msgBytes)
+		err = smtp.SendMail(smtpCfg.addr, smtpCfg.auth, cfg.Username, to, msgBytes)
 	}
 
 	if err != nil {
@@ -329,46 +279,8 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 }
 
 func extractRecipients(cfg Config, msg router.Message) []string {
-	var candidateRecipients []string
-
-	if msg.OriginalSource != "" && strings.Contains(msg.OriginalSource, "@") {
-		candidateRecipients = append(candidateRecipients, msg.OriginalSource)
-	}
-
-	// Check message metadata 'to' and 'extra'
-	if len(msg.Metadata.To) > 0 {
-		for _, t := range msg.Metadata.To {
-			if strings.Contains(t, "@") && !strings.HasSuffix(t, "@mail") && !strings.HasSuffix(t, "@matrix") && !strings.HasSuffix(t, "@web") {
-				candidateRecipients = append(candidateRecipients, t)
-			}
-		}
-	}
-	if len(candidateRecipients) == 0 && msg.Metadata.Extra != nil {
-		if extraTo, ok := msg.Metadata.Extra["to"].(string); ok && extraTo != "" && strings.Contains(extraTo, "@") {
-			candidateRecipients = append(candidateRecipients, extraTo)
-		} else if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" && strings.Contains(fromAddr, "@") {
-			candidateRecipients = append(candidateRecipients, fromAddr)
-		}
-	}
-
-	// Filter via allowlist if configured
-	var allowed []string
-	if len(cfg.Allowlist) > 0 {
-		for _, cand := range candidateRecipients {
-			allowedMatch := false
-			for _, allowedAddr := range cfg.Allowlist {
-				if strings.EqualFold(cand, allowedAddr) {
-					allowedMatch = true
-					break
-				}
-			}
-			if allowedMatch {
-				allowed = append(allowed, cand)
-			}
-		}
-	} else {
-		allowed = candidateRecipients
-	}
+	candidateRecipients := collectCandidateRecipients(msg)
+	allowed := filterByAllowlist(candidateRecipients, cfg.Allowlist)
 
 	if len(allowed) > 0 {
 		return allowed
@@ -380,6 +292,156 @@ func extractRecipients(cfg Config, msg router.Message) []string {
 	}
 
 	return nil
+}
+
+type smtpSettings struct {
+	host string
+	port int
+	addr string
+	auth smtp.Auth
+}
+
+func resolveSMTPSettings(cfg Config) smtpSettings {
+	host := cfg.SMTP.Host
+	if host == "" {
+		host = cfg.IMAP.Host
+	}
+
+	port := cfg.SMTP.Port
+	if port == 0 {
+		port = 587
+		if cfg.IMAP.Port == 993 || cfg.IMAP.Port == 465 {
+			port = 465
+		}
+	}
+
+	settings := smtpSettings{
+		host: host,
+		port: port,
+		addr: fmt.Sprintf("%s:%d", host, port),
+	}
+
+	if cfg.Username != "" && cfg.Password != "" {
+		settings.auth = smtp.PlainAuth("", cfg.Username, cfg.Password, host)
+	}
+
+	return settings
+}
+
+func defaultSubject(subject string) string {
+	if subject != "" {
+		return subject
+	}
+
+	return "Response from Spark Assistant"
+}
+
+func buildMultipartMessage(from string, to []string, subject, plainText string) []byte {
+	htmlContent := markdown.ToHTML([]byte(plainText), nil, nil)
+	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
+
+	var msgBuilder strings.Builder
+	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", from))
+	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
+	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msgBuilder.WriteString("MIME-Version: 1.0\r\n")
+	msgBuilder.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
+
+	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	msgBuilder.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
+	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	msgBuilder.WriteString(plainText)
+	msgBuilder.WriteString("\r\n\r\n")
+
+	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
+	msgBuilder.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
+	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
+	msgBuilder.Write(htmlContent)
+	msgBuilder.WriteString("\r\n\r\n")
+
+	msgBuilder.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
+
+	return []byte(msgBuilder.String())
+}
+
+func collectCandidateRecipients(msg router.Message) []string {
+	var recipients []string
+	recipients = appendValidRecipient(recipients, msg.OriginalSource)
+
+	for _, to := range msg.Metadata.To {
+		recipients = appendValidRecipient(recipients, to)
+	}
+
+	if len(recipients) == 0 && msg.Metadata.Extra != nil {
+		if extraTo, ok := msg.Metadata.Extra["to"].(string); ok {
+			recipients = appendValidRecipient(recipients, extraTo)
+		}
+		if len(recipients) == 0 {
+			if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok {
+				recipients = appendValidRecipient(recipients, fromAddr)
+			}
+		}
+	}
+
+	return recipients
+}
+
+func appendValidRecipient(recipients []string, raw string) []string {
+	address, ok := parseEmailAddress(raw)
+	if !ok || isRouterAddress(address) {
+		return recipients
+	}
+
+	for _, existing := range recipients {
+		if strings.EqualFold(existing, address) {
+			return recipients
+		}
+	}
+
+	return append(recipients, address)
+}
+
+func parseEmailAddress(raw string) (string, bool) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", false
+	}
+
+	parsed, err := stdmail.ParseAddress(raw)
+	if err != nil {
+		return "", false
+	}
+
+	return parsed.Address, true
+}
+
+func isRouterAddress(value string) bool {
+	v := strings.ToLower(strings.TrimSpace(value))
+	return strings.HasSuffix(v, "@mail") || strings.HasSuffix(v, "@matrix") || strings.HasSuffix(v, "@web")
+}
+
+func filterByAllowlist(candidates, allowlist []string) []string {
+	if len(allowlist) == 0 {
+		return candidates
+	}
+
+	allowSet := make(map[string]struct{}, len(allowlist))
+	for _, allowedAddr := range allowlist {
+		address, ok := parseEmailAddress(allowedAddr)
+		if !ok {
+			continue
+		}
+		allowSet[strings.ToLower(address)] = struct{}{}
+	}
+
+	filtered := make([]string, 0, len(candidates))
+	for _, cand := range candidates {
+		if _, ok := allowSet[strings.ToLower(cand)]; ok {
+			filtered = append(filtered, cand)
+		}
+	}
+
+	return filtered
 }
 
 func sendSMTPSecure(smtpAddr, smtpHost string, auth smtp.Auth, username string, to []string, msgBytes []byte) error {

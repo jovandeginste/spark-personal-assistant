@@ -30,140 +30,146 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			r := router.NewRouter(aiClient, c.app)
 
-			// Initialize Matrix clients
-			for instanceName, mCfg := range c.app.Config.Matrix {
-				if !mCfg.IsEnabled() {
-					c.app.Logger().Info("Matrix client is disabled in config", "instance", instanceName)
-					continue
-				}
-
-				mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName, Router: r}
-				mc.AIClient = aiClient
-
-				aiData, err := c.app.BuildData()
-				if err != nil {
-					return err
-				}
-				mc.AIData = aiData
-
-				if err := mc.InitClient(); err != nil {
-					return err
-				}
-				mc.ConfigureSyncer()
-				if err := mc.ConfigureCryptoHelper(); err != nil {
-					return err
-				}
-				mc.InitChat()
-				if err := mc.Greet(); err != nil {
-					return err
-				}
-
-				if err := mc.Register(r, instanceName, "Matrix Room ("+instanceName+")"); err != nil {
-					return err
-				}
-
-				go func(client *matrix.MatrixConfig) {
-					if err := client.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
-						c.app.Logger().Error("Failed to sync matrix", "error", err)
-					}
-				}(&mc)
+			if err := c.startMatrixRouters(ctx, aiClient, r); err != nil {
+				return err
 			}
 
-			// Initialize Web servers
-			for instanceName, wCfg := range c.app.Config.Webserver {
-				if wCfg.IsEnabled() {
-					c.app.Logger().Info("Initializing Web server...", "instance", instanceName)
-					for range c.app.Config.Matrix {
-						mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
-						mc.AIClient = aiClient
-						aiData, _ := c.app.BuildData()
-						mc.AIData = aiData
-						mc.ServeHTTP(instanceName)
-						break
-					}
-
-					if err := r.RegisterAddress(router.Address{
-						ID:           instanceName + "@web",
-						InstanceName: instanceName,
-						System:       "web",
-						Description:  "Web Server Interface (" + instanceName + ")",
-						SendFunc: func(ctx context.Context, msg router.Message) error {
-							c.app.Logger().Warn("Web sending not yet supported", "content", msg.Content)
-							return nil
-						},
-					}); err != nil {
-						return err
-					}
-				} else {
-					c.app.Logger().Info("Web server is disabled in config", "instance", instanceName)
-				}
+			if err := c.startWebServers(aiClient, r); err != nil {
+				return err
 			}
 
-			// Initialize Mail clients
-			for instanceName, mailCfg := range c.app.Config.Mail {
-				if !mailCfg.IsEnabled() {
-					c.app.Logger().Info("Mail client is disabled in config", "instance", instanceName)
-					continue
-				}
-
-				c.app.Logger().Info("Initializing Mail client...", "instance", instanceName, "host", mailCfg.IMAP.Host, "port", mailCfg.IMAP.Port)
-				mailAddrID := instanceName + "@mail"
-
-				mc := mail.Config{
-					IMAP: mail.IMAPConfig{
-						Host: mailCfg.IMAP.Host,
-						Port: mailCfg.IMAP.Port,
-					},
-					SMTP: mail.SMTPConfig{
-						Host: mailCfg.SMTP.Host,
-						Port: mailCfg.SMTP.Port,
-					},
-					To:       mailCfg.To,
-					Username: mailCfg.Username,
-					Password: mailCfg.Password,
-					Folder:   mailCfg.Folder,
-					UseTLS:   mailCfg.UseTLS,
-				}
-
-				if err := mail.Register(r, mc, instanceName, "Mail Account ("+instanceName+")", c.app.Logger()); err != nil {
-					return err
-				}
-
-				go func(cfg mail.Config, addrID string, instName string) {
-					msgChan := make(chan mail.Message, 10)
-					go func() {
-						for msg := range msgChan {
-							c.app.Logger().Info("Received email via mail", "instance", instName, "subject", msg.Subject, "from", msg.From)
-							_ = r.SubmitMessage(ctx, addrID, router.Message{
-								Metadata: router.Metadata{
-									To:      []string{"ai"},
-									Subject: msg.Subject,
-								},
-								OriginalSource: msg.FromAddress,
-								Content: fmt.Sprintf("I received this email on behalf of my user. Do not reply to the email directly. "+
-									"Your response will be sent to the user via Matrix so they know what you did with it.\n\n"+
-									"Email from: %s\nSubject: %s\nDate: %s\n\n%s", msg.From, msg.Subject, msg.Date, msg.Body),
-							})
-						}
-					}()
-
-					c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
-					if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
-						c.app.Logger().Error("Mail connection failed", "instance", instName, "error", err)
-					}
-				}(mc, mailAddrID, instanceName)
+			if err := c.startMailRouters(ctx, r); err != nil {
+				return err
 			}
 
 			c.app.Logger().Info("Router started")
-
-			// Wait for interrupt
-			sigChan := make(chan os.Signal, 1)
-			signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
-
-			<-sigChan
-			c.app.Logger().Info("Shutting down router...")
+			c.waitForShutdown()
 
 			return nil
 		},
 	}
+}
+
+func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *router.Router) error {
+	for instanceName, mCfg := range c.app.Config.Matrix {
+		if !mCfg.IsEnabled() {
+			c.app.Logger().Info("Matrix client is disabled in config", "instance", instanceName)
+			continue
+		}
+
+		mc, err := c.initMatrixClient(instanceName, aiClient, r)
+		if err != nil {
+			return err
+		}
+
+		go func(client *matrix.MatrixConfig) {
+			if err := client.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
+				c.app.Logger().Error("Failed to sync matrix", "error", err)
+			}
+		}(mc)
+	}
+
+	return nil
+}
+
+func (c *cli) startWebServers(aiClient ai.Client, r *router.Router) error {
+	for instanceName, wCfg := range c.app.Config.Webserver {
+		if !wCfg.IsEnabled() {
+			c.app.Logger().Info("Web server is disabled in config", "instance", instanceName)
+			continue
+		}
+
+		c.app.Logger().Info("Initializing Web server...", "instance", instanceName)
+		for range c.app.Config.Matrix {
+			mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
+			mc.AIClient = aiClient
+			aiData, _ := c.app.BuildData()
+			mc.AIData = aiData
+			mc.ServeHTTP(instanceName)
+			break
+		}
+
+		if err := r.RegisterAddress(router.Address{
+			ID:           instanceName + "@web",
+			InstanceName: instanceName,
+			System:       "web",
+			Description:  "Web Server Interface (" + instanceName + ")",
+			SendFunc: func(ctx context.Context, msg router.Message) error {
+				c.app.Logger().Warn("Web sending not yet supported", "content", msg.Content)
+				return nil
+			},
+		}); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (c *cli) startMailRouters(ctx context.Context, r *router.Router) error {
+	for instanceName, mailCfg := range c.app.Config.Mail {
+		if !mailCfg.IsEnabled() {
+			c.app.Logger().Info("Mail client is disabled in config", "instance", instanceName)
+			continue
+		}
+
+		c.app.Logger().Info("Initializing Mail client...", "instance", instanceName, "host", mailCfg.IMAP.Host, "port", mailCfg.IMAP.Port)
+		mailAddrID := instanceName + "@mail"
+
+		mc := mail.Config{
+			IMAP: mail.IMAPConfig{
+				Host: mailCfg.IMAP.Host,
+				Port: mailCfg.IMAP.Port,
+			},
+			SMTP: mail.SMTPConfig{
+				Host: mailCfg.SMTP.Host,
+				Port: mailCfg.SMTP.Port,
+			},
+			To:       mailCfg.To,
+			Username: mailCfg.Username,
+			Password: mailCfg.Password,
+			Folder:   mailCfg.Folder,
+			UseTLS:   mailCfg.UseTLS,
+		}
+
+		if err := mail.Register(r, mc, instanceName, "Mail Account ("+instanceName+")", c.app.Logger()); err != nil {
+			return err
+		}
+
+		go c.runMailLoop(ctx, r, mc, mailAddrID, instanceName)
+	}
+
+	return nil
+}
+
+func (c *cli) runMailLoop(ctx context.Context, r *router.Router, cfg mail.Config, addrID, instName string) {
+	msgChan := make(chan mail.Message, 10)
+	go func() {
+		for msg := range msgChan {
+			c.app.Logger().Info("Received email via mail", "instance", instName, "subject", msg.Subject, "from", msg.From)
+			_ = r.SubmitMessage(ctx, addrID, router.Message{
+				Metadata: router.Metadata{
+					To:      []string{"ai"},
+					Subject: msg.Subject,
+				},
+				OriginalSource: msg.FromAddress,
+				Content: fmt.Sprintf("I received this email on behalf of my user. Do not reply to the email directly. "+
+					"Your response will be sent to the user via Matrix so they know what you did with it.\n\n"+
+					"Email from: %s\nSubject: %s\nDate: %s\n\n%s", msg.From, msg.Subject, msg.Date, msg.Body),
+			})
+		}
+	}()
+
+	c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
+	if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
+		c.app.Logger().Error("Mail connection failed", "instance", instName, "error", err)
+	}
+}
+
+func (c *cli) waitForShutdown() {
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	<-sigChan
+	c.app.Logger().Info("Shutting down router...")
 }

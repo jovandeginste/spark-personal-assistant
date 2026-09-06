@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -50,51 +51,9 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 		return nil, fmt.Errorf("mcp server config not found: %s", name)
 	}
 
-	var transport mcp.Transport
-
-	// Default to stdio if not specified
-	if config.Transport == "" {
-		if config.URL != "" {
-			config.Transport = "streamable"
-		} else {
-			config.Transport = "stdio"
-		}
-	}
-
-	switch config.Transport {
-	case "streamable":
-		if config.URL == "" {
-			return nil, fmt.Errorf("MCP server %s configured with streamable transport but no url", name)
-		}
-
-		endpoint := config.URL
-		if endpoint == "" {
-			endpoint = "/"
-		}
-
-		transport = &mcp.StreamableClientTransport{
-			Endpoint: endpoint,
-			HTTPClient: &http.Client{
-				Transport: &headerTransport{
-					transport: http.DefaultTransport,
-					token:     config.Token,
-				},
-			},
-		}
-	case "stdio":
-		if config.Command == "" {
-			return nil, fmt.Errorf("MCP server %s configured with stdio transport but no command", name)
-		}
-
-		tf := &mcp.CommandTransport{
-			Command: exec.Command(config.Command, config.Args...), //nolint:gosec // Trusted config
-		}
-		tf.Command.Env = os.Environ()
-		tf.Command.Env = append(tf.Command.Env, config.Env...)
-		tf.Command.Stderr = os.Stderr
-		transport = tf
-	default:
-		return nil, fmt.Errorf("unknown MCP transport for %s: %s", name, config.Transport)
+	transport, transportType, err := createMCPTransport(config, name)
+	if err != nil {
+		return nil, err
 	}
 
 	c := mcp.NewClient(&mcp.Implementation{
@@ -102,7 +61,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 		Version: "1.0.0",
 	}, nil)
 
-	a.Logger().Info("Connecting to MCP server", "name", name, "transport", config.Transport)
+	a.Logger().Info("Connecting to MCP server", "name", name, "transport", transportType)
 
 	// Create a context for the connection.
 	// Note: We need a long-lived context for the connection, distinct from the request context.
@@ -147,30 +106,10 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 			continue
 		}
 
-		client, err := a.getMCPClient(ctx, name)
+		result, err := a.listToolsWithReconnect(ctx, name)
 		if err != nil {
-			a.Logger().Error("Failed to get MCP client", "client", name, "error", err)
+			a.Logger().Error("Failed to list tools", "client", name, "error", err)
 			continue
-		}
-
-		result, err := client.ListTools(ctx, nil)
-		if err != nil {
-			a.Logger().Warn("Failed to list tools, retrying connection", "client", name, "error", err)
-
-			// Retry once
-			a.forceReconnect(name)
-
-			client, err = a.getMCPClient(ctx, name)
-			if err != nil {
-				a.Logger().Error("Failed to reconnect to MCP client", "client", name, "error", err)
-				continue
-			}
-
-			result, err = client.ListTools(ctx, nil)
-			if err != nil {
-				a.Logger().Error("Failed to list tools after reconnect", "client", name, "error", err)
-				continue
-			}
 		}
 
 		serverTools := make([]ai.Tool, 0, len(result.Tools))
@@ -204,29 +143,9 @@ func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]a
 		return "", fmt.Errorf("mcp server config not found: %s", clientName)
 	}
 
-	// Helper to execute the call
-	execute := func() (*mcp.CallToolResult, error) {
-		client, err := a.getMCPClient(ctx, clientName)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get mcp client: %w", err)
-		}
-
-		return client.CallTool(ctx, &mcp.CallToolParams{
-			Name:      toolName,
-			Arguments: args,
-		})
-	}
-
-	result, err := execute()
+	result, err := a.callToolWithReconnect(ctx, clientName, toolName, args)
 	if err != nil {
-		a.Logger().Warn("mcp tool call failed, retrying connection", "client", clientName, "error", err)
-		// Retry once with force reconnect
-		a.forceReconnect(clientName)
-
-		result, err = execute()
-		if err != nil {
-			return "", fmt.Errorf("mcp tool call failed after retry: %w", err)
-		}
+		return "", err
 	}
 
 	if result.IsError {
@@ -247,55 +166,151 @@ func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]a
 
 func (a *App) UpdateMCPServers(ctx context.Context) map[string]string {
 	results := make(map[string]string)
-	type result struct {
-		name string
-		msg  string
-	}
-	resChan := make(chan result)
-	count := 0
+	var mu sync.Mutex
+	var wg sync.WaitGroup
 
 	for name, config := range a.Config.MCPServers {
 		if config.URL == "" {
 			continue
 		}
-		count++
+		wg.Add(1)
 
 		go func(name, url string) {
-			// Assuming the URL is the base URL, append /update
-			updateURL := url
-			if updateURL[len(updateURL)-1] == '/' {
-				updateURL = updateURL[:len(updateURL)-1]
-			}
-			updateURL += "/update"
+			defer wg.Done()
+
+			updateURL := strings.TrimRight(url, "/") + "/update"
 
 			req, err := http.NewRequestWithContext(ctx, http.MethodGet, updateURL, nil)
 			if err != nil {
-				resChan <- result{name, fmt.Sprintf("Failed to create request: %v", err)}
+				mu.Lock()
+				results[name] = fmt.Sprintf("Failed to create request: %v", err)
+				mu.Unlock()
 				return
 			}
 
 			resp, err := http.DefaultClient.Do(req)
 			if err != nil {
-				resChan <- result{name, fmt.Sprintf("Failed: %v", err)}
+				mu.Lock()
+				results[name] = fmt.Sprintf("Failed: %v", err)
+				mu.Unlock()
 				return
 			}
 			defer resp.Body.Close()
 
 			if resp.StatusCode != http.StatusOK {
-				resChan <- result{name, fmt.Sprintf("Failed: Status %d", resp.StatusCode)}
+				mu.Lock()
+				results[name] = fmt.Sprintf("Failed: Status %d", resp.StatusCode)
+				mu.Unlock()
 				return
 			}
 
-			resChan <- result{name, "Success"}
+			mu.Lock()
+			results[name] = "Success"
+			mu.Unlock()
 		}(name, config.URL)
 	}
 
-	for i := 0; i < count; i++ {
-		res := <-resChan
-		results[res.name] = res.msg
-	}
+	wg.Wait()
 
 	return results
+}
+
+func createMCPTransport(config MCPServerConfig, name string) (mcp.Transport, string, error) {
+	transportType := config.Transport
+	if transportType == "" {
+		if config.URL != "" {
+			transportType = "streamable"
+		} else {
+			transportType = "stdio"
+		}
+	}
+
+	switch transportType {
+	case "streamable":
+		if config.URL == "" {
+			return nil, "", fmt.Errorf("MCP server %s configured with streamable transport but no url", name)
+		}
+
+		return &mcp.StreamableClientTransport{
+			Endpoint: config.URL,
+			HTTPClient: &http.Client{
+				Transport: &headerTransport{
+					transport: http.DefaultTransport,
+					token:     config.Token,
+				},
+			},
+		}, transportType, nil
+	case "stdio":
+		if config.Command == "" {
+			return nil, "", fmt.Errorf("MCP server %s configured with stdio transport but no command", name)
+		}
+
+		tf := &mcp.CommandTransport{
+			Command: exec.Command(config.Command, config.Args...), //nolint:gosec // Trusted config
+		}
+		tf.Command.Env = append(os.Environ(), config.Env...)
+		tf.Command.Stderr = os.Stderr
+
+		return tf, transportType, nil
+	default:
+		return nil, "", fmt.Errorf("unknown MCP transport for %s: %s", name, transportType)
+	}
+}
+
+func (a *App) listToolsWithReconnect(ctx context.Context, name string) (*mcp.ListToolsResult, error) {
+	client, err := a.getMCPClient(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mcp client: %w", err)
+	}
+
+	result, err := client.ListTools(ctx, nil)
+	if err == nil {
+		return result, nil
+	}
+
+	a.Logger().Warn("Failed to list tools, retrying connection", "client", name, "error", err)
+	a.forceReconnect(name)
+
+	client, err = a.getMCPClient(ctx, name)
+	if err != nil {
+		return nil, fmt.Errorf("failed to reconnect to mcp client: %w", err)
+	}
+
+	result, err = client.ListTools(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list tools after reconnect: %w", err)
+	}
+
+	return result, nil
+}
+
+func (a *App) callToolWithReconnect(ctx context.Context, clientName, toolName string, args map[string]any) (*mcp.CallToolResult, error) {
+	result, err := a.executeMCPToolCall(ctx, clientName, toolName, args)
+	if err == nil {
+		return result, nil
+	}
+
+	a.Logger().Warn("mcp tool call failed, retrying connection", "client", clientName, "error", err)
+	a.forceReconnect(clientName)
+
+	result, err = a.executeMCPToolCall(ctx, clientName, toolName, args)
+	if err != nil {
+		return nil, fmt.Errorf("mcp tool call failed after retry: %w", err)
+	}
+
+	return result, nil
+}
+
+func (a *App) executeMCPToolCall(ctx context.Context, clientName, toolName string, args map[string]any) (*mcp.CallToolResult, error) {
+	client, err := a.getMCPClient(ctx, clientName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get mcp client: %w", err)
+	}
+
+	return client.CallTool(ctx, &mcp.CallToolParams{
+		Name:      toolName,
+		Arguments: args,
+	})
 }
 
 type headerTransport struct {

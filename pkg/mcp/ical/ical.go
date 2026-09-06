@@ -115,29 +115,10 @@ func (m *Module) handleListEvents(ctx context.Context, request *mcp.CallToolRequ
 
 	if len(allEvents) == 0 {
 		logger.Info("No events found", "start_date", params.StartDate, "end_date", params.EndDate)
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: "No events found for this time range.",
-				},
-			},
-		}, nil, nil
+		return m.textResult("No events found for this time range."), nil, nil
 	}
 
-	jsonEvents, err := json.Marshal(allEvents)
-	if err != nil {
-		logger.Error("Failed to marshal events", "error", err)
-		return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: string(jsonEvents),
-			},
-		},
-	}, nil, nil
+	return m.eventsJSONResult(allEvents)
 }
 
 func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRequest, params searchParams) (*mcp.CallToolResult, any, error) {
@@ -160,29 +141,10 @@ func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRe
 
 	if len(allEvents) == 0 {
 		logger.Info("No matching events found", "query", params.Query)
-
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{
-					Text: "No matching events found.",
-				},
-			},
-		}, nil, nil
+		return m.textResult("No matching events found."), nil, nil
 	}
 
-	jsonEvents, err := json.Marshal(allEvents)
-	if err != nil {
-		logger.Error("Failed to marshal search results", "error", err)
-		return nil, nil, fmt.Errorf("failed to marshal search results: %w", err)
-	}
-
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{
-				Text: string(jsonEvents),
-			},
-		},
-	}, nil, nil
+	return m.eventsJSONResult(allEvents)
 }
 
 func (m *Module) handleUpdateCalendar(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
@@ -262,26 +224,9 @@ type Event struct {
 }
 
 func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) {
-	icsPath, err := m.fetchAndCacheICS(cal.URL)
+	parser, err := m.parseCalendar(cal, start.Add(-24*time.Hour), end.Add(48*time.Hour))
 	if err != nil {
-		return nil, fmt.Errorf("fetching ICS: %w", err)
-	}
-
-	f, err := os.Open(icsPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening ICS file: %w", err)
-	}
-	defer f.Close()
-
-	// Parse with buffer around the range
-	pStart := start.Add(-24 * time.Hour)
-	pEnd := end.Add(48 * time.Hour)
-
-	parser := gocal.NewParser(f)
-	parser.Start, parser.End = &pStart, &pEnd
-
-	if err := parser.Parse(); err != nil {
-		return nil, fmt.Errorf("parsing ICS: %w", err)
+		return nil, err
 	}
 
 	// Normalize range for filtering
@@ -302,13 +247,8 @@ func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) 
 			continue
 		}
 
-		newEvent := Event{
-			CalendarName: cal.Name,
-			Summary:      e.Summary,
-			Description:  e.Description,
-			Location:     e.Location,
-		}
-		if err := newEvent.SetTimes(e); err != nil {
+		newEvent, err := eventFromGocal(cal.Name, e)
+		if err != nil {
 			continue
 		}
 
@@ -319,30 +259,14 @@ func (m *Module) getEvents(cal Calendar, start, end time.Time) ([]Event, error) 
 }
 
 func (m *Module) searchEvents(cal Calendar, query []string, startDateStr, endDateStr string) ([]Event, error) {
-	icsPath, err := m.fetchAndCacheICS(cal.URL)
-	if err != nil {
-		return nil, fmt.Errorf("fetching ICS: %w", err)
-	}
-
-	f, err := os.Open(icsPath)
-	if err != nil {
-		return nil, fmt.Errorf("opening ICS file: %w", err)
-	}
-	defer f.Close()
-
 	start, end, err := determineSearchRange(startDateStr, endDateStr)
 	if err != nil {
 		return nil, err
 	}
 
-	// Widen the parser scope to ensure we don't miss boundary events
-	pStart := start.Add(-24 * time.Hour)
-	pEnd := end.Add(24 * time.Hour)
-	parser := gocal.NewParser(f)
-	parser.Start, parser.End = &pStart, &pEnd
-
-	if err := parser.Parse(); err != nil {
-		return nil, fmt.Errorf("parsing ICS: %w", err)
+	parser, err := m.parseCalendar(cal, start.Add(-24*time.Hour), end.Add(24*time.Hour))
+	if err != nil {
+		return nil, err
 	}
 
 	queryLower := make([]string, 0, len(query))
@@ -376,19 +300,70 @@ func (m *Module) searchEvents(cal Calendar, query []string, startDateStr, endDat
 			continue
 		}
 
-		newEvent := Event{
-			CalendarName: cal.Name,
-			Summary:      e.Summary,
-			Description:  e.Description,
-			Location:     e.Location,
+		newEvent, err := eventFromGocal(cal.Name, e)
+		if err != nil {
+			continue
 		}
-
-		newEvent.SetTimes(e)
 
 		results = append(results, newEvent)
 	}
 
 	return results, nil
+}
+
+func (m *Module) textResult(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+		},
+	}
+}
+
+func (m *Module) eventsJSONResult(events []Event) (*mcp.CallToolResult, any, error) {
+	jsonEvents, err := json.Marshal(events)
+	if err != nil {
+		m.Logger().Error("Failed to marshal events", "error", err)
+		return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
+	}
+
+	return m.textResult(string(jsonEvents)), nil, nil
+}
+
+func (m *Module) parseCalendar(cal Calendar, start, end time.Time) (*gocal.Gocal, error) {
+	icsPath, err := m.fetchAndCacheICS(cal.URL)
+	if err != nil {
+		return nil, fmt.Errorf("fetching ICS: %w", err)
+	}
+
+	f, err := os.Open(icsPath)
+	if err != nil {
+		return nil, fmt.Errorf("opening ICS file: %w", err)
+	}
+	defer f.Close()
+
+	parser := gocal.NewParser(f)
+	parser.Start, parser.End = &start, &end
+
+	if err := parser.Parse(); err != nil {
+		return nil, fmt.Errorf("parsing ICS: %w", err)
+	}
+
+	return parser, nil
+}
+
+func eventFromGocal(calendarName string, event gocal.Event) (Event, error) {
+	newEvent := Event{
+		CalendarName: calendarName,
+		Summary:      event.Summary,
+		Description:  event.Description,
+		Location:     event.Location,
+	}
+
+	if err := newEvent.SetTimes(event); err != nil {
+		return Event{}, err
+	}
+
+	return newEvent, nil
 }
 
 func determineSearchRange(startDateStr, endDateStr string) (*time.Time, *time.Time, error) {
