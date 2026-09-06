@@ -12,6 +12,8 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 )
 
+const maxToolArgLengthLog = 40
+
 // Metadata represents message headers similar to email.
 type Metadata struct {
 	From    string         `json:"from"`
@@ -393,6 +395,7 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 	}
 
 	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		r.sendToolNotice(ctx, msg, name, args)
 		if res, handled, err := r.ExecuteTool(ctx, name, args, msg); handled {
 			return res, err
 		}
@@ -432,4 +435,48 @@ func (r *Router) sendReply(ctx context.Context, targetID, content, subject strin
 	if targetAddr.SendFunc != nil {
 		_ = targetAddr.SendFunc(ctx, msg)
 	}
+}
+
+func (r *Router) sendToolNotice(ctx context.Context, msg Message, name string, args map[string]any) {
+	if !r.threadedToolNoticesEnabled(msg.Metadata.From) {
+		return
+	}
+
+	extra := make(map[string]any, len(msg.Metadata.Extra)+1)
+	for k, v := range msg.Metadata.Extra {
+		extra[k] = v
+	}
+	extra["msgtype"] = "notice"
+
+	r.sendReply(ctx, msg.Metadata.From, fmt.Sprintf("> Using tool: `%s%s`", name, formatToolArgs(args)), msg.Metadata.Subject, extra)
+}
+
+func (r *Router) threadedToolNoticesEnabled(sourceID string) bool {
+	r.mu.RLock()
+	addr, ok := r.addresses[sourceID]
+	r.mu.RUnlock()
+	if !ok || r.app == nil || !strings.EqualFold(addr.System, "matrix") {
+		return false
+	}
+
+	return r.app.Config.Matrix[addr.InstanceName].ThreadedTools
+}
+
+func formatToolArgs(args map[string]any) string {
+	if len(args) == 0 {
+		return ""
+	}
+
+	argList := make([]string, 0, len(args))
+	for k, v := range args {
+		n := fmt.Sprintf("%v", v)
+		if len(n) > maxToolArgLengthLog {
+			n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
+		} else {
+			n = fmt.Sprintf("%q", n)
+		}
+		argList = append(argList, fmt.Sprintf("%s: %v", k, n))
+	}
+
+	return "(" + strings.Join(argList, ", ") + ")"
 }

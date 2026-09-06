@@ -266,7 +266,8 @@ func (mc *MatrixConfig) submitToRouter(ctx context.Context, evt *event.Event, bo
 			To:      []string{"ai"},
 			Subject: "Matrix Message",
 			Extra: map[string]any{
-				"room_id": evt.RoomID.String(),
+				"room_id":  evt.RoomID.String(),
+				"event_id": evt.ID.String(),
 			},
 		},
 		OriginalSource: evt.Sender.String(),
@@ -445,12 +446,20 @@ func (mc *MatrixConfig) RegisterRouter(r *router.Router, instanceName string, de
 		SendFunc: func(ctx context.Context, msg router.Message) error {
 			mc.App.Logger().Info("Sending message via Matrix", "to", msg.Metadata.To, "content", msg.Content)
 			targetRoom := mc.DefaultRoomID()
+			threadEvent := id.EventID("")
+			msgType := event.MsgText
 			if msg.Metadata.Extra != nil {
 				if rID, ok := msg.Metadata.Extra["room_id"].(string); ok && rID != "" {
 					targetRoom = id.RoomID(rID)
 				}
+				if eID, ok := msg.Metadata.Extra["event_id"].(string); ok && eID != "" {
+					threadEvent = id.EventID(eID)
+				}
+				if mt, ok := msg.Metadata.Extra["msgtype"].(string); ok && mt == "notice" {
+					msgType = event.MsgNotice
+				}
 			}
-			mc.SendMessage(targetRoom, msg.Content)
+			mc.send(targetRoom, threadEvent, msgType, msg.Content)
 			return nil
 		},
 	})

@@ -209,3 +209,46 @@ func TestRouter_AIOnlyTargetAllowed(t *testing.T) {
 	})
 	require.NoError(t, err)
 }
+
+func TestRouter_ThreadedToolNoticeForMatrixSource(t *testing.T) {
+	ctx := context.Background()
+	a := app.NewApp()
+	a.Config.Matrix = map[string]app.MatrixConfig{"room1": {ThreadedTools: true}}
+	r := NewRouter(&mockAIClient{response: "Processed by AI"}, a)
+
+	var notices []Message
+	require.NoError(t, r.RegisterAddress(Address{
+		ID:           "room1@matrix",
+		InstanceName: "room1",
+		System:       "matrix",
+		Description:  "Source Matrix Room",
+		SendFunc: func(ctx context.Context, msg Message) error {
+			notices = append(notices, msg)
+			return nil
+		},
+	}))
+	require.NoError(t, r.RegisterAddress(Address{
+		ID:           "room2@matrix",
+		InstanceName: "room2",
+		System:       "matrix",
+		Description:  "Target Matrix Room",
+	}))
+
+	r.routeToAI(ctx, Message{
+		Metadata: Metadata{
+			From:    "room1@matrix",
+			To:      []string{"ai"},
+			Subject: "AI Question",
+			Extra: map[string]any{
+				"room_id":  "!room:id",
+				"event_id": "$event",
+			},
+		},
+		Content: "Help me",
+	})
+
+	require.NotEmpty(t, notices)
+	assert.Equal(t, "notice", notices[0].Metadata.Extra["msgtype"])
+	assert.Equal(t, "$event", notices[0].Metadata.Extra["event_id"])
+	assert.Contains(t, notices[0].Content, "> Using tool: `router_list_destinations`")
+}
