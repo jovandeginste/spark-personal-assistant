@@ -4,14 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
+	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mail"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/matrix"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	slogecho "github.com/samber/slog-echo"
 	"github.com/spf13/cobra"
 )
 
@@ -34,7 +40,7 @@ func (c *cli) routerCmd() *cobra.Command {
 				return err
 			}
 
-			if err := c.startWebServers(aiClient, r); err != nil {
+			if err := c.startWebServers(r); err != nil {
 				return err
 			}
 
@@ -72,7 +78,7 @@ func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *rou
 	return nil
 }
 
-func (c *cli) startWebServers(aiClient ai.Client, r *router.Router) error {
+func (c *cli) startWebServers(r *router.Router) error {
 	for instanceName, wCfg := range c.app.Config.Webserver {
 		if !wCfg.IsEnabled() {
 			c.app.Logger().Info("Web server is disabled in config", "instance", instanceName)
@@ -80,27 +86,74 @@ func (c *cli) startWebServers(aiClient ai.Client, r *router.Router) error {
 		}
 
 		c.app.Logger().Info("Initializing Web server...", "instance", instanceName)
-		for range c.app.Config.Matrix {
-			mc := matrix.MatrixConfig{App: c.app, InstanceName: instanceName}
-			mc.AIClient = aiClient
-			aiData, _ := c.app.BuildData()
-			mc.AIData = aiData
-			mc.ServeHTTP(instanceName)
-			break
-		}
 
+		webAddrID := instanceName + "@web"
 		if err := r.RegisterAddress(router.Address{
-			ID:           instanceName + "@web",
+			ID:           webAddrID,
 			InstanceName: instanceName,
 			System:       "web",
 			Description:  "Web Server Interface (" + instanceName + ")",
 			SendFunc: func(ctx context.Context, msg router.Message) error {
-				c.app.Logger().Warn("Web sending not yet supported", "content", msg.Content)
+				c.app.Logger().Info("Web message response", "content", msg.Content)
 				return nil
 			},
 		}); err != nil {
 			return err
 		}
+
+		e := echo.New()
+		e.Use(slogecho.New(c.app.Logger()))
+		e.Use(middleware.Recover())
+		e.HideBanner = true
+		e.HidePort = true
+
+		e.GET("/prompt", func(ec echo.Context) error {
+			prompt := ec.QueryParam("prompt")
+			if prompt == "" {
+				return ec.JSON(http.StatusBadRequest, map[string]string{"error": "prompt query parameter is required"})
+			}
+			return submitWebPrompt(ec, r, webAddrID, "Web Prompt", prompt)
+		})
+
+		e.POST("/prompt", func(ec echo.Context) error {
+			var payload struct {
+				Title   string         `json:"title"`
+				Message string         `json:"message"`
+				Source  string         `json:"source"`
+				Extra   map[string]any `json:"extra"`
+			}
+			if err := ec.Bind(&payload); err != nil {
+				return ec.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
+			}
+			if payload.Title == "" {
+				return ec.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
+			}
+
+			var prompt strings.Builder
+			prompt.WriteString(payload.Title + "\n\n" + payload.Message)
+			if payload.Source != "" {
+				prompt.WriteString("\n\nSource: " + payload.Source)
+			}
+			if len(payload.Extra) > 0 {
+				prompt.WriteString("\n\nExtra Metadata:\n")
+				for k, v := range payload.Extra {
+					prompt.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
+				}
+			}
+
+			return submitWebPrompt(ec, r, webAddrID, payload.Title, prompt.String())
+		})
+
+		bind := wCfg.Bind
+		if bind == "" {
+			bind = ":8080"
+		}
+
+		go func(srv *echo.Echo, addr string) {
+			if err := srv.Start(addr); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				c.app.Logger().Error("failed to start web server", "error", err)
+			}
+		}(e, bind)
 	}
 
 	return nil
@@ -172,4 +225,46 @@ func (c *cli) waitForShutdown() {
 
 	<-sigChan
 	c.app.Logger().Info("Shutting down router...")
+}
+
+func submitWebPrompt(ec echo.Context, r *router.Router, webAddrID, subject, content string) error {
+	respChan := make(chan string, 1)
+	replyInstance := fmt.Sprintf("web-%d", time.Now().UnixNano())
+	replyAddr := replyInstance + "@web"
+
+	err := r.RegisterAddress(router.Address{
+		ID:           replyAddr,
+		InstanceName: replyInstance,
+		System:       "web",
+		Description:  "Web Temporary Reply Address",
+		SendFunc: func(ctx context.Context, msg router.Message) error {
+			respChan <- msg.Content
+			return nil
+		},
+	})
+	if err != nil {
+		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	err = r.SubmitMessage(ec.Request().Context(), webAddrID, router.Message{
+		Metadata: router.Metadata{
+			From:    webAddrID,
+			To:      []string{"ai"},
+			Subject: subject,
+			Extra: map[string]any{
+				"reply_to": replyAddr,
+			},
+		},
+		Content: content,
+	})
+	if err != nil {
+		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+	}
+
+	select {
+	case reply := <-respChan:
+		return ec.String(http.StatusOK, reply)
+	case <-time.After(60 * time.Second):
+		return ec.JSON(http.StatusGatewayTimeout, map[string]string{"error": "timed out waiting for AI response"})
+	}
 }

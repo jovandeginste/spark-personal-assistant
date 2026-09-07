@@ -177,38 +177,45 @@ func (mc *MatrixConfig) sendResponse(roomID id.RoomID, eventID id.EventID, sende
 		mc.Client.UserTyping(context.Background(), roomID, false, 0)
 	}()
 
-	input = strings.TrimSpace(input)
-	if input == "" {
-		return nil
-	}
-
-	result, err := mc.parseInput(input, roomID.String())
+	result, err := mc.calculateInputResponse(roomID, eventID, sender, input)
 	if err != nil {
 		return err
 	}
 
 	if result != "" {
 		mc.sendMessage(roomID, result)
-		return nil
 	}
-
-	result, err = mc.calculateResponse(roomID, eventID, sender, input)
-	if err != nil {
-		return err
-	}
-
-	mc.sendMessage(roomID, result)
 
 	return nil
+}
+
+func (mc *MatrixConfig) calculateInputResponse(roomID id.RoomID, eventID id.EventID, sender id.UserID, input string) (string, error) {
+	input = strings.TrimSpace(input)
+	if input == "" {
+		return "", nil
+	}
+
+	result, err := mc.parseInput(input, roomID.String())
+	if err != nil {
+		return "", err
+	}
+
+	if result != "" {
+		return result, nil
+	}
+
+	return mc.calculateResponse(roomID, eventID, sender, input)
 }
 
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, sender id.UserID, input string) (string, error) {
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
-	_, err := mc.Client.SendReaction(context.Background(), roomID, eventID, "✨")
-	if err != nil {
-		mc.App.Logger().Error("Failed to send reaction", "error", err)
+	if mc.Client != nil && eventID != "" {
+		_, err := mc.Client.SendReaction(context.Background(), roomID, eventID, "✨")
+		if err != nil {
+			mc.App.Logger().Error("Failed to send reaction", "error", err)
+		}
 	}
 
 	tools, err := mc.App.GetMCPTools(context.Background(), roomID.String())
@@ -216,9 +223,29 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
 
+	// Add router tools if a router is configured/available
+	if mc.Router != nil {
+		tools = append(tools, mc.Router.MCPTools()...)
+	}
+
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
 	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+		if mc.Router != nil {
+			if res, handled, err := mc.Router.ExecuteTool(ctx, name, args, router.Message{
+				Metadata: router.Metadata{
+					From: mc.InstanceName + "@matrix",
+					To:   []string{"ai"},
+					Extra: map[string]any{
+						"room_id": roomID.String(),
+					},
+				},
+				Content: input,
+			}); handled {
+				return res, err
+			}
+		}
+
 		if mc.App.Config.Matrix[mc.InstanceName].ThreadedTools {
 			argsStr := formatToolArgs(args)
 			mc.sendNotice(roomID, eventID, fmt.Sprintf("> Using tool: `%s%s`", name, argsStr))
@@ -389,6 +416,10 @@ func (mc *MatrixConfig) InitChat() {
 }
 
 func (mc *MatrixConfig) send(roomID id.RoomID, eventID id.EventID, msgType event.MessageType, text string) {
+	if mc.msges == nil {
+		return
+	}
+
 	content := format.RenderMarkdown(text, true, true)
 	content.MsgType = msgType
 

@@ -318,6 +318,23 @@ func (r *Router) logMessage(msg *Message) {
 }
 
 func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
+	content := strings.TrimSpace(msg.Content)
+	if strings.HasPrefix(content, "!") {
+		cmdParts := strings.SplitN(strings.TrimPrefix(content, "!"), " ", 2)
+		if strings.EqualFold(cmdParts[0], "prompt") && len(cmdParts) > 1 {
+			promptName := strings.TrimSpace(cmdParts[1])
+			if r.app != nil {
+				if promptBody, ok := r.app.Config.Prompts[promptName]; ok {
+					msg.Content = promptBody
+				} else {
+					msg.Content = fmt.Sprintf("Prompt '%s' not found in configuration", promptName)
+					r.sendReply(ctx, msg.Metadata.From, msg.Content, msg.Metadata.Subject, msg.Metadata.Extra)
+					return
+				}
+			}
+		}
+	}
+
 	needsAI := slices.ContainsFunc(msg.Metadata.To, isAIIdentifier)
 	if len(msg.Metadata.To) == 0 && !isAIIdentifier(msg.Metadata.From) {
 		needsAI = true
@@ -402,14 +419,21 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 		return r.app.ExecuteMCPTool(ctx, name, args, roomID)
 	}, nil)
 
+	replyTarget := msg.Metadata.From
+	if msg.Metadata.Extra != nil {
+		if rTo, ok := msg.Metadata.Extra["reply_to"].(string); ok && rTo != "" {
+			replyTarget = rTo
+		}
+	}
+
 	if err != nil {
 		r.app.Logger().Error("Failed to get AI response", "error", err)
-		r.sendReply(ctx, msg.Metadata.From, "Sorry, I encountered an error processing your request.", msg.Metadata.Subject, msg.Metadata.Extra)
+		r.sendReply(ctx, replyTarget, "Sorry, I encountered an error processing your request.", msg.Metadata.Subject, msg.Metadata.Extra)
 		return
 	}
 
 	if response != "" {
-		r.sendReply(ctx, msg.Metadata.From, response, msg.Metadata.Subject, msg.Metadata.Extra)
+		r.sendReply(ctx, replyTarget, response, msg.Metadata.Subject, msg.Metadata.Extra)
 	}
 }
 

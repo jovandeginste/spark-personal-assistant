@@ -50,11 +50,12 @@ func (mc *MatrixConfig) prompt(c echo.Context) error {
 	prompt := c.QueryParam("prompt")
 	mc.sendNotice(mc.DefaultRoomID(), "", "Parsing prompt: "+prompt)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", prompt); err != nil {
+	response, err := mc.calculateInputResponse(mc.DefaultRoomID(), "", "web", prompt)
+	if err != nil {
 		return c.JSON(http.StatusBadRequest, err)
 	}
 
-	return c.String(http.StatusOK, "Prompt sent")
+	return c.String(http.StatusOK, response)
 }
 
 type PromptPayload struct {
@@ -91,11 +92,12 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 
 	mc.sendNotice(mc.DefaultRoomID(), "", "Parsing prompt from "+payload.Source+": "+payload.Title)
 
-	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", prompt.String()); err != nil {
+	response, err := mc.calculateInputResponse(mc.DefaultRoomID(), "", "web", prompt.String())
+	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}
 
-	return c.String(http.StatusOK, "Prompt sent")
+	return c.String(http.StatusOK, response)
 }
 
 func (mc *MatrixConfig) switchPersona(c echo.Context) error {
