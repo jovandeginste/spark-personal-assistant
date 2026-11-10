@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -91,6 +92,7 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 			baseURL:   baseURL,
 			assistant: ac,
 			logger:    l,
+			sessionID: "ses_" + rand.Text(),
 		}
 	default:
 		return nil, fmt.Errorf("unknown type: %s", cc.Type)

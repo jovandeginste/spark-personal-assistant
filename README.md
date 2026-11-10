@@ -131,7 +131,8 @@ llm:
   api_key: your-opencode-api-key
 ```
 
-For a Go subscription, point `base_url` at the Go endpoint instead:
+For a Go subscription, point `base_url` at the Go endpoint instead. Spark sends
+a stable `x-opencode-session` header for every request, as Go requires.
 
 ```yaml
 llm:

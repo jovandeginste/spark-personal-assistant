@@ -20,6 +20,7 @@ type openaiClient struct {
 	baseURL   string
 	assistant *AssistantConfig
 	logger    *slog.Logger
+	sessionID string
 }
 
 func (c openaiClient) Logger() *slog.Logger {
@@ -173,6 +174,10 @@ func (c openaiClient) newOpenAIClient() openai.Client {
 
 	if c.baseURL != "" {
 		opts = append(opts, option.WithBaseURL(c.baseURL))
+	}
+
+	if c.sessionID != "" {
+		opts = append(opts, option.WithHeader("x-opencode-session", c.sessionID))
 	}
 
 	return openai.NewClient(opts...)
