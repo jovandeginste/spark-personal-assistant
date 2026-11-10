@@ -21,8 +21,8 @@ The following summaries are currently pre-defined:
 You can also start a conversation with Spark, to ask it questions about your
 events.
 
-Spark supports Google Gemini, OpenAI ChatGPT, and Ollama. All backends use the
-OpenAI-compatible API format, making configuration simple.
+Spark supports Google Gemini, OpenAI ChatGPT, Ollama, and OpenCode. All backends
+use the OpenAI-compatible API format, making configuration simple.
 
 ## Installation
 
@@ -116,6 +116,29 @@ llm:
   type: openai
   model: gpt-4o
   api_key: your-openai-api-key
+```
+
+#### OpenCode
+
+Uses the [OpenCode Console](https://opencode.ai/docs/zen/) gateway, which offers
+an OpenAI-compatible endpoint. Create an API key in the console and use the
+model IDs from the [model list](https://opencode.ai/docs/zen/#model-list).
+
+```yaml
+llm:
+  type: opencode
+  model: deepseek-v4.1-flash
+  api_key: your-opencode-api-key
+```
+
+For a Go subscription, point `base_url` at the Go endpoint instead:
+
+```yaml
+llm:
+  type: opencode
+  model: deepseek-v4.1-flash
+  api_key: your-opencode-api-key
+  base_url: https://opencode.ai/inference/go/openai/v1/
 ```
 
 #### Custom OpenAI-compatible Provider

@@ -80,6 +80,18 @@ func NewClient(cc *AIConfig, ac *AssistantConfig, l *slog.Logger) (Client, error
 			assistant: ac,
 			logger:    l,
 		}
+	case "opencode":
+		baseURL := cc.BaseURL
+		if baseURL == "" {
+			baseURL = "https://opencode.ai/inference/openai/v1/"
+		}
+		c = &openaiClient{
+			apiKey:    cc.APIKey,
+			model:     cc.Model,
+			baseURL:   baseURL,
+			assistant: ac,
+			logger:    l,
+		}
 	default:
 		return nil, fmt.Errorf("unknown type: %s", cc.Type)
 	}

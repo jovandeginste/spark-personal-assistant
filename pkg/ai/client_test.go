@@ -54,6 +54,17 @@ func TestNewClient(t *testing.T) {
 			expectedClientType: (*openaiClient)(nil), // Expected concrete type
 		},
 		{
+			name: "Create OpenCode client",
+			aiConfig: &AIConfig{
+				Type:   "opencode",
+				APIKey: "opencode-key",
+				Model:  "deepseek-v4.1-flash",
+			},
+			assistantConfig:    assistantConfig,
+			expectError:        false,
+			expectedClientType: (*openaiClient)(nil), // Expected concrete type
+		},
+		{
 			name: "Unknown AI type",
 			aiConfig: &AIConfig{
 				Type: "unknown",
