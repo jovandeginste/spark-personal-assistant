@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/TwiN/gocache/v2"
@@ -28,6 +29,9 @@ type Service struct {
 	memoryCache *gocache.Cache
 	storageDir  string
 	ttl         time.Duration
+
+	// mu allows concurrent reads and writes, but makes Clear exclusive.
+	mu sync.RWMutex
 }
 
 // NewService creates a new caching service
@@ -68,6 +72,9 @@ func (s *Service) Set(key string, value []byte) {
 
 // GetFile retrieves the path to a cached file if it exists and hasn't expired
 func (s *Service) GetFile(key string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	filename := s.getFilePath(key)
 
 	info, err := os.Stat(filename)
@@ -86,6 +93,9 @@ func (s *Service) GetFile(key string) (string, bool) {
 
 // SetFile writes data to a file in the cache directory and returns the path
 func (s *Service) SetFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	filename := s.getFilePath(key)
 	if filename == "" {
 		return "", fmt.Errorf("invalid cache key: %s", key)
@@ -139,6 +149,9 @@ func (s *Service) ForceUpdateFile(key string, dataProvider func() (io.ReadCloser
 
 // RemoveFile removes a file from the cache by key
 func (s *Service) RemoveFile(key string) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
 	filename := s.getFilePath(key)
 	if filename == "" {
 		return fmt.Errorf("invalid cache key: %s", key)
@@ -153,7 +166,11 @@ func (s *Service) RemoveFile(key string) error {
 
 // Clear clears both in-memory and file-based caches
 func (s *Service) Clear() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	s.memoryCache.Clear()
+
 	return os.RemoveAll(s.storageDir)
 }
 

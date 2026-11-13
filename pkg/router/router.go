@@ -443,7 +443,9 @@ func (r *Router) sendReply(ctx context.Context, targetID, content, subject strin
 	}
 
 	if targetAddr.SendFunc != nil {
-		_ = targetAddr.SendFunc(ctx, msg)
+		if err := targetAddr.SendFunc(ctx, msg); err != nil && r.app != nil && r.app.Logger() != nil {
+			r.app.Logger().Error("Failed to send reply", "target", targetAddr.ID, "error", err)
+		}
 	}
 }
 

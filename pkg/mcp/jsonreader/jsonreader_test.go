@@ -6,6 +6,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -319,6 +320,50 @@ func TestLoadAllEventsReportsFailures(t *testing.T) {
 	events, failed := module.loadAllEvents(config)
 	assert.Empty(t, events)
 	assert.Equal(t, []string{"Broken Source: boom"}, failed)
+}
+
+func TestLoadAllEventsConcurrentDuplicateSources(t *testing.T) {
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	generic.GetBody = func(string) ([]byte, error) {
+		return []byte(`[{"Date":"2026-01-01T00:00:00Z","Summary":"Event"}]`), nil
+	}
+
+	config := Config{
+		Sources: []Source{
+			{Name: "A", URL: "http://example.com/shared.json"},
+			{Name: "B", URL: "http://example.com/shared.json"},
+		},
+	}
+
+	module := New(config, nil, slog.Default())
+
+	const goroutines = 20
+
+	var wg sync.WaitGroup
+
+	results := make(chan []Event, goroutines)
+
+	for range goroutines {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			events, _ := module.loadAllEvents(config)
+			results <- events
+		}()
+	}
+
+	wg.Wait()
+	close(results)
+
+	for events := range results {
+		require.Len(t, events, 2)
+		assert.Equal(t, "A", events[0].Source)
+		assert.Equal(t, "B", events[1].Source)
+	}
 }
 
 func TestHandleEventsByQueryNotesFailures(t *testing.T) {

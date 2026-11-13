@@ -16,6 +16,9 @@ func (mc *MatrixConfig) performCommandPrompt(name, roomID string) (string, error
 	mc.aiDataMu.Lock()
 	defer mc.aiDataMu.Unlock()
 
+	ctx, cancel := context.WithTimeout(context.Background(), aiRequestTimeout)
+	defer cancel()
+
 	promptBody, ok := mc.App.Config.Prompts[name]
 	if !ok {
 		return fmt.Sprintf("Prompt '%s' not found in configuration", name), nil
@@ -24,12 +27,12 @@ func (mc *MatrixConfig) performCommandPrompt(name, roomID string) (string, error
 	mc.AIData.ResetHistory(roomID)
 	mc.AIData.EmployerQuestion = []string{promptBody}
 
-	tools, err := mc.App.GetMCPTools(context.Background())
+	tools, err := mc.App.GetMCPTools(ctx)
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
 
-	return mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+	return mc.AIClient.GenerateWithTools(ctx, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		return mc.App.ExecuteMCPTool(ctx, name, args)
 	}, mc.AIData.FileURIs)
 }
@@ -123,7 +126,10 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 func (mc *MatrixConfig) performCommandUpdate() (string, error) {
 	mc.sendNotice(mc.DefaultRoomID(), "", "Updating MCP servers...")
 
-	results := mc.App.UpdateMCPServers(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), aiRequestTimeout)
+	defer cancel()
+
+	results := mc.App.UpdateMCPServers(ctx)
 
 	var out strings.Builder
 	out.WriteString("Update results:\n")

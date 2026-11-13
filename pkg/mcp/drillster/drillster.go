@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -27,7 +28,9 @@ type Drillster struct {
 	mcp.BaseModule
 	config Config
 	client *http.Client
-	token  string
+
+	mu    sync.Mutex
+	token string
 }
 
 func New(config Config, logger *slog.Logger) *Drillster {
@@ -181,6 +184,9 @@ func (d *Drillster) login() error {
 }
 
 func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult, any, error) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
 	if d.token == "" {
 		if err := d.login(); err != nil {
 			return d.textResult(fmt.Sprintf("Error logging in: %v", err), true), nil, nil
@@ -207,20 +213,26 @@ func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult,
 		d.token = ""
 		// Optionally we could retry once here, but let's keep it simple for now and let the next user turn retry.
 		// Actually, let's retry once immediately for better UX.
-		if err := d.login(); err == nil {
-			req.Header.Set("Authorization", "Bearer "+d.token)
-			if resp, err = d.client.Do(req); err == nil {
-				defer resp.Body.Close()
-			} else {
-				// Retry failed
-				return d.textResult(fmt.Sprintf("Error executing request after re-login: %v", err), true), nil, nil
-			}
+		if err := d.login(); err != nil {
+			return d.textResult(fmt.Sprintf("Error re-logging in: %v", err), true), nil, nil
 		}
+
+		req.Header.Set("Authorization", "Bearer "+d.token)
+
+		resp, err = d.client.Do(req)
+		if err != nil {
+			return d.textResult(fmt.Sprintf("Error executing request after re-login: %v", err), true), nil, nil
+		}
+		defer resp.Body.Close()
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return d.textResult(fmt.Sprintf("Error reading response body: %v", err), true), nil, nil
+	}
+
+	if resp.StatusCode >= http.StatusBadRequest {
+		return d.textResult(fmt.Sprintf("Drillster returned %s: %s", resp.Status, string(body)), true), nil, nil
 	}
 
 	return d.textResult(string(body), false), nil, nil

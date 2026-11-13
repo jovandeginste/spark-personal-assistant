@@ -27,6 +27,8 @@ const (
 	// legacyCryptoPassphrase keeps existing crypto stores readable when no
 	// passphrase is configured. New setups should set crypto_passphrase.
 	legacyCryptoPassphrase = "meow"
+
+	aiRequestTimeout = 5 * time.Minute
 )
 
 func init() {
@@ -222,17 +224,20 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 	mc.aiDataMu.Lock()
 	defer mc.aiDataMu.Unlock()
 
+	ctx, cancel := context.WithTimeout(context.Background(), aiRequestTimeout)
+	defer cancel()
+
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 
 	if mc.Client != nil && eventID != "" {
-		_, err := mc.Client.SendReaction(context.Background(), roomID, eventID, "✨")
+		_, err := mc.Client.SendReaction(ctx, roomID, eventID, "✨")
 		if err != nil {
 			mc.App.Logger().Error("Failed to send reaction", "error", err)
 		}
 	}
 
-	tools, err := mc.App.GetMCPTools(context.Background())
+	tools, err := mc.App.GetMCPTools(ctx)
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -244,7 +249,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 
 	mc.App.Logger().Info("Using tools", "count", len(tools))
 
-	md, err := mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
+	md, err := mc.AIClient.GenerateWithTools(ctx, mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		if mc.Router != nil {
 			if res, handled, err := mc.Router.ExecuteTool(ctx, name, args, router.Message{
 				Metadata: router.Metadata{

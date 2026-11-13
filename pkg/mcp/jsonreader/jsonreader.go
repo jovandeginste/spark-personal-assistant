@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -168,7 +169,9 @@ func (m *Module) loadAllEvents(config Config) ([]Event, []string) {
 			continue
 		}
 
-		// Tag with source name
+		// Tag with source name on a private copy; singleflight may share the
+		// slice between concurrent callers.
+		events = slices.Clone(events)
 		for i := range events {
 			events[i].Source = source.Name
 		}

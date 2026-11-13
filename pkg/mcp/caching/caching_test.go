@@ -263,6 +263,44 @@ func TestSetFileWithSymlinkedStorageDir(t *testing.T) {
 	assert.Equal(t, "data", string(content))
 }
 
+func TestClearWaitsForSetFile(t *testing.T) {
+	tempDir := t.TempDir()
+	service, err := NewService(tempDir, time.Hour)
+	require.NoError(t, err)
+
+	started := make(chan struct{})
+	release := make(chan struct{})
+	setDone := make(chan error, 1)
+	clearDone := make(chan error, 1)
+
+	go func() {
+		_, err := service.SetFile("key", func() (io.ReadCloser, error) {
+			close(started)
+			<-release
+
+			return io.NopCloser(strings.NewReader("data")), nil
+		})
+		setDone <- err
+	}()
+
+	<-started
+
+	go func() {
+		clearDone <- service.Clear()
+	}()
+
+	select {
+	case err := <-clearDone:
+		t.Fatalf("Clear returned while SetFile was still writing: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	close(release)
+
+	require.NoError(t, <-setDone)
+	require.NoError(t, <-clearDone)
+}
+
 func TestGetFileRemovesExpiredFile(t *testing.T) {
 	tempDir := t.TempDir()
 	service, err := NewService(tempDir, time.Millisecond)
