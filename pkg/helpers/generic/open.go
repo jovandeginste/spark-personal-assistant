@@ -81,7 +81,13 @@ func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
 }
 
 func readHTTPWithClient(u *url.URL, headers map[string]string, client *http.Client) (io.ReadCloser, error) {
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	uri := u.String()
+
+	if err := checkCooldown(uri); err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, uri, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -93,13 +99,19 @@ func readHTTPWithClient(u *url.URL, headers map[string]string, client *http.Clie
 
 	resp, err := client.Do(req)
 	if err != nil {
+		markFailure(uri)
+
 		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
 		resp.Body.Close() // Close the body on non-OK status
+		markFailure(uri)
+
 		return nil, fmt.Errorf("HTTP request failed with status: %s", resp.Status)
 	}
+
+	clearFailure(uri)
 
 	return resp.Body, nil
 }

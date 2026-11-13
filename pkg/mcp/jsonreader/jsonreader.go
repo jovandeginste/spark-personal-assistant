@@ -84,7 +84,7 @@ func (m *Module) handleEventsByDate(ctx context.Context, request *mcp.CallToolRe
 
 	logger.Debug("Search json events by date", "params", params)
 
-	events := m.loadAllEvents(config)
+	events, failed := m.loadAllEvents(config)
 
 	filtered, err := m.filterEventsByDate(events, params)
 	if err != nil {
@@ -93,14 +93,10 @@ func (m *Module) handleEventsByDate(ctx context.Context, request *mcp.CallToolRe
 	}
 
 	if len(filtered) == 0 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "No events found matching the date criteria."},
-			},
-		}, nil, nil
+		return m.textResult(withFailureNote("No events found matching the date criteria.", failed)), nil, nil
 	}
 
-	return m.formatEvents(filtered)
+	return m.formatEvents(filtered, failed)
 }
 
 func (m *Module) handleEventsByQuery(ctx context.Context, request *mcp.CallToolRequest, params queryParams) (*mcp.CallToolResult, any, error) {
@@ -109,23 +105,22 @@ func (m *Module) handleEventsByQuery(ctx context.Context, request *mcp.CallToolR
 
 	logger.Debug("Search json events by query", "query", params.Query)
 
-	events := m.loadAllEvents(config)
+	events, failed := m.loadAllEvents(config)
 
 	filtered := m.filterEventsByQuery(events, params.Query)
 
 	if len(filtered) == 0 {
-		return &mcp.CallToolResult{
-			Content: []mcp.Content{
-				&mcp.TextContent{Text: "No events found matching the query."},
-			},
-		}, nil, nil
+		return m.textResult(withFailureNote("No events found matching the query.", failed)), nil, nil
 	}
 
-	return m.formatEvents(filtered)
+	return m.formatEvents(filtered, failed)
 }
 
-func (m *Module) loadAllEvents(config Config) []Event {
-	var allEvents []Event
+func (m *Module) loadAllEvents(config Config) ([]Event, []string) {
+	var (
+		allEvents []Event
+		failed    []string
+	)
 
 	for _, source := range config.Sources {
 		key := "jsonreader:" + source.URL
@@ -145,6 +140,7 @@ func (m *Module) loadAllEvents(config Config) []Event {
 			data, err = generic.GetBody(source.URL)
 			if err != nil {
 				m.Logger().Warn("Failed to read source", "name", source.Name, "url", source.URL, "error", err)
+				failed = append(failed, fmt.Sprintf("%s: %v", source.Name, err))
 
 				continue
 			}
@@ -153,6 +149,7 @@ func (m *Module) loadAllEvents(config Config) []Event {
 		var events []Event
 		if err := json.Unmarshal(data, &events); err != nil {
 			m.Logger().Warn("Failed to parse source json", "name", source.Name, "error", err)
+			failed = append(failed, fmt.Sprintf("%s: invalid JSON: %v", source.Name, err))
 
 			continue
 		}
@@ -169,7 +166,7 @@ func (m *Module) loadAllEvents(config Config) []Event {
 		allEvents = append(allEvents, events...)
 	}
 
-	return allEvents
+	return allEvents, failed
 }
 
 func (m *Module) filterEventsByDate(events []Event, params dateParams) ([]Event, error) {
@@ -238,15 +235,44 @@ func (m *Module) filterEventsByQuery(events []Event, queries []string) []Event {
 	return results
 }
 
-func (m *Module) formatEvents(events []Event) (*mcp.CallToolResult, any, error) {
+func (m *Module) textResult(text string) *mcp.CallToolResult {
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: text},
+		},
+	}
+}
+
+func withFailureNote(message string, failed []string) string {
+	if note := failedSourcesNote(failed); note != "" {
+		message += " " + note
+	}
+
+	return message
+}
+
+func failedSourcesNote(failed []string) string {
+	if len(failed) == 0 {
+		return ""
+	}
+
+	return fmt.Sprintf("Could not fetch: %s.", strings.Join(failed, ", "))
+}
+
+func (m *Module) formatEvents(events []Event, failed []string) (*mcp.CallToolResult, any, error) {
 	// Re-marshal to JSON for the LLM
 	j, err := json.Marshal(events)
 	if err != nil {
 		return nil, nil, err
 	}
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: string(j)},
-		},
-	}, nil, nil
+
+	content := []mcp.Content{
+		&mcp.TextContent{Text: string(j)},
+	}
+
+	if note := failedSourcesNote(failed); note != "" {
+		content = append(content, &mcp.TextContent{Text: note})
+	}
+
+	return &mcp.CallToolResult{Content: content}, nil, nil
 }

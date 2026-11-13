@@ -110,10 +110,10 @@ func (m *Module) handleListEvents(ctx context.Context, request *mcp.CallToolRequ
 
 	if len(allEvents) == 0 {
 		logger.Info("No events found", "start_date", params.StartDate, "end_date", params.EndDate)
-		return m.textResult("No events found for this time range." + failedCalendarsNote(failed)), nil, nil
+		return m.textResult(withFailureNote("No events found for this time range.", failed)), nil, nil
 	}
 
-	return m.eventsJSONResult(allEvents)
+	return m.eventsJSONResult(allEvents, failed)
 }
 
 func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRequest, params searchParams) (*mcp.CallToolResult, any, error) {
@@ -129,10 +129,10 @@ func (m *Module) handleSearchEvents(ctx context.Context, request *mcp.CallToolRe
 
 	if len(allEvents) == 0 {
 		logger.Info("No matching events found", "query", params.Query)
-		return m.textResult("No matching events found." + failedCalendarsNote(failed)), nil, nil
+		return m.textResult(withFailureNote("No matching events found.", failed)), nil, nil
 	}
 
-	return m.eventsJSONResult(allEvents)
+	return m.eventsJSONResult(allEvents, failed)
 }
 
 func (m *Module) handleUpdateCalendar(ctx context.Context, request *mcp.CallToolRequest, params updateParams) (*mcp.CallToolResult, any, error) {
@@ -211,11 +211,19 @@ func collectEvents(logger *slog.Logger, calendars []Calendar, failureMessage str
 			continue
 		}
 
-		failed = append(failed, calendars[i].Name)
+		failed = append(failed, fmt.Sprintf("%s: %v", calendars[i].Name, err))
 		logger.Error(failureMessage, "calendar", calendars[i].Name, "error", err)
 	}
 
 	return allEvents, failed
+}
+
+func withFailureNote(message string, failed []string) string {
+	if note := failedCalendarsNote(failed); note != "" {
+		message += " " + note
+	}
+
+	return message
 }
 
 func failedCalendarsNote(failed []string) string {
@@ -223,7 +231,7 @@ func failedCalendarsNote(failed []string) string {
 		return ""
 	}
 
-	return fmt.Sprintf(" Could not fetch: %s.", strings.Join(failed, ", "))
+	return fmt.Sprintf("Could not fetch: %s.", strings.Join(failed, ", "))
 }
 
 // runConcurrently calls fn for every index below count, running at most
@@ -377,14 +385,22 @@ func (m *Module) textResult(text string) *mcp.CallToolResult {
 	}
 }
 
-func (m *Module) eventsJSONResult(events []Event) (*mcp.CallToolResult, any, error) {
+func (m *Module) eventsJSONResult(events []Event, failed []string) (*mcp.CallToolResult, any, error) {
 	jsonEvents, err := json.Marshal(events)
 	if err != nil {
 		m.Logger().Error("Failed to marshal events", "error", err)
 		return nil, nil, fmt.Errorf("failed to marshal events: %w", err)
 	}
 
-	return m.textResult(string(jsonEvents)), nil, nil
+	content := []mcp.Content{
+		&mcp.TextContent{Text: string(jsonEvents)},
+	}
+
+	if note := failedCalendarsNote(failed); note != "" {
+		content = append(content, &mcp.TextContent{Text: note})
+	}
+
+	return &mcp.CallToolResult{Content: content}, nil, nil
 }
 
 func (m *Module) parseCalendar(cal Calendar, start, end time.Time) (*gocal.Gocal, error) {

@@ -67,29 +67,41 @@ func (t *Twizzit) registerGetActivitiesInfo(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetActivitiesInfoParams) (*sdk.CallToolResult, any, error) {
-		var allDetails []any
+		var (
+			allDetails []any
+			failed     []string
+		)
 
 		for _, id := range params.ActivityIDs {
 			u := fmt.Sprintf("https://app.twizzit.com/v2/activity/details?activity=%d&view=info", id)
 			result, _, err := t.makeRequest("GET", u)
 			if err != nil {
-				// We skip errors for individual activities to allow partial success
+				// Skip this activity but tell the caller it is missing.
+				failed = append(failed, fmt.Sprintf("activity %d: %v", id, err))
+
 				continue
 			}
 
 			if len(result.Content) == 0 {
+				failed = append(failed, fmt.Sprintf("activity %d: empty response", id))
+
 				continue
 			}
 
 			textContent, ok := result.Content[0].(*sdk.TextContent)
 			if !ok {
+				failed = append(failed, fmt.Sprintf("activity %d: unexpected content type", id))
+
 				continue
 			}
 
 			details, err := parseActivityDetails(textContent.Text)
 			if err != nil {
+				failed = append(failed, fmt.Sprintf("activity %d: %v", id, err))
+
 				continue
 			}
+
 			allDetails = append(allDetails, details)
 		}
 
@@ -98,13 +110,17 @@ func (t *Twizzit) registerGetActivitiesInfo(server *sdk.Server) {
 			return nil, nil, fmt.Errorf("failed to marshal activity details: %w", err)
 		}
 
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: string(detailsJSON),
-				},
+		content := []sdk.Content{
+			&sdk.TextContent{
+				Text: string(detailsJSON),
 			},
-		}, nil, nil
+		}
+
+		if note := failureNote(failed); note != "" {
+			content = append(content, &sdk.TextContent{Text: note})
+		}
+
+		return &sdk.CallToolResult{Content: content}, nil, nil
 	}
 
 	sdk.AddTool(server, tool, handler)
@@ -217,7 +233,7 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetSubscriptionByFormIdParams) (*sdk.CallToolResult, any, error) {
-		entries, err := t.fetchSubscriptionEntries(params.FormID)
+		entries, failed, err := t.fetchSubscriptionEntries(params.FormID)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -227,24 +243,34 @@ func (t *Twizzit) registerGetSubscriptionByFormId(server *sdk.Server) {
 			return nil, nil, fmt.Errorf("failed to marshal entries: %w", err)
 		}
 
-		return textResult(string(entriesJSON), false), nil, nil
+		content := []sdk.Content{
+			&sdk.TextContent{Text: string(entriesJSON)},
+		}
+
+		if note := failureNote(failed); note != "" {
+			content = append(content, &sdk.TextContent{Text: note})
+		}
+
+		return &sdk.CallToolResult{Content: content}, nil, nil
 	}
 
 	sdk.AddTool(server, tool, handler)
 }
 
-func (t *Twizzit) fetchSubscriptionEntries(formID int) ([]FormEntry, error) {
+func (t *Twizzit) fetchSubscriptionEntries(formID int) ([]FormEntry, []string, error) {
 	searchResultID, err := t.fetchSearchResultID(formID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	entryIDs, err := t.fetchEntryIDs(formID, searchResultID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return t.fetchEntryDetails(formID, entryIDs), nil
+	entries, failed := t.fetchEntryDetails(formID, entryIDs)
+
+	return entries, failed, nil
 }
 
 func (t *Twizzit) fetchSearchResultID(formID int) (string, error) {
@@ -298,18 +324,23 @@ func (t *Twizzit) fetchEntryIDs(formID int, searchResultID string) ([]int, error
 	return entryIDs, nil
 }
 
-func (t *Twizzit) fetchEntryDetails(formID int, entryIDs []int) []FormEntry {
+func (t *Twizzit) fetchEntryDetails(formID int, entryIDs []int) ([]FormEntry, []string) {
 	entries := make([]FormEntry, 0, len(entryIDs))
+	failed := make([]string, 0, len(entryIDs))
 
 	for _, id := range entryIDs {
 		entryURL := fmt.Sprintf("https://app.twizzit.com/v2/ajax/form/%d/entry?entryId=%d", formID, id)
 		entryResult, _, err := t.makeRequest("GET", entryURL)
 		if err != nil {
+			failed = append(failed, fmt.Sprintf("entry %d: %v", id, err))
+
 			continue
 		}
 
 		entryText, err := getResultText(entryResult)
 		if err != nil {
+			failed = append(failed, fmt.Sprintf("entry %d: %v", id, err))
+
 			continue
 		}
 
@@ -319,7 +350,7 @@ func (t *Twizzit) fetchEntryDetails(formID int, entryIDs []int) []FormEntry {
 		})
 	}
 
-	return entries
+	return entries, failed
 }
 
 func getResultText(result *sdk.CallToolResult) (string, error) {
@@ -413,21 +444,30 @@ func (t *Twizzit) registerGetContactsInfo(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetContactsInfoParams) (*sdk.CallToolResult, any, error) {
-		var allContacts []ContactInfo
+		var (
+			allContacts []ContactInfo
+			failed      []string
+		)
 
 		for _, id := range params.ContactIDs {
 			u := fmt.Sprintf("https://app.twizzit.com/v2/ajax/clubmanager/profile/contact/modal?contactId=%d", id)
 			result, _, err := t.makeRequest("GET", u)
 			if err != nil {
+				failed = append(failed, fmt.Sprintf("contact %d: %v", id, err))
+
 				continue
 			}
 
 			if len(result.Content) == 0 {
+				failed = append(failed, fmt.Sprintf("contact %d: empty response", id))
+
 				continue
 			}
 
 			textContent, ok := result.Content[0].(*sdk.TextContent)
 			if !ok {
+				failed = append(failed, fmt.Sprintf("contact %d: unexpected content type", id))
+
 				continue
 			}
 
@@ -453,13 +493,17 @@ func (t *Twizzit) registerGetContactsInfo(server *sdk.Server) {
 			return nil, nil, fmt.Errorf("failed to marshal contacts: %w", err)
 		}
 
-		return &sdk.CallToolResult{
-			Content: []sdk.Content{
-				&sdk.TextContent{
-					Text: string(contactsJSON),
-				},
+		content := []sdk.Content{
+			&sdk.TextContent{
+				Text: string(contactsJSON),
 			},
-		}, nil, nil
+		}
+
+		if note := failureNote(failed); note != "" {
+			content = append(content, &sdk.TextContent{Text: note})
+		}
+
+		return &sdk.CallToolResult{Content: content}, nil, nil
 	}
 
 	sdk.AddTool(server, tool, handler)

@@ -10,9 +10,26 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
+	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestEventsJSONResultNotesFailures(t *testing.T) {
+	module := &Module{}
+	module.SetLogger(slog.Default())
+
+	result, _, err := module.eventsJSONResult(
+		[]Event{{Summary: "Event"}},
+		[]string{"Personal: HTTP request failed with status: 500"},
+	)
+	require.NoError(t, err)
+	require.Len(t, result.Content, 2)
+
+	note, ok := result.Content[1].(*sdk.TextContent)
+	require.True(t, ok)
+	assert.Contains(t, note.Text, "Could not fetch: Personal: HTTP request failed with status: 500")
+}
 
 func TestFetchAndCacheICS(t *testing.T) {
 	// 1. Setup mock server

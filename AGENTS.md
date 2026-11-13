@@ -117,6 +117,10 @@ golangci-lint. The lint workflow runs without `--fix`.
 - Matrix `AIData` is shared between sync and HTTP handlers and is protected by
   a mutex.
 - Reminder callbacks have a 30-second timeout.
+- HTTP resources that fail are not retried for 5 minutes; this is implemented
+  in `pkg/helpers/generic`.
+- Tools that can return partial results (iCal, JSON sources, Twizzit) append
+  a `Could not fetch: ...` note to the tool response.
 - Logging uses `log/slog`; the MCP servers use JSON handlers.
 
 ## Tests and lint

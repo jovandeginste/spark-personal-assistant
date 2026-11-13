@@ -3,6 +3,7 @@ package jsonreader
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"os"
 	"testing"
@@ -265,7 +266,7 @@ func TestLoadAllEvents_ErrorHandling(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	module := New(config, nil, logger)
 
-	events := module.loadAllEvents(config)
+	events, _ := module.loadAllEvents(config)
 	assert.Empty(t, events)
 }
 
@@ -291,10 +292,56 @@ func TestLoadAllEventsCachesSources(t *testing.T) {
 
 	module := New(config, cache, slog.Default())
 
-	events := module.loadAllEvents(config)
+	events, _ := module.loadAllEvents(config)
 	require.Len(t, events, 3)
 
-	events = module.loadAllEvents(config)
+	events, _ = module.loadAllEvents(config)
 	require.Len(t, events, 3)
 	assert.Equal(t, 1, calls)
+}
+
+func TestLoadAllEventsReportsFailures(t *testing.T) {
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	generic.GetBody = func(string) ([]byte, error) {
+		return nil, errors.New("boom")
+	}
+
+	config := Config{
+		Sources: []Source{
+			{Name: "Broken Source", URL: "http://example.com/broken.json"},
+		},
+	}
+
+	module := New(config, nil, slog.Default())
+
+	events, failed := module.loadAllEvents(config)
+	assert.Empty(t, events)
+	assert.Equal(t, []string{"Broken Source: boom"}, failed)
+}
+
+func TestHandleEventsByQueryNotesFailures(t *testing.T) {
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	generic.GetBody = func(string) ([]byte, error) {
+		return nil, errors.New("boom")
+	}
+
+	config := Config{
+		Sources: []Source{
+			{Name: "Broken Source", URL: "http://example.com/broken.json"},
+		},
+	}
+
+	module := New(config, nil, slog.Default())
+
+	result, _, err := module.handleEventsByQuery(context.Background(), nil, queryParams{Query: []string{"anything"}})
+	require.NoError(t, err)
+	require.Len(t, result.Content, 1)
+
+	text, ok := result.Content[0].(*mcp.TextContent)
+	require.True(t, ok)
+	assert.Contains(t, text.Text, "Could not fetch: Broken Source: boom")
 }

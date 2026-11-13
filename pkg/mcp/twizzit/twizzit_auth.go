@@ -192,6 +192,14 @@ func (t *Twizzit) newRequest(method, requestURL string, formData ...url.Values) 
 	return req, nil
 }
 
+func failureNote(failed []string) string {
+	if len(failed) == 0 {
+		return ""
+	}
+
+	return "Could not fetch: " + strings.Join(failed, ", ") + "."
+}
+
 func textResult(text string, isError bool) *sdk.CallToolResult {
 	return &sdk.CallToolResult{
 		Content: []sdk.Content{
