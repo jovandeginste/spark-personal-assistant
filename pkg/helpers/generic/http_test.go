@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/awterman/monkey"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,16 +29,24 @@ func (m *MockReadCloser) Close() error {
 	return nil
 }
 
+// mockReadResource temporarily replaces the resource reader used by getBody.
+func mockReadResource(t *testing.T, fn func(string) (io.ReadCloser, error)) {
+	t.Helper()
+
+	original := readResource
+	t.Cleanup(func() { readResource = original })
+
+	readResource = fn
+}
+
 func TestGetBody_Success(t *testing.T) {
 	testData := []byte("This is the body content.")
 	mockReadCloser := io.NopCloser(bytes.NewReader(testData)) // Use io.NopCloser for simplicity
 
-	// Patch ReadResource to return our mock reader
-	patch := monkey.Func(nil, ReadResource, func(uri string) (io.ReadCloser, error) {
+	mockReadResource(t, func(uri string) (io.ReadCloser, error) {
 		assert.Equal(t, "http://example.com/resource", uri, "ReadResource called with incorrect URI")
 		return mockReadCloser, nil
 	})
-	defer patch.Reset()
 
 	// Call the function under test
 	body, err := getBody("http://example.com/resource")
@@ -52,12 +59,10 @@ func TestGetBody_Success(t *testing.T) {
 func TestGetBody_ReadResourceError(t *testing.T) {
 	mockError := errors.New("failed to open resource")
 
-	// Patch ReadResource to return an error
-	patch := monkey.Func(nil, ReadResource, func(uri string) (io.ReadCloser, error) {
+	mockReadResource(t, func(uri string) (io.ReadCloser, error) {
 		assert.Equal(t, "file:///path/to/resource", uri, "ReadResource called with incorrect URI")
 		return nil, mockError
 	})
-	defer patch.Reset()
 
 	// Call the function under test
 	body, err := getBody("file:///path/to/resource")
@@ -76,12 +81,10 @@ func TestGetBody_ReadError(t *testing.T) {
 		Err:    mockReadError,
 	}
 
-	// Patch ReadResource to return our error-prone reader
-	patch := monkey.Func(nil, ReadResource, func(uri string) (io.ReadCloser, error) {
+	mockReadResource(t, func(uri string) (io.ReadCloser, error) {
 		assert.Equal(t, "http://another.com/resource", uri, "ReadResource called with incorrect URI")
 		return errorReader, nil
 	})
-	defer patch.Reset()
 
 	// Call the function under test
 	body, err := getBody("http://another.com/resource")
@@ -100,11 +103,10 @@ func TestGetBody_EmptyBody(t *testing.T) {
 	testData := []byte("") // Empty body
 	mockReadCloser := io.NopCloser(bytes.NewReader(testData))
 
-	patch := monkey.Func(nil, ReadResource, func(uri string) (io.ReadCloser, error) {
+	mockReadResource(t, func(uri string) (io.ReadCloser, error) {
 		assert.Equal(t, "http://empty.com/resource", uri, "ReadResource called with incorrect URI")
 		return mockReadCloser, nil
 	})
-	defer patch.Reset()
 
 	body, err := getBody("http://empty.com/resource")
 
@@ -119,11 +121,10 @@ func TestGetBody_LargeBody(t *testing.T) {
 	largeData := bytes.Repeat([]byte("a"), 1024*10) // 10KB
 	mockReadCloser := io.NopCloser(bytes.NewReader(largeData))
 
-	patch := monkey.Func(nil, ReadResource, func(uri string) (io.ReadCloser, error) {
+	mockReadResource(t, func(uri string) (io.ReadCloser, error) {
 		assert.Equal(t, "http://large.com/resource", uri, "ReadResource called with incorrect URI")
 		return mockReadCloser, nil
 	})
-	defer patch.Reset()
 
 	body, err := getBody("http://large.com/resource")
 

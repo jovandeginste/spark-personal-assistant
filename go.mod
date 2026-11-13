@@ -8,7 +8,6 @@ require (
 	github.com/TwiN/gocache/v2 v2.4.0
 	github.com/adrg/frontmatter v0.2.0
 	github.com/apognu/gocal v0.9.1
-	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/dop251/goja v0.0.0-20260903201622-f87b40ad7341
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
@@ -61,7 +60,6 @@ require (
 	github.com/GaijinEntertainment/go-exhaustruct/v3 v3.3.0 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/OpenPeeDeeP/depguard/v2 v2.2.0 // indirect
-	github.com/agiledragon/gomonkey/v2 v2.13.0 // indirect
 	github.com/alecthomas/go-check-sumtype v0.3.1 // indirect
 	github.com/alexkohler/nakedret/v2 v2.0.5 // indirect
 	github.com/alexkohler/prealloc v1.0.0 // indirect

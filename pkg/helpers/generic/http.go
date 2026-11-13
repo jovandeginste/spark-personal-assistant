@@ -5,12 +5,13 @@ import (
 )
 
 var (
-	GetBody     = getBody
-	GetBodySafe = getBodySafe
+	GetBody      = getBody
+	GetBodySafe  = getBodySafe
+	readResource = ReadResource
 )
 
 func getBody(remote string) ([]byte, error) {
-	data, err := ReadResource(remote)
+	data, err := readResource(remote)
 	if err != nil {
 		return nil, err
 	}

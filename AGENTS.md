@@ -42,7 +42,7 @@ repository, not a historical snapshot.
 
 ## Commands
 
-- `make test` — `CGO_ENABLED=0 go test -short -count 1 -tags "goolm,sqlite_foreign_keys" -mod vendor -covermode=atomic -gcflags=all=-l ./...`
+- `make test` — `CGO_ENABLED=0 go test -short -count 1 -tags "goolm,sqlite_foreign_keys" -mod vendor -covermode=atomic ./...`
 - `make lint` — `CGO_ENABLED=0 go tool golangci-lint run --allow-parallel-runners --fix --config=./.golangci.yml --build-tags="goolm,sqlite_foreign_keys"`
 - `make build` — builds `data/spark`, `data/spark-mcp-assistant` and
   `data/spark-mcp-hockey`.
@@ -58,9 +58,8 @@ golangci-lint. The lint workflow runs without `--fix`.
 
 - The Makefile uses the `goolm` and `sqlite_foreign_keys` build tags for tests
   and lint; keep them consistent when running Go commands manually.
-- `-gcflags=all=-l` is intentional: some tests use
-  `github.com/awterman/monkey` to patch functions, which breaks when inlining
-  is enabled. Do not remove it from `make test`.
+- Tests inject function variables instead of monkey-patching compiled code, so
+  the test target does not disable inlining.
 - Normal development and CI use `CGO_ENABLED=0`.
 - With `CGO_ENABLED=1`, the Matrix package can panic at init with
   `sql: Register called twice for driver sqlite3-fk-wal` (mautrix's litestream
