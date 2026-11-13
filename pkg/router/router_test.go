@@ -80,6 +80,27 @@ func TestRouter_RegisterAndList(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestRouter_UnregisterAddress(t *testing.T) {
+	r := NewRouter(nil, nil)
+
+	addr := Address{
+		ID:           "room1@matrix",
+		InstanceName: "room1",
+		System:       "matrix",
+		Description:  "Matrix Room 1",
+	}
+
+	require.NoError(t, r.RegisterAddress(addr))
+
+	r.UnregisterAddress(addr.ID)
+
+	_, ok := r.GetAddress(addr.ID)
+	assert.False(t, ok)
+
+	// Unregistering an unknown address is a no-op.
+	r.UnregisterAddress("unknown@matrix")
+}
+
 func TestRouter_SubmitMessage(t *testing.T) {
 	ctx := context.Background()
 	r := NewRouter(&mockAIClient{response: "Hello back"}, nil)

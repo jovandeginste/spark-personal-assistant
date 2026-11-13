@@ -3,9 +3,11 @@ package reminders
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -368,11 +370,52 @@ func TestDeleteReminders(t *testing.T) {
 	err = m.writeReminders(reminders)
 	require.NoError(t, err)
 
-	m.deleteReminders(remindersFile, []string{"1"})
+	m.deleteReminders([]string{"1"})
 
 	updatedReminders, err := m.readReminders()
 	require.NoError(t, err)
 
 	assert.NotContains(t, updatedReminders, "1")
 	assert.Contains(t, updatedReminders, "2")
+}
+
+func TestConcurrentCreateReminders(t *testing.T) {
+	tempDir := t.TempDir()
+	remindersFile := filepath.Join(tempDir, "reminders.json")
+	m := New(Config{File: remindersFile}, slog.Default())
+
+	require.NoError(t, m.writeReminders(map[string]Reminder{}))
+
+	const count = 10
+
+	var wg sync.WaitGroup
+
+	errs := make(chan error, count)
+
+	for i := range count {
+		wg.Add(1)
+
+		go func(i int) {
+			defer wg.Done()
+
+			_, _, err := m.handleCreateReminder(context.Background(), nil, createReminderParams{
+				ID:      fmt.Sprintf("reminder-%d", i),
+				Name:    "Name",
+				Message: "Message",
+				Cron:    "* * * * *",
+			})
+			errs <- err
+		}(i)
+	}
+
+	wg.Wait()
+	close(errs)
+
+	for err := range errs {
+		require.NoError(t, err)
+	}
+
+	reminders, err := m.readReminders()
+	require.NoError(t, err)
+	assert.Len(t, reminders, count)
 }

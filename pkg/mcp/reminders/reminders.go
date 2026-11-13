@@ -19,6 +19,8 @@ import (
 	"github.com/netresearch/go-cron"
 )
 
+const callbackTimeout = 30 * time.Second
+
 type Config struct {
 	File     string `mapstructure:"file"`
 	Callback string `mapstructure:"callback"`
@@ -71,6 +73,10 @@ func (m *Module) readReminders() (map[string]Reminder, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
+	return m.readRemindersLocked()
+}
+
+func (m *Module) readRemindersLocked() (map[string]Reminder, error) {
 	config := m.Config().(Config)
 	data, err := os.ReadFile(config.File)
 	if err != nil {
@@ -141,7 +147,7 @@ func (m *Module) processReminders(config Config, logger *slog.Logger) {
 	}
 
 	if len(toDelete) > 0 {
-		m.deleteReminders(config.File, toDelete)
+		m.deleteReminders(toDelete)
 	}
 }
 
@@ -185,8 +191,18 @@ func (m *Module) triggerCallback(callbackUrl string, reminder Reminder, logger *
 			return
 		}
 
+		ctx, cancel := context.WithTimeout(context.Background(), callbackTimeout)
+		defer cancel()
+
 		// #nosec G107
-		resp, err := http.Post(u, "application/json", bytes.NewBuffer(jsonData))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(jsonData))
+		if err != nil {
+			logger.Error("Failed to create callback request", "url", u, "error", err)
+			return
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			logger.Error("Failed to call callback", "url", u, "error", err)
 			return
@@ -198,39 +214,30 @@ func (m *Module) triggerCallback(callbackUrl string, reminder Reminder, logger *
 	}(callbackUrl, reminder)
 }
 
-func (m *Module) deleteReminders(file string, toDelete []string) {
+func (m *Module) deleteReminders(toDelete []string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	data, err := os.ReadFile(file)
+	reminders, err := m.readRemindersLocked()
 	if err != nil {
-		return
-	}
-
-	var currentReminders map[string]Reminder
-	if err := json.Unmarshal(data, &currentReminders); err != nil {
 		return
 	}
 
 	for _, id := range toDelete {
-		delete(currentReminders, id)
+		delete(reminders, id)
 	}
 
-	outData, err := json.MarshalIndent(currentReminders, "", "  ")
-	if err != nil {
-		return
-	}
-
-	tmpFile := file + ".tmp"
-	if err := os.WriteFile(tmpFile, outData, 0o600); err == nil {
-		_ = os.Rename(tmpFile, file)
-	}
+	_ = m.writeRemindersLocked(reminders)
 }
 
 func (m *Module) writeReminders(reminders map[string]Reminder) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	return m.writeRemindersLocked(reminders)
+}
+
+func (m *Module) writeRemindersLocked(reminders map[string]Reminder) error {
 	config := m.Config().(Config)
 	data, err := json.MarshalIndent(reminders, "", "  ")
 	if err != nil {
@@ -349,7 +356,10 @@ func (m *Module) handleCreateReminder(ctx context.Context, request *mcp.CallTool
 		return nil, nil, errors.New("missing or invalid 'cron'")
 	}
 
-	reminders, err := m.readReminders()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	reminders, err := m.readRemindersLocked()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading reminders: %w", err)
 	}
@@ -367,7 +377,7 @@ func (m *Module) handleCreateReminder(ctx context.Context, request *mcp.CallTool
 	}
 	reminders[params.ID] = reminder
 
-	if err := m.writeReminders(reminders); err != nil {
+	if err := m.writeRemindersLocked(reminders); err != nil {
 		return nil, nil, fmt.Errorf("error writing reminders: %w", err)
 	}
 
@@ -383,7 +393,10 @@ func (m *Module) handleDeleteReminder(ctx context.Context, request *mcp.CallTool
 		return nil, nil, errors.New("missing or invalid 'id'")
 	}
 
-	reminders, err := m.readReminders()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	reminders, err := m.readRemindersLocked()
 	if err != nil {
 		return nil, nil, fmt.Errorf("error reading reminders: %w", err)
 	}
@@ -394,7 +407,7 @@ func (m *Module) handleDeleteReminder(ctx context.Context, request *mcp.CallTool
 
 	delete(reminders, params.ID)
 
-	if err := m.writeReminders(reminders); err != nil {
+	if err := m.writeRemindersLocked(reminders); err != nil {
 		return nil, nil, fmt.Errorf("error writing reminders: %w", err)
 	}
 

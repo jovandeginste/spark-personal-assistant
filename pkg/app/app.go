@@ -3,6 +3,7 @@ package app
 import (
 	"log/slog"
 	"os"
+	"sync"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -14,18 +15,34 @@ type App struct {
 
 	logger *slog.Logger
 
+	mcpMu      sync.Mutex
 	mcpClients map[string]*mcp.ClientSession
-	mcpCleanup []func()
+	mcpCleanup map[string]func()
 	mcpTools   map[string][]ai.Tool
 }
 
 func NewApp() *App {
 	a := &App{
 		mcpClients: make(map[string]*mcp.ClientSession),
+		mcpCleanup: make(map[string]func()),
 		mcpTools:   make(map[string][]ai.Tool),
 	}
 
 	return a
+}
+
+// Close releases all resources held by the app.
+func (a *App) Close() {
+	a.mcpMu.Lock()
+	cleanup := a.mcpCleanup
+	a.mcpCleanup = make(map[string]func())
+	a.mcpClients = make(map[string]*mcp.ClientSession)
+	a.mcpTools = make(map[string][]ai.Tool)
+	a.mcpMu.Unlock()
+
+	for _, fn := range cleanup {
+		fn()
+	}
 }
 
 func (a *App) Logger() *slog.Logger {

@@ -13,6 +13,9 @@ import (
 )
 
 func (mc *MatrixConfig) performCommandPrompt(name, roomID string) (string, error) {
+	mc.aiDataMu.Lock()
+	defer mc.aiDataMu.Unlock()
+
 	promptBody, ok := mc.App.Config.Prompts[name]
 	if !ok {
 		return fmt.Sprintf("Prompt '%s' not found in configuration", name), nil
@@ -71,7 +74,11 @@ func (mc *MatrixConfig) performCommandResetRecovery() (string, error) {
 }
 
 func (mc *MatrixConfig) performCommandReset(roomID string) (string, error) {
+	mc.aiDataMu.Lock()
+	defer mc.aiDataMu.Unlock()
+
 	mc.AIData.ResetHistory(roomID)
+
 	return "History is clear", nil
 }
 

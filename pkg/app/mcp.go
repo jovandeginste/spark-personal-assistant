@@ -34,7 +34,10 @@ func (a *App) getMCPClient(ctx context.Context, name string) (*mcp.ClientSession
 
 	// Better approach: Since we can't easily check health without making a call,
 	// let's wrap the "get" logic to create if missing.
+	a.mcpMu.Lock()
 	session, ok := a.mcpClients[name]
+	a.mcpMu.Unlock()
+
 	if ok {
 		// Basic check - we can't really know if it's dead until we try to use it
 		// or if we track close events (which we don't currently).
@@ -73,27 +76,44 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 		return nil, fmt.Errorf("failed to connect to MCP server %s: %w", name, err)
 	}
 
-	a.mcpClients[name] = session
+	a.mcpMu.Lock()
 
-	// Clean up old cleanup function if exists (though we just overwrote the map entry)
-	// We should probably structure this better, but for now:
-	cleanup := func() {
-		session.Close()
+	// Another goroutine may have connected while we were dialing.
+	if existing, ok := a.mcpClients[name]; ok {
+		a.mcpMu.Unlock()
+		_ = session.Close()
+
+		return existing, nil
 	}
-	a.mcpCleanup = append(a.mcpCleanup, cleanup)
+
+	a.mcpClients[name] = session
+	a.mcpCleanup[name] = func() {
+		_ = session.Close()
+	}
+
+	a.mcpMu.Unlock()
 
 	return session, nil
 }
 
 // forceReconnect closes the existing session (if any) and removes it, ensuring the next get call creates a new one
 func (a *App) forceReconnect(name string) {
-	if session, ok := a.mcpClients[name]; ok {
-		a.Logger().Info("Forcing reconnection for MCP server", "name", name)
-		session.Close()
+	a.mcpMu.Lock()
+	session, ok := a.mcpClients[name]
+	if ok {
 		delete(a.mcpClients, name)
 		// invalidate cached tools when we reconnect, they might have changed
 		delete(a.mcpTools, name)
+		delete(a.mcpCleanup, name)
 	}
+	a.mcpMu.Unlock()
+
+	if !ok {
+		return
+	}
+
+	a.Logger().Info("Forcing reconnection for MCP server", "name", name)
+	_ = session.Close()
 }
 
 func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error) {
@@ -101,7 +121,11 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 
 	// Iterate over configured servers instead of active clients to ensure we try to connect to all
 	for name := range a.Config.MCPServers {
-		if cachedTools, ok := a.mcpTools[name]; ok {
+		a.mcpMu.Lock()
+		cachedTools, ok := a.mcpTools[name]
+		a.mcpMu.Unlock()
+
+		if ok {
 			tools = append(tools, cachedTools...)
 			continue
 		}
@@ -121,7 +145,17 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 			})
 		}
 
+		a.mcpMu.Lock()
+		// Another goroutine may have populated the cache while we were listing.
+		if existingTools, ok := a.mcpTools[name]; ok {
+			a.mcpMu.Unlock()
+			tools = append(tools, existingTools...)
+			continue
+		}
+
 		a.mcpTools[name] = serverTools
+		a.mcpMu.Unlock()
+
 		tools = append(tools, serverTools...)
 	}
 

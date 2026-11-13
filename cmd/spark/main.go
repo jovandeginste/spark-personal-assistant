@@ -10,7 +10,12 @@ func main() {
 	a := app.NewApp()
 
 	cmd := NewCLI(a)
-	if err := cmd.rootCmd.Execute(); err != nil {
+
+	err := cmd.rootCmd.Execute()
+
+	a.Close()
+
+	if err != nil {
 		os.Exit(1)
 	}
 }

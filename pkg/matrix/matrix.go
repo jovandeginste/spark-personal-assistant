@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/glebarez/go-sqlite"
@@ -43,7 +44,8 @@ type MatrixConfig struct {
 	CryptoHelper *cryptohelper.CryptoHelper
 	Router       *router.Router
 
-	msges chan msg
+	msges    chan msg
+	aiDataMu sync.Mutex
 }
 
 type msg struct {
@@ -63,11 +65,14 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		return
 	}
 
+	mc.aiDataMu.Lock()
 	mc.AIData.CleanHistory(evt.RoomID.String())
+	history := len(mc.AIData.ChatHistory[evt.RoomID.String()])
+	mc.aiDataMu.Unlock()
+
 	message := evt.Content.AsMessage()
 	body := message.Body
 
-	history := mc.AIData.ChatHistory[evt.RoomID.String()]
 	mc.App.Logger().Info(
 		"Received message",
 		"sender", evt.Sender.String(),
@@ -76,7 +81,7 @@ func (mc *MatrixConfig) handleMessage(ctx context.Context, evt *event.Event) {
 		"id", evt.ID.String(),
 		"timestamp", time.Unix(0, evt.Timestamp*int64(time.Millisecond)),
 		"body", body,
-		"history", len(history),
+		"history", history,
 	)
 
 	if err := mc.Client.MarkRead(context.Background(), evt.RoomID, evt.ID); err != nil {
@@ -172,7 +177,10 @@ func (mc *MatrixConfig) handleAttachment(ctx context.Context, evt *event.Event) 
 		return true
 	}
 
+	mc.aiDataMu.Lock()
 	mc.AIData.FileURIs = append(mc.AIData.FileURIs, aiURI)
+	mc.aiDataMu.Unlock()
+
 	mc.sendNotice(evt.RoomID, evt.ID, fmt.Sprintf("Received file %s and uploaded to AI", message.Body))
 	return true
 }
@@ -214,6 +222,9 @@ func (mc *MatrixConfig) calculateInputResponse(roomID id.RoomID, eventID id.Even
 }
 
 func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, sender id.UserID, input string) (string, error) {
+	mc.aiDataMu.Lock()
+	defer mc.aiDataMu.Unlock()
+
 	mc.App.Logger().Info("Parsing question...", "sender", sender)
 	mc.AIData.EmployerQuestion = []string{fmt.Sprintf("Sender: %s", sender), input}
 

@@ -262,6 +262,7 @@ func submitWebPrompt(ec echo.Context, r *router.Router, webAddrID, subject, cont
 	if err != nil {
 		return ec.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 	}
+	defer r.UnregisterAddress(replyAddr)
 
 	err = r.SubmitMessage(ec.Request().Context(), webAddrID, router.Message{
 		Metadata: router.Metadata{

@@ -122,6 +122,14 @@ func (r *Router) RegisterAddress(addr Address) error {
 	return nil
 }
 
+// UnregisterAddress removes a registered address by ID.
+func (r *Router) UnregisterAddress(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	delete(r.addresses, id)
+}
+
 // GetAddress returns a registered address by ID.
 func (r *Router) GetAddress(id string) (Address, bool) {
 	r.mu.RLock()
