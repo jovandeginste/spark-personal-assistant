@@ -252,6 +252,7 @@ github.com/emersion/go-imap-idle
 ## explicit; go 1.14
 github.com/emersion/go-message
 github.com/emersion/go-message/charset
+github.com/emersion/go-message/mail
 github.com/emersion/go-message/textproto
 # github.com/emersion/go-sasl v0.0.0-20241020182733-b788ff22d5a6
 ## explicit; go 1.12

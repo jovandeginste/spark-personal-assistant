@@ -18,6 +18,7 @@ import (
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/charset"
+	gomail "github.com/emersion/go-message/mail"
 	"github.com/gomarkdown/markdown"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
 )
@@ -244,51 +245,55 @@ func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, 
 // extractMessageBody decodes transfer encodings, charsets and multipart
 // bodies, preferring the text/plain part over HTML.
 func extractMessageBody(r io.Reader) (string, error) {
-	entity, err := message.Read(r)
-	if err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err) {
-		return "", err
-	}
-
-	if entity == nil {
-		return "", err
+	reader, err := gomail.CreateReader(r)
+	if err != nil {
+		if reader == nil || (!message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err)) {
+			return "", err
+		}
 	}
 
 	var plainBody, htmlBody string
 
-	err = entity.Walk(func(_ []int, part *message.Entity, walkErr error) error {
-		if walkErr != nil {
-			if message.IsUnknownCharset(walkErr) || message.IsUnknownEncoding(walkErr) {
-				return nil
-			}
-
-			return walkErr
+	for {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
 		}
 
-		mediaType, _, _ := part.Header.ContentType()
+		if err != nil {
+			if message.IsUnknownCharset(err) || message.IsUnknownEncoding(err) {
+				continue
+			}
+
+			return "", err
+		}
+
+		mediaType := "text/plain"
+		if contentType := part.Header.Get("Content-Type"); contentType != "" {
+			parsedType, _, err := mime.ParseMediaType(contentType)
+			if err != nil {
+				continue
+			}
+
+			mediaType = parsedType
+		}
 
 		switch {
-		case strings.HasPrefix(mediaType, "multipart/"):
-			return nil
 		case plainBody == "" && strings.HasPrefix(mediaType, "text/plain"):
 			body, err := io.ReadAll(part.Body)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			plainBody = string(body)
 		case htmlBody == "" && strings.HasPrefix(mediaType, "text/html"):
 			body, err := io.ReadAll(part.Body)
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			htmlBody = string(body)
 		}
-
-		return nil
-	})
-	if err != nil {
-		return "", err
 	}
 
 	if plainBody != "" {
