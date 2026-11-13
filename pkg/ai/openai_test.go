@@ -47,3 +47,21 @@ func TestOpenAIClientSendsOpenCodeSessionHeader(t *testing.T) {
 	assert.Equal(t, "hello", result)
 	assert.Equal(t, "ses_test", receivedSession)
 }
+
+func TestGeneratePromptReturnsErrorAfterRetries(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "not now", http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	c := openaiClient{
+		apiKey:    "test-key",
+		model:     "test-model",
+		baseURL:   server.URL + "/",
+		assistant: &AssistantConfig{Name: "TestAssistant"},
+		logger:    slog.Default(),
+	}
+
+	_, err := c.GeneratePrompt(context.Background(), nil)
+	require.Error(t, err)
+}

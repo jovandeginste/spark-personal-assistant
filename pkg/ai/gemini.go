@@ -8,11 +8,14 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"google.golang.org/api/iterator"
 	"google.golang.org/genai"
 )
+
+// geminiRetryAttempts is the total number of attempts, including the first
+// request, used by the Gemini SDK for transient failures.
+const geminiRetryAttempts = 5
 
 type geminiClient struct {
 	apiKey    string
@@ -67,33 +70,25 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 
 	config := &genai.GenerateContentConfig{}
 
-	var result *genai.GenerateContentResponse
-
-	for i := range 10 {
-		result, err = client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
-		if err == nil {
-			break
-		}
-
-		if i < 10 {
-			c.Logger().Warn("Retrying in 30 seconds...", "error", err)
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
+	result, err := client.Models.GenerateContent(ctx, c.model, []*genai.Content{prompt}, config)
+	if err != nil {
 		c.Logger().Error("Failed to generate prompt", "error", err)
 
 		return "", err
 	}
 
+	if result == nil {
+		return "", errors.New("no result returned by AI")
+	}
+
 	c.Logger().Info("Parsing results")
 
-	for _, c := range result.Candidates {
-		if len(c.Content.Parts) == 0 {
+	for _, candidate := range result.Candidates {
+		if len(candidate.Content.Parts) == 0 {
 			continue
 		}
 
-		return c.Content.Parts[0].Text, nil
+		return candidate.Content.Parts[0].Text, nil
 	}
 
 	c.Logger().Info("No result")
@@ -133,9 +128,9 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 			if strings.Contains(err.Error(), "Unsupported MIME type") {
 				return "", err
 			}
-			c.Logger().Warn("Error generating content", "error", err, "attempt", i)
-			time.Sleep(2 * time.Second)
-			continue
+			c.Logger().Error("Error generating content", "error", err, "iteration", i)
+
+			return "", err
 		}
 
 		if len(result.Candidates) == 0 || result.Candidates[0].Content == nil {
@@ -346,5 +341,14 @@ func (c geminiClient) DeleteFile(ctx context.Context, name string) error {
 }
 
 func (c geminiClient) newGeminiClient(ctx context.Context) (*genai.Client, error) {
-	return genai.NewClient(ctx, &genai.ClientConfig{APIKey: c.apiKey})
+	attempts := int32(geminiRetryAttempts)
+
+	return genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: c.apiKey,
+		HTTPOptions: genai.HTTPOptions{
+			RetryOptions: &genai.HTTPRetryOptions{
+				Attempts: &attempts,
+			},
+		},
+	})
 }

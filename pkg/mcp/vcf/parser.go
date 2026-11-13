@@ -2,6 +2,7 @@ package vcf
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"strconv"
@@ -207,19 +208,34 @@ func parseBirthday(s string) (*Date, error) {
 }
 
 func parseDate(s string) (Date, error) {
-	// Expect MM-DD
+	s = strings.TrimSpace(s)
+
 	parts := strings.Split(s, "-")
-	if len(parts) != 2 {
-		return Date{}, errors.New("invalid format, expected MM-DD")
+
+	switch len(parts) {
+	case 2:
+		// MM-DD
+	case 3:
+		// YYYY-MM-DD; only month and day matter for birthdays
+		parts = parts[1:]
+	default:
+		return Date{}, errors.New("invalid format, expected MM-DD or YYYY-MM-DD")
 	}
+
 	m, err := strconv.Atoi(parts[0])
 	if err != nil {
 		return Date{}, err
 	}
+
 	d, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return Date{}, err
 	}
+
+	if m < 1 || m > 12 || d < 1 || d > 31 {
+		return Date{}, fmt.Errorf("invalid date: %s", s)
+	}
+
 	return Date{Month: m, Day: d}, nil
 }
 

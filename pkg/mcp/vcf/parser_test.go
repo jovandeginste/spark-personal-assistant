@@ -81,9 +81,13 @@ func TestParseDate(t *testing.T) {
 	}{
 		{"01-01", Date{Month: 1, Day: 1}, false},
 		{"12-31", Date{Month: 12, Day: 31}, false},
+		{"2022-01-01", Date{Month: 1, Day: 1}, false},
+		{"2026-12-31", Date{Month: 12, Day: 31}, false},
 		{"invalid", Date{}, true},
 		{"1-1", Date{Month: 1, Day: 1}, false},
-		{"01-01-2022", Date{}, true}, // Should fail, expects MM-DD
+		{"01-01-2022", Date{}, true}, // Year in the middle is not a valid format
+		{"13-01", Date{}, true},
+		{"01-32", Date{}, true},
 	}
 
 	for _, tt := range tests {

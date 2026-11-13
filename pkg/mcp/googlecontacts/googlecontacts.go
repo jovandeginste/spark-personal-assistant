@@ -6,7 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
+	"sync"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,6 +23,10 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
+
+	initOnce sync.Once
+	client   *http.Client
+	initErr  error
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -29,6 +35,30 @@ func New(config Config, logger *slog.Logger) *Module {
 	}
 	module.SetLogger(logger.With("module", "googlecontacts"))
 	return module
+}
+
+func (m *Module) Initialize() error {
+	if !m.configured() {
+		return nil
+	}
+
+	m.initOnce.Do(func() {
+		m.client, m.initErr = getClient(m.Config().(Config))
+	})
+
+	return m.initErr
+}
+
+func (m *Module) httpClient() (*http.Client, error) {
+	if err := m.Initialize(); err != nil {
+		return nil, err
+	}
+
+	if m.client == nil {
+		return nil, errors.New("google contacts client is not configured")
+	}
+
+	return m.client, nil
 }
 
 type contactsParams struct {
@@ -80,11 +110,10 @@ func (m *Module) Register(server *mcp.Server) error {
 }
 
 func (m *Module) handleContacts(ctx context.Context, request *mcp.CallToolRequest, params contactsParams) (*mcp.CallToolResult, any, error) {
-	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "contacts")
 
 	logger.Debug("Search google contacts", "query", params.Query)
-	result, err := m.searchContacts(ctx, config, params.Query)
+	result, err := m.searchContacts(ctx, params.Query)
 	if err != nil {
 		logger.Error("Failed to search contacts", "query", params.Query, "error", err)
 		return nil, nil, err
@@ -100,12 +129,11 @@ func (m *Module) handleContacts(ctx context.Context, request *mcp.CallToolReques
 }
 
 func (m *Module) handleContactsByDate(ctx context.Context, request *mcp.CallToolRequest, params dateParams) (*mcp.CallToolResult, any, error) {
-	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "contactsByDate")
 
 	start, end := params.GetDateRange()
 	logger.Debug("Search google contacts by date", "start", start, "end", end)
-	result, err := m.searchContactsByDate(ctx, config, start, end)
+	result, err := m.searchContactsByDate(ctx, start, end)
 	if err != nil {
 		logger.Error("Failed to search contacts by date", "start", start, "end", end, "error", err)
 		return nil, nil, err
@@ -121,11 +149,10 @@ func (m *Module) handleContactsByDate(ctx context.Context, request *mcp.CallTool
 }
 
 func (m *Module) handleContactsByLocation(ctx context.Context, request *mcp.CallToolRequest, params locationParams) (*mcp.CallToolResult, any, error) {
-	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "contactsByLocation")
 
 	logger.Debug("Search google contacts by location", "query", params.Query)
-	result, err := m.searchContactsByLocation(ctx, config, params)
+	result, err := m.searchContactsByLocation(ctx, params)
 	if err != nil {
 		logger.Error("Failed to search contacts by location", "params", params, "error", err)
 		return nil, nil, err
@@ -140,17 +167,26 @@ func (m *Module) handleContactsByLocation(ctx context.Context, request *mcp.Call
 	}, nil, nil
 }
 
-func (m *Module) Enabled() error {
+func (m *Module) configured() bool {
 	config := m.Config().(Config)
-	if config.TokenFile == "" {
-		return errors.New("googlecontacts token file is not configured")
+
+	return config.Init != "" && config.TokenFile != ""
+}
+
+func (m *Module) Enabled() error {
+	if !m.configured() {
+		return errors.New("googlecontacts client config or token file is not configured")
 	}
+
 	return nil
 }
 
 // searchContacts now accepts a slice of strings
-func (m *Module) searchContacts(ctx context.Context, config Config, query []string) (string, error) {
-	client := getClient(&config)
+func (m *Module) searchContacts(ctx context.Context, query []string) (string, error) {
+	client, err := m.httpClient()
+	if err != nil {
+		return "", err
+	}
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
@@ -250,8 +286,11 @@ func fetchAllConnections(srv *people.Service) ([]*people.Person, error) {
 	return allConnections, nil
 }
 
-func (m *Module) searchContactsByDate(ctx context.Context, config Config, start, end string) (string, error) {
-	client := getClient(&config)
+func (m *Module) searchContactsByDate(ctx context.Context, start, end string) (string, error) {
+	client, err := m.httpClient()
+	if err != nil {
+		return "", err
+	}
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
@@ -332,8 +371,11 @@ func checkDate(date *people.Date, startStr, endStr string) bool {
 	return false
 }
 
-func (m *Module) searchContactsByLocation(ctx context.Context, config Config, params locationParams) (string, error) {
-	client := getClient(&config)
+func (m *Module) searchContactsByLocation(ctx context.Context, params locationParams) (string, error) {
+	client, err := m.httpClient()
+	if err != nil {
+		return "", err
+	}
 
 	srv, err := people.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {

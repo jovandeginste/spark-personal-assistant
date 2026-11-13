@@ -79,7 +79,6 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 		jsonInput   []byte
 		expectedHT  HumanTime
 		expectError bool
-		expectPanic bool // Testing the panic behavior in the original code
 	}{
 		{
 			name:      "Valid JSON string with date and time",
@@ -120,9 +119,9 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 			expectError: true, // json.Unmarshal fails
 		},
 		{
-			name:        "Invalid time string format (leads to panic in current code)",
+			name:        "Invalid time string format",
 			jsonInput:   []byte(`"invalid-date"`),
-			expectPanic: true, // Code panics if all parsing layouts fail
+			expectError: true,
 		},
 		{
 			name:        "Invalid JSON string format",
@@ -133,20 +132,6 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer func() {
-				if r := recover(); r != nil {
-					if !tt.expectPanic {
-						t.Errorf("UnmarshalJSON() panicked unexpectedly with: %v", r)
-					}
-
-					return
-				}
-
-				if tt.expectPanic {
-					t.Errorf("UnmarshalJSON() did not panic as expected")
-				}
-			}()
-
 			var ht HumanTime
 			err := json.Unmarshal(tt.jsonInput, &ht)
 
@@ -155,10 +140,6 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 					t.Errorf("UnmarshalJSON() expected an error but got none")
 				}
 
-				return
-			}
-
-			if tt.expectPanic {
 				return
 			}
 

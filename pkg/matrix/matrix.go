@@ -447,6 +447,10 @@ func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
 }
 
 func (mc *MatrixConfig) Greet() error {
+	if mc.Client == nil {
+		return nil
+	}
+
 	if err := mc.Client.SetDisplayName(context.Background(), mc.App.Config.Assistant.Name); err != nil {
 		mc.App.Logger().Error("Failed to set display name", "error", err)
 	}

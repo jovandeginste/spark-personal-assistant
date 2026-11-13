@@ -92,17 +92,17 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 
 	t := time.Time{}
 	// Parse the unquoted string using the layout matching MarshalJSON's output
-	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04", "2006-01-02"} {
-		var err error
+	var parseErr error
 
-		t, err = time.ParseInLocation(layout, s, LocalTimezone)
-		if err == nil {
+	for _, layout := range []string{time.RFC3339, "2006-01-02 15:04", "2006-01-02"} {
+		t, parseErr = time.ParseInLocation(layout, s, LocalTimezone)
+		if parseErr == nil {
 			break
 		}
 	}
 
-	if t.IsZero() {
-		panic(s)
+	if parseErr != nil {
+		return fmt.Errorf("HumanTime.UnmarshalJSON: cannot parse %q: %w", s, parseErr)
 	}
 
 	// Set the parsed time on the receiver's internal time field

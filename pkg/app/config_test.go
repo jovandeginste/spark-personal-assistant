@@ -28,7 +28,10 @@ func TestPersonaLoading(t *testing.T) {
 	assert.Contains(t, a.Config.Assistant.Style, "highly professional English butler")
 
 	// Test SetPersona manual override
-	a.SetPersona("spock")
+	assert.NoError(t, a.SetPersona("spock"))
 	assert.Equal(t, "Spock", a.Config.Assistant.Name)
 	assert.Contains(t, a.Config.Assistant.Style, "Vulcan")
+
+	// Unknown personas are reported as an error
+	assert.Error(t, a.SetPersona("does-not-exist"))
 }

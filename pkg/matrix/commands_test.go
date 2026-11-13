@@ -138,3 +138,14 @@ func TestParseInput_Prompt_With_MultiWord_Name(t *testing.T) {
 
 	mockAIClient.AssertExpectations(t)
 }
+
+func TestPerformCommandSwitchPersona(t *testing.T) {
+	mc := &MatrixConfig{App: &app.App{}}
+
+	res, err := mc.performCommandSwitchPersona("spock")
+	assert.NoError(t, err)
+	assert.Equal(t, "Switched to persona: Spock", res)
+
+	_, err = mc.performCommandSwitchPersona("does-not-exist")
+	assert.Error(t, err)
+}

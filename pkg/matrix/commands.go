@@ -104,8 +104,11 @@ func (mc *MatrixConfig) performCommandListPersona() (string, error) {
 }
 
 func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error) {
-	mc.App.SetPersona(name)
-	mc.Greet()
+	if err := mc.App.SetPersona(name); err != nil {
+		return "", err
+	}
+
+	_ = mc.Greet()
 
 	return "Switched to persona: " + mc.App.Config.Assistant.Name, nil
 }

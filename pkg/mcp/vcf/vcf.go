@@ -122,8 +122,7 @@ func (m *Module) handleGetBirthdays(ctx context.Context, request *mcp.CallToolRe
 
 	// Use generic helper to determine query mode
 	// But VCF logic uses Date{Month, Day} structs, so we need to parse.
-	// We can reuse the existing `parseDate` which handles MM-DD.
-	// `DateRangeParams` uses YYYY-MM-DD or MM-DD.
+	// `parseDate` accepts both MM-DD and YYYY-MM-DD.
 	// `params.GetDateRange()` handles precedence.
 
 	// Helper to parse safely

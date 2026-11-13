@@ -12,6 +12,7 @@ context: |
   Jane is a teacher
   Jane likes to read novels
 llm:
+  type: ollama
   model: gemma3:1b
   base_url: http://localhost:11434/v1/
 matrix:
@@ -24,8 +25,6 @@ webserver:
   default:
     enabled: true
     bind: ":8080"
-mail:
-  default:
 mail:
   default:
     enabled: false

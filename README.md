@@ -72,7 +72,7 @@ ical:
 vcf:
   path: /path/to/contacts.vcf
 googlecontacts:
-  client_secret: '{"installed":{"client_id":"...","client_secret":"..."}}'
+  init: '{"installed":{"client_id":"...","client_secret":"..."}}'
   token_file: /path/to/token.json
 ```
 

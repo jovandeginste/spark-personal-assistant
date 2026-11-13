@@ -188,6 +188,11 @@ func TestCheckDate(t *testing.T) {
 	}
 }
 
+func TestGetClientWithoutConfig(t *testing.T) {
+	_, err := getClient(Config{})
+	assert.Error(t, err)
+}
+
 // Note: Testing actual Google API calls requires mocking the Google People API service
 // or integration tests with credentials, which is beyond unit testing scope.
 // We are focusing on the logic parts (date matching, location matching) here.

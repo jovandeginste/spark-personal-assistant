@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -244,13 +245,15 @@ func (a *App) setDefaultPersona() {
 	applyAssistantConfig(&a.Config.Assistant, dp, false)
 }
 
-func (a *App) SetPersona(persona string) {
+func (a *App) SetPersona(persona string) error {
 	dp := readPersona(persona)
 	if dp == nil {
-		return
+		return fmt.Errorf("unknown persona: %s", persona)
 	}
 
 	applyAssistantConfig(&a.Config.Assistant, dp, true)
+
+	return nil
 }
 
 func applyAssistantConfig(target *ai.AssistantConfig, source *ai.AssistantConfig, overwrite bool) {

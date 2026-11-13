@@ -102,13 +102,18 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 
 func (mc *MatrixConfig) switchPersona(c echo.Context) error {
 	persona := c.QueryParam("persona")
-	mc.sendNotice(mc.DefaultRoomID(), "", "Switching to persona: "+persona)
-
-	if err := mc.sendResponse(mc.DefaultRoomID(), "", "web", "switch "+persona); err != nil {
-		return c.JSON(http.StatusBadRequest, err)
+	if persona == "" {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": "persona query parameter is required"})
 	}
 
-	return c.String(http.StatusOK, "Persona switched")
+	mc.sendNotice(mc.DefaultRoomID(), "", "Switching to persona: "+persona)
+
+	response, err := mc.performCommandSwitchPersona(persona)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+	}
+
+	return c.String(http.StatusOK, response)
 }
 
 func (mc *MatrixConfig) update(c echo.Context) error {

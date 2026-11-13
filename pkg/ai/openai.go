@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"time"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -62,31 +61,25 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 
 	client := c.newOpenAIClient()
 
-	for i := range 10 {
-		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-			Messages: []openai.ChatCompletionMessageParamUnion{prompt},
-			Model:    c.Model(),
-		})
-		if err != nil {
-			if i < 10 {
-				c.Logger().Warn("Retrying in 30 seconds...", "error", err)
-				time.Sleep(30 * time.Second)
-				continue
-			}
+	result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Messages: []openai.ChatCompletionMessageParamUnion{prompt},
+		Model:    c.Model(),
+	})
+	if err != nil {
+		c.Logger().Error("Failed to generate prompt", "error", err)
 
-			return "", err
-		}
-
-		for _, c := range result.Choices {
-			if len(c.Message.Content) == 0 {
-				continue
-			}
-
-			return c.Message.Content, nil
-		}
+		return "", err
 	}
 
-	return "", nil
+	for _, choice := range result.Choices {
+		if len(choice.Message.Content) == 0 {
+			continue
+		}
+
+		return choice.Message.Content, nil
+	}
+
+	return "", errors.New("no response returned by AI")
 }
 
 func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
@@ -101,12 +94,19 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 
 	openaiTools := make([]openai.ChatCompletionToolParam, 0, len(tools))
 	for _, t := range tools {
+		schema, ok := t.InputSchema.(map[string]any)
+		if !ok {
+			c.Logger().Warn("Skipping tool with unsupported input schema", "tool", t.Name)
+
+			continue
+		}
+
 		openaiTools = append(openaiTools, openai.ChatCompletionToolParam{
 			Type: constant.Function("function"),
 			Function: shared.FunctionDefinitionParam{
 				Name:        t.Name,
 				Description: openai.String(t.Description),
-				Parameters:  shared.FunctionParameters(t.InputSchema.(map[string]any)),
+				Parameters:  shared.FunctionParameters(schema),
 			},
 		})
 	}
@@ -120,8 +120,14 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 			Tools:    openaiTools,
 		})
 		if err != nil {
-			c.Logger().Warn("Error generating content", "error", err, "attempt", i)
-			time.Sleep(2 * time.Second)
+			c.Logger().Error("Error generating content", "error", err, "iteration", i)
+
+			return "", err
+		}
+
+		if len(result.Choices) == 0 {
+			c.Logger().Warn("No choices returned", "attempt", i)
+
 			continue
 		}
 
