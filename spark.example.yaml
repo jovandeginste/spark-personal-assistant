@@ -21,10 +21,14 @@ matrix:
     username: spark-bot
     password: secretpassword
     room_id: "!roomid:matrix.org"
+    database: ./matrix.db
+    crypto_passphrase: change-me
 webserver:
   default:
     enabled: true
-    bind: ":8080"
+    bind: "127.0.0.1:8080"
+    # Set a token to allow access from other hosts:
+    # token: change-me
 mail:
   default:
     enabled: false

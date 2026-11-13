@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	stdmail "net/mail"
 	"net/smtp"
 	"strings"
@@ -310,6 +311,16 @@ func extractRecipients(cfg Config, msg router.Message) []string {
 	return nil
 }
 
+func sanitizeHeaderValue(value string) string {
+	replacer := strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
+
+	return strings.TrimSpace(replacer.Replace(value))
+}
+
+func encodeHeaderValue(value string) string {
+	return mime.QEncoding.Encode("utf-8", sanitizeHeaderValue(value))
+}
+
 func buildMultipartMessage(from string, to []string, subject, plainText string) []byte {
 	if subject == "" {
 		subject = "Response from Spark Assistant"
@@ -319,9 +330,9 @@ func buildMultipartMessage(from string, to []string, subject, plainText string) 
 	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
 
 	var msgBuilder strings.Builder
-	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", from))
-	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", strings.Join(to, ", ")))
-	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", subject))
+	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", sanitizeHeaderValue(from)))
+	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", sanitizeHeaderValue(strings.Join(to, ", "))))
+	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", encodeHeaderValue(subject)))
 	msgBuilder.WriteString("MIME-Version: 1.0\r\n")
 	msgBuilder.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
 

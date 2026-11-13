@@ -7,10 +7,13 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/dop251/goja"
 	"golang.org/x/net/html"
 )
+
+var scriptTimeout = 2 * time.Second
 
 type ActivityDetails struct {
 	Contact     Contact      `json:"contact"`
@@ -82,6 +85,11 @@ func extractDataFromScript(scriptContent string) (map[string]any, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to setup JS VM: %w", err)
 	}
+
+	timeout := time.AfterFunc(scriptTimeout, func() {
+		vm.Interrupt("script execution timed out")
+	})
+	defer timeout.Stop()
 
 	if _, err = vm.RunString(scriptContent); err != nil {
 		return nil, fmt.Errorf("failed to run script: %w", err)

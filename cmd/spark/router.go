@@ -15,6 +15,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mail"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/matrix"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/web"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
@@ -106,6 +107,7 @@ func (c *cli) startWebServers(r *router.Router) error {
 		e := echo.New()
 		e.Use(slogecho.New(c.app.Logger()))
 		e.Use(middleware.Recover())
+		e.Use(web.TokenAuth(wCfg.Token))
 		e.HideBanner = true
 		e.HidePort = true
 
@@ -148,7 +150,7 @@ func (c *cli) startWebServers(r *router.Router) error {
 
 		bind := wCfg.Bind
 		if bind == "" {
-			bind = ":8080"
+			bind = "127.0.0.1:8080"
 		}
 
 		go func(srv *echo.Echo, addr string) {

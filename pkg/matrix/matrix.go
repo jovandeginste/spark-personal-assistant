@@ -22,7 +22,13 @@ import (
 	"maunium.net/go/mautrix/id"
 )
 
-const maxToolArgLengthLog = 40
+const (
+	maxToolArgLengthLog = 40
+
+	// legacyCryptoPassphrase keeps existing crypto stores readable when no
+	// passphrase is configured. New setups should set crypto_passphrase.
+	legacyCryptoPassphrase = "meow"
+)
 
 func init() {
 	sql.Register("sqlite3-fk-wal", &sqlite.Driver{})
@@ -378,7 +384,18 @@ func (mc *MatrixConfig) InitClient() error {
 
 func (mc *MatrixConfig) ConfigureCryptoHelper() error {
 	cfg := mc.App.Config.Matrix[mc.InstanceName]
-	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte("meow"), cfg.CryptoStore)
+
+	pickleKey := cfg.CryptoPassphrase
+	if pickleKey == "" {
+		mc.App.Logger().Warn(
+			"Matrix crypto passphrase is not configured, using the legacy default",
+			"instance", mc.InstanceName,
+			"hint", "set matrix.<instance>.crypto_passphrase",
+		)
+		pickleKey = legacyCryptoPassphrase
+	}
+
+	cryptoHelper, err := cryptohelper.NewCryptoHelper(mc.Client, []byte(pickleKey), cfg.CryptoStore)
 	if err != nil {
 		return err
 	}

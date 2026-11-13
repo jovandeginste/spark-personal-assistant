@@ -5,7 +5,18 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
+
+func TestExtractDataFromScriptTimeout(t *testing.T) {
+	originalTimeout := scriptTimeout
+	scriptTimeout = 10 * time.Millisecond
+	defer func() { scriptTimeout = originalTimeout }()
+
+	if _, err := extractDataFromScript(`while (true) {}`); err == nil {
+		t.Fatal("expected a timeout error")
+	}
+}
 
 func TestParseSubscriptionForms(t *testing.T) {
 	// JSON snippet provided in prompt is actually HTML content inside a JSON string.

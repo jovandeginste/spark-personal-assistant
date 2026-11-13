@@ -65,14 +65,15 @@ type MCPServerConfig struct {
 }
 
 type MatrixConfig struct {
-	Enabled       *bool    `mapstructure:"enabled"`
-	Homeserver    string   `mapstructure:"homeserver"`
-	Username      string   `mapstructure:"username"`
-	Password      string   `mapstructure:"password"`
-	RoomID        string   `mapstructure:"room_id"`
-	CryptoStore   string   `mapstructure:"database"`
-	Users         []string `mapstructure:"users"`
-	ThreadedTools bool     `mapstructure:"threaded_tools"`
+	Enabled          *bool    `mapstructure:"enabled"`
+	Homeserver       string   `mapstructure:"homeserver"`
+	Username         string   `mapstructure:"username"`
+	Password         string   `mapstructure:"password"`
+	RoomID           string   `mapstructure:"room_id"`
+	CryptoStore      string   `mapstructure:"database"`
+	CryptoPassphrase string   `mapstructure:"crypto_passphrase"`
+	Users            []string `mapstructure:"users"`
+	ThreadedTools    bool     `mapstructure:"threaded_tools"`
 }
 
 func (c MatrixConfig) IsEnabled() bool {
@@ -82,6 +83,7 @@ func (c MatrixConfig) IsEnabled() bool {
 type WebserverConfig struct {
 	Enabled *bool  `mapstructure:"enabled"`
 	Bind    string `mapstructure:"bind"`
+	Token   string `mapstructure:"token"`
 }
 
 func (c WebserverConfig) IsEnabled() bool {
@@ -213,7 +215,7 @@ func readPersona(persona string) *ai.AssistantConfig {
 func (a *App) SetDefaults() {
 	for k, wb := range a.Config.Webserver {
 		if wb.Bind == "" {
-			wb.Bind = ":8080"
+			wb.Bind = "127.0.0.1:8080"
 			a.Config.Webserver[k] = wb
 		}
 	}

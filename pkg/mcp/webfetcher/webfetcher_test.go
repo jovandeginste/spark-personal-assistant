@@ -48,11 +48,11 @@ func TestProcess(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Mock generic.GetBody
-			originalGetBody := generic.GetBody
-			defer func() { generic.GetBody = originalGetBody }()
+			// Mock generic.GetBodySafe
+			originalGetBodySafe := generic.GetBodySafe
+			defer func() { generic.GetBodySafe = originalGetBodySafe }()
 
-			generic.GetBody = func(url string) ([]byte, error) {
+			generic.GetBodySafe = func(url string) ([]byte, error) {
 				return []byte(tt.html), nil
 			}
 

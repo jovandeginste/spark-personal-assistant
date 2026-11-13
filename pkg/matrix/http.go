@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/jovandeginste/spark-personal-assistant/pkg/web"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	slogecho "github.com/samber/slog-echo"
@@ -21,6 +22,9 @@ func (mc *MatrixConfig) ServeHTTP(instanceName string) {
 	// Middleware
 	e.Use(middleware.Recover())
 
+	webConfig := mc.App.Config.Webserver[instanceName]
+	e.Use(web.TokenAuth(webConfig.Token))
+
 	e.HideBanner = true
 	e.HidePort = true
 
@@ -30,9 +34,9 @@ func (mc *MatrixConfig) ServeHTTP(instanceName string) {
 	e.GET("/persona", mc.switchPersona)
 	e.GET("/update", mc.update)
 
-	bind := mc.App.Config.Webserver[instanceName].Bind
+	bind := webConfig.Bind
 	if bind == "" {
-		bind = ":8080"
+		bind = "127.0.0.1:8080"
 	}
 
 	go func() {

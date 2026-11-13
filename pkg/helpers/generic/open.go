@@ -77,6 +77,10 @@ func readFile(u *url.URL) (io.ReadCloser, error) {
 }
 
 func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
+	return readHTTPWithClient(u, headers, httpClient)
+}
+
+func readHTTPWithClient(u *url.URL, headers map[string]string, client *http.Client) (io.ReadCloser, error) {
 	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return nil, err
@@ -87,7 +91,7 @@ func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
 		req.Header.Set(k, v)
 	}
 
-	resp, err := httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
