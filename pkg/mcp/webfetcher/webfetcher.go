@@ -68,10 +68,6 @@ func (m *Module) Register(server *mcp.Server) error {
 	return nil
 }
 
-func (m *Module) Enabled() error {
-	return nil
-}
-
 func (m *Module) fetchAndProcess(url string, keepTags, keepForms bool) (string, error) {
 	// Use the generic helper to get the body, restricting access to public HTTP(S) URLs
 	body, err := generic.GetBodySafe(url)

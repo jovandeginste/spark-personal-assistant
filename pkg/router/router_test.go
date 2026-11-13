@@ -42,12 +42,6 @@ func (m *mockAIClient) GenerateWithTools(ctx context.Context, data any, tools []
 func (m *mockAIClient) UploadFile(ctx context.Context, name string, data []byte, mime string) (string, error) {
 	return "", nil
 }
-func (m *mockAIClient) ListFiles(ctx context.Context) ([]string, error) {
-	return nil, nil
-}
-func (m *mockAIClient) DeleteFile(ctx context.Context, name string) error {
-	return nil
-}
 
 func TestRouter_RegisterAndList(t *testing.T) {
 	r := NewRouter(nil, nil)

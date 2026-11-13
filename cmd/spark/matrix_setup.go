@@ -12,11 +12,7 @@ func (c *cli) initMatrixClient(instanceName string, aiClient ai.Client, r *route
 	mc := &matrix.MatrixConfig{App: c.app, InstanceName: instanceName, Router: r}
 	mc.AIClient = aiClient
 
-	aiData, err := c.app.BuildData()
-	if err != nil {
-		return nil, err
-	}
-	mc.AIData = aiData
+	mc.AIData = c.app.BuildData()
 
 	if err := mc.InitClient(); err != nil {
 		return nil, err
@@ -28,10 +24,7 @@ func (c *cli) initMatrixClient(instanceName string, aiClient ai.Client, r *route
 	}
 
 	mc.InitChat()
-
-	if err := mc.Greet(); err != nil {
-		return nil, err
-	}
+	mc.Greet()
 
 	if r != nil {
 		description := fmt.Sprintf("Matrix Room (%s)", instanceName)

@@ -150,7 +150,3 @@ func (m *Module) handleGetCollections(ctx context.Context, request *mcp.CallTool
 		},
 	}, nil, nil
 }
-
-func (m *Module) Enabled() error {
-	return nil
-}

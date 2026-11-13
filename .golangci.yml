@@ -30,7 +30,6 @@ linters:
     - unparam
     - unused
     - usestdlibvars
-    - govet
     - wastedassign
 
   disable:

@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"strings"
 
-	"google.golang.org/api/iterator"
 	"google.golang.org/genai"
 )
 
@@ -299,45 +298,6 @@ func (c geminiClient) UploadFile(ctx context.Context, name string, content []byt
 	}
 
 	return f.URI, nil
-}
-
-func (c geminiClient) ListFiles(ctx context.Context) ([]string, error) {
-	client, err := c.newGeminiClient(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var uris []string
-	// Changed from client.Models.ListFiles to client.Files.List
-	iter, err := client.Files.List(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	for {
-		page, err := iter.Next(ctx)
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return nil, err
-		}
-		for _, f := range page.Items {
-			uris = append(uris, f.URI)
-		}
-	}
-
-	return uris, nil
-}
-
-func (c geminiClient) DeleteFile(ctx context.Context, name string) error {
-	client, err := c.newGeminiClient(ctx)
-	if err != nil {
-		return err
-	}
-
-	// Changed from client.Models.DeleteFile to client.Files.Delete
-	_, err = client.Files.Delete(ctx, name, nil)
-	return err
 }
 
 func (c geminiClient) newGeminiClient(ctx context.Context) (*genai.Client, error) {

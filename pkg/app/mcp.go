@@ -14,17 +14,6 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func (a *App) InitializeMCP() error {
-	// We'll initialize connections on demand or lazily, but let's at least validate config here
-	for name, config := range a.Config.MCPServers {
-		a.Logger().Info("MCP server configured", "name", name, "type", config.Transport)
-		// We can try to connect here to fail fast if config is bad, but for resiliency
-		// we should rely on getMCPClient to handle connections and reconnections.
-	}
-
-	return nil
-}
-
 func (a *App) getMCPClient(ctx context.Context, name string) (*mcp.ClientSession, error) {
 	// If we already have a healthy client, return it
 	// Note: The SDK doesn't expose a simple "IsConnected()" check that is cheap.
@@ -116,7 +105,7 @@ func (a *App) forceReconnect(name string) {
 	_ = session.Close()
 }
 
-func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error) {
+func (a *App) GetMCPTools(ctx context.Context) ([]ai.Tool, error) {
 	var tools []ai.Tool
 
 	// Iterate over configured servers instead of active clients to ensure we try to connect to all
@@ -162,7 +151,7 @@ func (a *App) GetMCPTools(ctx context.Context, roomID string) ([]ai.Tool, error)
 	return tools, nil
 }
 
-func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]any, roomID string) (string, error) {
+func (a *App) ExecuteMCPTool(ctx context.Context, name string, args map[string]any) (string, error) {
 	a.Logger().Info("executing mcp tool", "tool", name, "args", args)
 
 	parts := strings.SplitN(name, "__", 2)

@@ -165,14 +165,6 @@ func (c openaiClient) UploadFile(ctx context.Context, name string, content []byt
 	return "", errors.New("not implemented")
 }
 
-func (c openaiClient) ListFiles(ctx context.Context) ([]string, error) {
-	return nil, errors.New("not implemented")
-}
-
-func (c openaiClient) DeleteFile(ctx context.Context, name string) error {
-	return errors.New("not implemented")
-}
-
 func (c openaiClient) newOpenAIClient() openai.Client {
 	opts := []option.RequestOption{
 		option.WithAPIKey(c.APIKey()),

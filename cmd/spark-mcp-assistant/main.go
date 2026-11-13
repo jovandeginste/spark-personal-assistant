@@ -175,7 +175,7 @@ func allModules(config *Config, logger *slog.Logger, cacheService *caching.Servi
 	modules := []mcp.Module{
 		weather.New(config.Weather, logger),
 		ical.New(config.ICal, cacheService, logger),
-		vcf.New(config.VCF, cacheService, logger),
+		vcf.New(config.VCF, logger),
 		googlecontacts.New(config.GoogleContacts, logger),
 		jsonreader.New(config.JSONReader, logger),
 		webfetcher.New(config.WebFetcher, logger),

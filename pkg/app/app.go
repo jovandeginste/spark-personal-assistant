@@ -56,10 +56,6 @@ func (a *App) Initialize() error {
 		return err
 	}
 
-	if err := a.InitializeMCP(); err != nil {
-		return err
-	}
-
 	return nil
 }
 

@@ -25,7 +25,7 @@ func (aiData *AIData) ResetHistory(roomID string) {
 	aiData.ChatHistory[roomID] = []ChatHistory{}
 }
 
-// CleanHistory: keep last 10 elements in aiData.ChatHistory[roomID]:
+// CleanHistory keeps the last 100 entries from the past hour for the given room.
 func (aiData *AIData) CleanHistory(roomID string) {
 	if aiData.ChatHistory == nil {
 		return
@@ -64,12 +64,10 @@ func (aiData *AIData) AddChatHistory(roomID string, role string, input string) {
 	)
 }
 
-func (a *App) BuildData() (*AIData, error) {
-	aiData := &AIData{
+func (a *App) BuildData() *AIData {
+	return &AIData{
 		Context:     a.Config.Context,
 		UserData:    a.Config.UserData,
 		ChatHistory: make(map[string][]ChatHistory),
 	}
-
-	return aiData, nil
 }

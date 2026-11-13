@@ -2,7 +2,6 @@ package humantime
 
 import (
 	"bytes"
-	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -14,38 +13,8 @@ type HumanTime struct {
 	time.Time
 }
 
-func Today() *HumanTime {
-	now := time.Now()
-	t := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, LocalTimezone)
-	return &HumanTime{Time: t}
-}
-
-func Now() *HumanTime {
-	return &HumanTime{Time: time.Now().In(LocalTimezone)}
-}
-
-func (ct *HumanTime) Before(other *HumanTime) bool {
-	return ct.Time.Before(other.Time)
-}
-
-func (ct *HumanTime) After(other *HumanTime) bool {
-	return ct.Time.After(other.Time)
-}
-
-func (ct *HumanTime) Add(d time.Duration) *HumanTime {
-	return &HumanTime{ct.Time.Add(d)}
-}
-
 func (ct *HumanTime) DateOnly() bool {
 	return ct.Hour() == 0 && ct.Minute() == 0
-}
-
-func (ct *HumanTime) SameDate(other *HumanTime) bool {
-	return ct.Format("2006-01-02") == other.Format("2006-01-02")
-}
-
-func (ct *HumanTime) IsToday() bool {
-	return ct.SameDate(Now())
 }
 
 func (ct *HumanTime) MarshalJSON() ([]byte, error) {
@@ -109,37 +78,6 @@ func (ct *HumanTime) UnmarshalJSON(data []byte) error {
 	ct.Time = t
 
 	return nil // Success
-}
-
-func (ct HumanTime) Value() (driver.Value, error) {
-	// Check if the time is zero. You might want to store zero times as NULL in the database.
-	if ct.IsZero() {
-		return nil, nil // Return nil for zero time -> NULL in database
-	}
-
-	// Return the embedded time.Time. GORM/database driver knows how to handle this.
-	return ct.Time, nil
-}
-
-func (ct *HumanTime) Scan(value any) error {
-	// Scan needs a pointer receiver to modify the struct instance
-	if value == nil {
-		// Handle NULL from database
-		ct.Time = time.Time{} // Set to zero value
-		return nil
-	}
-
-	// Check if the value received from the database is time.Time
-	// GORM drivers typically return time.Time for DATE/TIME/TIMESTAMP columns
-	if t, ok := value.(time.Time); ok {
-		ct.Time = t
-		return nil
-	}
-
-	// If it's not time.Time, return an error
-	// (You could add more type checks here if your driver returns dates differently,
-	// e.g., as strings, but handling time.Time is the most common case)
-	return fmt.Errorf("cannot scan type %T into HumanTime", value)
 }
 
 func (ct *HumanTime) FormatDate() string {

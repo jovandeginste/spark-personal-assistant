@@ -10,7 +10,6 @@ import (
 	"time"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
-	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -20,15 +19,12 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
-	Cache caching.Cache
 }
 
-func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
-	module := &Module{
+func New(config Config, logger *slog.Logger) *Module {
+	return &Module{
 		BaseModule: sparkmcp.NewBaseModule(config, logger.With("module", "vcf")),
-		Cache:      cache,
 	}
-	return module
 }
 
 type contactParams struct {

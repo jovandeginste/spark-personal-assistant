@@ -24,13 +24,13 @@ func (mc *MatrixConfig) performCommandPrompt(name, roomID string) (string, error
 	mc.AIData.ResetHistory(roomID)
 	mc.AIData.EmployerQuestion = []string{promptBody}
 
-	tools, err := mc.App.GetMCPTools(context.Background(), roomID)
+	tools, err := mc.App.GetMCPTools(context.Background())
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
 
 	return mc.AIClient.GenerateWithTools(context.Background(), mc.AIData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
-		return mc.App.ExecuteMCPTool(ctx, name, args, roomID)
+		return mc.App.ExecuteMCPTool(ctx, name, args)
 	}, mc.AIData.FileURIs)
 }
 
@@ -115,7 +115,7 @@ func (mc *MatrixConfig) performCommandSwitchPersona(name string) (string, error)
 		return "", err
 	}
 
-	_ = mc.Greet()
+	mc.Greet()
 
 	return "Switched to persona: " + mc.App.Config.Assistant.Name, nil
 }

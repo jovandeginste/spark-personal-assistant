@@ -18,11 +18,10 @@ type AIConfig struct {
 }
 
 type AssistantConfig struct {
-	Name      string `mapstructure:"name"`
-	Style     string `mapstructure:"style"`
-	StyleFile string `mapstructure:"style_file"`
-	Language  string `mapstructure:"language"`
-	File      string `mapstructure:"file"`
+	Name     string `mapstructure:"name"`
+	Style    string `mapstructure:"style"`
+	Language string `mapstructure:"language"`
+	File     string `mapstructure:"file"`
 }
 
 type Client interface {
@@ -32,8 +31,6 @@ type Client interface {
 	GenerateWithTools(context.Context, any, []Tool, ToolExecutor, []string) (string, error)
 	Logger() *slog.Logger
 	UploadFile(context.Context, string, []byte, string) (string, error)
-	ListFiles(context.Context) ([]string, error)
-	DeleteFile(context.Context, string) error
 }
 
 type Tool struct {

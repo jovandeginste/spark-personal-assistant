@@ -63,10 +63,6 @@ func (m *Module) handler(ctx context.Context, request *mcp.CallToolRequest, para
 	}, nil, nil
 }
 
-func (m *Module) Enabled() error {
-	return nil
-}
-
 func (m *Module) search(ctx context.Context, query string, maxResults int) (string, error) {
 	tool, err := duckduckgo.New(maxResults, duckduckgo.DefaultUserAgent)
 	if err != nil {

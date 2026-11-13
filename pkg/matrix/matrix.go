@@ -24,8 +24,6 @@ import (
 )
 
 const (
-	maxToolArgLengthLog = 40
-
 	// legacyCryptoPassphrase keeps existing crypto stores readable when no
 	// passphrase is configured. New setups should set crypto_passphrase.
 	legacyCryptoPassphrase = "meow"
@@ -50,7 +48,6 @@ type MatrixConfig struct {
 
 type msg struct {
 	RoomID  id.RoomID
-	EventID id.EventID
 	Content event.MessageEventContent
 }
 
@@ -235,7 +232,7 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 		}
 	}
 
-	tools, err := mc.App.GetMCPTools(context.Background(), roomID.String())
+	tools, err := mc.App.GetMCPTools(context.Background())
 	if err != nil {
 		mc.App.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -264,10 +261,10 @@ func (mc *MatrixConfig) calculateResponse(roomID id.RoomID, eventID id.EventID, 
 		}
 
 		if mc.App.Config.Matrix[mc.InstanceName].ThreadedTools {
-			argsStr := formatToolArgs(args)
+			argsStr := ai.FormatToolArgs(args)
 			mc.sendNotice(roomID, eventID, fmt.Sprintf("> Using tool: `%s%s`", name, argsStr))
 		}
-		return mc.App.ExecuteMCPTool(ctx, name, args, roomID.String())
+		return mc.App.ExecuteMCPTool(ctx, name, args)
 	}, mc.AIData.FileURIs)
 	if err != nil {
 		return "", fmt.Errorf("could not calculate response: %w", err)
@@ -331,26 +328,6 @@ func extractAttachmentURL(message *event.MessageEventContent) id.ContentURIStrin
 	}
 
 	return ""
-}
-
-func formatToolArgs(args map[string]any) string {
-	if len(args) == 0 {
-		return ""
-	}
-
-	argList := make([]string, 0, len(args))
-	for k, v := range args {
-		n := fmt.Sprintf("%v", v)
-		if len(n) > maxToolArgLengthLog {
-			n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
-		} else {
-			n = fmt.Sprintf("%q", n)
-		}
-
-		argList = append(argList, fmt.Sprintf("%s: %v", k, n))
-	}
-
-	return "(" + strings.Join(argList, ", ") + ")"
 }
 
 func (mc *MatrixConfig) syncFunc(ctx context.Context, evt *event.Event) {
@@ -458,7 +435,7 @@ func (mc *MatrixConfig) send(roomID id.RoomID, eventID id.EventID, msgType event
 		}
 	}
 
-	mc.msges <- msg{RoomID: roomID, EventID: eventID, Content: content}
+	mc.msges <- msg{RoomID: roomID, Content: content}
 }
 
 func (mc *MatrixConfig) sendNotice(roomID id.RoomID, eventID id.EventID, text string) {
@@ -466,17 +443,13 @@ func (mc *MatrixConfig) sendNotice(roomID id.RoomID, eventID id.EventID, text st
 	mc.send(roomID, eventID, event.MsgNotice, text)
 }
 
-func (mc *MatrixConfig) SendMessage(roomID id.RoomID, text string) {
-	mc.sendMessage(roomID, text)
-}
-
 func (mc *MatrixConfig) sendMessage(roomID id.RoomID, text string) {
 	mc.send(roomID, "", event.MsgText, text)
 }
 
-func (mc *MatrixConfig) Greet() error {
+func (mc *MatrixConfig) Greet() {
 	if mc.Client == nil {
-		return nil
+		return
 	}
 
 	if err := mc.Client.SetDisplayName(context.Background(), mc.App.Config.Assistant.Name); err != nil {
@@ -484,8 +457,6 @@ func (mc *MatrixConfig) Greet() error {
 	}
 
 	mc.send(mc.DefaultRoomID(), "", event.MsgEmote, "reporting for duty")
-
-	return nil
 }
 
 func (mc *MatrixConfig) DefaultRoomID() id.RoomID {
@@ -493,10 +464,6 @@ func (mc *MatrixConfig) DefaultRoomID() id.RoomID {
 }
 
 func (mc *MatrixConfig) Register(r *router.Router, instanceName string, description string) error {
-	return mc.RegisterRouter(r, instanceName, description)
-}
-
-func (mc *MatrixConfig) RegisterRouter(r *router.Router, instanceName string, description string) error {
 	if instanceName == "" {
 		instanceName = "default"
 	}

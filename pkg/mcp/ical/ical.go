@@ -54,9 +54,7 @@ type searchParams struct {
 	sparkmcp.DateRangeParams
 }
 
-type updateParams struct {
-	Force bool `json:"force,omitempty" jsonschema:"Optional: Force update (default true)"`
-}
+type updateParams struct{}
 
 func (m *Module) Register(server *mcp.Server) error {
 	logger := m.Logger()
@@ -141,7 +139,7 @@ func (m *Module) handleUpdateCalendar(ctx context.Context, request *mcp.CallTool
 	config := m.Config().(Config)
 	logger := m.Logger().With("handler", "updateCalendar")
 
-	logger.Debug("Update calendar", "force", params.Force)
+	logger.Debug("Update calendar")
 
 	errs := make([]error, len(config.Calendars))
 

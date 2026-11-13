@@ -42,10 +42,6 @@ func New(config Config, logger *slog.Logger) *Drillster {
 	}
 }
 
-func (d *Drillster) Initialize() error {
-	return nil
-}
-
 func (d *Drillster) Register(server *sdk.Server) error {
 	d.registerWhoAmI(server)
 	d.registerSearchMembers(server)

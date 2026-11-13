@@ -9,8 +9,6 @@ import (
 
 	"github.com/chzyer/readline"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
-
-	// "github.com/jovandeginste/spark-personal-assistant/pkg/app"
 	"github.com/spf13/cobra"
 	"github.com/yarlson/pin"
 )
@@ -27,11 +25,7 @@ func (c *cli) printCmd() *cobra.Command {
 		Example: "spark print",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			aiData, err := c.app.BuildData()
-			if err != nil {
-				return err
-			}
-
+			aiData := c.app.BuildData()
 			aiData.EmployerQuestion = customPrompt
 
 			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
@@ -83,10 +77,7 @@ func (c *cli) chatCmd() *cobra.Command {
 		Example: "spark chat",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			aiData, err := c.app.BuildData()
-			if err != nil {
-				return err
-			}
+			aiData := c.app.BuildData()
 
 			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
 			if err != nil {

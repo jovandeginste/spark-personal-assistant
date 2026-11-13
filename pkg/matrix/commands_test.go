@@ -46,16 +46,6 @@ func (m *MockAIClient) UploadFile(ctx context.Context, name string, data []byte,
 	return args.String(0), args.Error(1)
 }
 
-func (m *MockAIClient) ListFiles(ctx context.Context) ([]string, error) {
-	args := m.Called(ctx)
-	return args.Get(0).([]string), args.Error(1)
-}
-
-func (m *MockAIClient) DeleteFile(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
-	return args.Error(0)
-}
-
 func TestParseInput_Prompt_With_Name(t *testing.T) {
 	mockAIClient := new(MockAIClient)
 

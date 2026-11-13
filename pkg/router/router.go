@@ -12,8 +12,6 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/app"
 )
 
-const maxToolArgLengthLog = 40
-
 // Metadata represents message headers similar to email.
 type Metadata struct {
 	From    string         `json:"from"`
@@ -296,10 +294,7 @@ func (r *Router) validateRegisteredTargets(targets []string) error {
 }
 
 func (r *Router) validateAndSetSource(sourceID string, msg *Message) error {
-	r.mu.RLock()
-	sourceAddr, ok := r.addresses[sourceID]
-	r.mu.RUnlock()
-
+	sourceAddr, ok := r.GetAddress(sourceID)
 	if !ok {
 		// If sourceID is "ai", we allow it as a virtual system source
 		if sourceID == "ai" {
@@ -364,10 +359,7 @@ func (r *Router) dispatchToTargets(ctx context.Context, msg *Message) {
 			continue
 		}
 
-		r.mu.RLock()
-		targetAddr, ok := r.addresses[targetID]
-		r.mu.RUnlock()
-
+		targetAddr, ok := r.GetAddress(targetID)
 		if !ok {
 			if r.app != nil && r.app.Logger() != nil {
 				r.app.Logger().Warn("Unknown target address", "target", targetID)
@@ -388,14 +380,7 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 		return
 	}
 
-	roomID := ""
-	if msg.Metadata.Extra != nil {
-		if rID, ok := msg.Metadata.Extra["room_id"].(string); ok {
-			roomID = rID
-		}
-	}
-
-	tools, err := r.app.GetMCPTools(ctx, roomID)
+	tools, err := r.app.GetMCPTools(ctx)
 	if err != nil {
 		r.app.Logger().Error("Failed to get MCP tools", "error", err)
 	}
@@ -403,28 +388,24 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 	// Append router MCP tools
 	tools = append(tools, r.MCPTools()...)
 
-	aiData, err := r.app.BuildData()
-	if err != nil {
-		r.app.Logger().Error("Failed to build AI data", "error", err)
-	}
-	if aiData != nil {
-		senderInfo := msg.Metadata.From
-		if msg.OriginalSource != "" {
-			senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, msg.OriginalSource)
-		} else if msg.Metadata.Extra != nil {
-			if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" {
-				senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, fromAddr)
-			}
+	aiData := r.app.BuildData()
+
+	senderInfo := msg.Metadata.From
+	if msg.OriginalSource != "" {
+		senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, msg.OriginalSource)
+	} else if msg.Metadata.Extra != nil {
+		if fromAddr, ok := msg.Metadata.Extra["from_address"].(string); ok && fromAddr != "" {
+			senderInfo = fmt.Sprintf("%s (%s)", msg.Metadata.From, fromAddr)
 		}
-		aiData.EmployerQuestion = []string{fmt.Sprintf("From: %s\nSubject: %s\n\n%s", senderInfo, msg.Metadata.Subject, msg.Content)}
 	}
+	aiData.EmployerQuestion = []string{fmt.Sprintf("From: %s\nSubject: %s\n\n%s", senderInfo, msg.Metadata.Subject, msg.Content)}
 
 	response, err := r.aiClient.GenerateWithTools(ctx, aiData, tools, func(ctx context.Context, name string, args map[string]any) (string, error) {
 		r.sendToolNotice(ctx, msg, name, args)
 		if res, handled, err := r.ExecuteTool(ctx, name, args, msg); handled {
 			return res, err
 		}
-		return r.app.ExecuteMCPTool(ctx, name, args, roomID)
+		return r.app.ExecuteMCPTool(ctx, name, args)
 	}, nil)
 
 	replyTarget := msg.Metadata.From
@@ -446,10 +427,7 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 }
 
 func (r *Router) sendReply(ctx context.Context, targetID, content, subject string, extra map[string]any) {
-	r.mu.RLock()
-	targetAddr, ok := r.addresses[targetID]
-	r.mu.RUnlock()
-
+	targetAddr, ok := r.GetAddress(targetID)
 	if !ok {
 		return
 	}
@@ -480,35 +458,14 @@ func (r *Router) sendToolNotice(ctx context.Context, msg Message, name string, a
 	}
 	extra["msgtype"] = "notice"
 
-	r.sendReply(ctx, msg.Metadata.From, fmt.Sprintf("> Using tool: `%s%s`", name, formatToolArgs(args)), msg.Metadata.Subject, extra)
+	r.sendReply(ctx, msg.Metadata.From, fmt.Sprintf("> Using tool: `%s%s`", name, ai.FormatToolArgs(args)), msg.Metadata.Subject, extra)
 }
 
 func (r *Router) threadedToolNoticesEnabled(sourceID string) bool {
-	r.mu.RLock()
-	addr, ok := r.addresses[sourceID]
-	r.mu.RUnlock()
+	addr, ok := r.GetAddress(sourceID)
 	if !ok || r.app == nil || !strings.EqualFold(addr.System, "matrix") {
 		return false
 	}
 
 	return r.app.Config.Matrix[addr.InstanceName].ThreadedTools
-}
-
-func formatToolArgs(args map[string]any) string {
-	if len(args) == 0 {
-		return ""
-	}
-
-	argList := make([]string, 0, len(args))
-	for k, v := range args {
-		n := fmt.Sprintf("%v", v)
-		if len(n) > maxToolArgLengthLog {
-			n = fmt.Sprintf("%q", n[:maxToolArgLengthLog]+"...")
-		} else {
-			n = fmt.Sprintf("%q", n)
-		}
-		argList = append(argList, fmt.Sprintf("%s: %v", k, n))
-	}
-
-	return "(" + strings.Join(argList, ", ") + ")"
 }

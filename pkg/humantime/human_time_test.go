@@ -1,11 +1,8 @@
 package humantime
 
 import (
-	"database/sql/driver"
 	"encoding/json"
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -157,144 +154,6 @@ func TestHumanTime_UnmarshalJSON(t *testing.T) {
 			// Also check the struct equality if the zero value is important
 			if !reflect.DeepEqual(ht, tt.expectedHT) {
 				t.Errorf("UnmarshalJSON() got struct = %+v, want %+v", ht, tt.expectedHT)
-			}
-		})
-	}
-}
-
-func TestHumanTime_Value(t *testing.T) {
-	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { LocalTimezone = time.Local }()
-
-	tests := []struct {
-		name          string
-		ht            HumanTime
-		expectedValue driver.Value
-		expectError   bool
-	}{
-		{
-			name:          "Non-zero time",
-			ht:            newHumanTimeLocal(2023, time.October, 27, 10, 30, 0),
-			expectedValue: time.Date(2023, time.October, 27, 10, 30, 0, 0, LocalTimezone),
-		},
-		{
-			name:          "Zero time",
-			ht:            HumanTime{},
-			expectedValue: nil, // Or potentially nil depending on driver interpretation of zero time{}
-			// The code returns time.Time{}, which database/sql drivers often map to NULL or a specific zero time.
-			// Let's test for time.Time{} as returned by the code.
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			value, err := tt.ht.Value()
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Value() expected an error but got none")
-				}
-
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Value() unexpected error: %v", err)
-				return
-			}
-
-			// Compare the database driver value
-			// For time.Time comparison, use Equal method
-			if expectedTime, ok := tt.expectedValue.(time.Time); ok {
-				if actualTime, ok := value.(time.Time); ok {
-					if !actualTime.Equal(expectedTime) {
-						t.Errorf("Value() got time = %v, want %v", actualTime, expectedTime)
-					}
-
-					return
-				}
-
-				t.Errorf("Value() returned unexpected type %T, want time.Time", value)
-
-				return
-			}
-			// For other types (like nil), use DeepEqual
-			if !reflect.DeepEqual(value, tt.expectedValue) {
-				t.Errorf("Value() got value = %v (%T), want %v (%T)", value, value, tt.expectedValue, tt.expectedValue)
-			}
-		})
-	}
-}
-
-func TestHumanTime_Scan(t *testing.T) {
-	LocalTimezone = time.FixedZone("Europe/Brussels", 2)
-	defer func() { LocalTimezone = time.Local }()
-
-	tests := []struct {
-		name        string
-		scanValue   any
-		expectedHT  HumanTime
-		expectError bool
-	}{
-		{
-			name:        "Scan nil (database NULL)",
-			scanValue:   nil,
-			expectedHT:  HumanTime{}, // Should be zero time
-			expectError: false,
-		},
-		{
-			name:        "Scan time.Time",
-			scanValue:   time.Date(2023, time.October, 27, 10, 30, 0, 0, time.UTC), // Database drivers often return UTC
-			expectedHT:  HumanTime{Time: time.Date(2023, time.October, 27, 10, 30, 0, 0, time.UTC)},
-			expectError: false,
-		},
-		{
-			name:        "Scan other type (e.g., string)",
-			scanValue:   "2023-10-27",
-			expectedHT:  HumanTime{}, // Should not modify receiver on error
-			expectError: true,
-		},
-		{
-			name:        "Scan zero time.Time",
-			scanValue:   time.Time{},
-			expectedHT:  HumanTime{Time: time.Time{}},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var ht HumanTime // Scan modifies the receiver
-			err := ht.Scan(tt.scanValue)
-
-			if tt.expectError {
-				if err == nil {
-					t.Errorf("Scan() expected an error but got none")
-					return
-				}
-				// Optionally check error type/message
-				expectedErrorSubstr := fmt.Sprintf("cannot scan type %T into HumanTime", tt.scanValue)
-				if !strings.Contains(err.Error(), expectedErrorSubstr) {
-					t.Errorf("Scan() error message got %q, want something containing %q", err.Error(), expectedErrorSubstr)
-				}
-
-				return
-			}
-
-			if err != nil {
-				t.Errorf("Scan() unexpected error: %v", err)
-				return
-			}
-
-			// Compare the scanned HumanTime
-			// Use Equal for time comparison
-			if !ht.Time.Equal(tt.expectedHT.Time) {
-				t.Errorf("Scan() got time = %v, want %v", ht.Time, tt.expectedHT.Time)
-			}
-
-			// Check full struct equality too, especially for the zero value case
-			if !reflect.DeepEqual(ht, tt.expectedHT) {
-				t.Errorf("Scan() got struct = %+v, want %+v", ht, tt.expectedHT)
 			}
 		})
 	}

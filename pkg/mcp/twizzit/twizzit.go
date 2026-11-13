@@ -44,10 +44,6 @@ func New(config Config, logger *slog.Logger) *Twizzit {
 	}
 }
 
-func (t *Twizzit) Initialize() error {
-	return nil
-}
-
 func (t *Twizzit) Register(server *sdk.Server) error {
 	t.registerGetNotifications(server)
 	t.registerGetSubscriptionForms(server)
