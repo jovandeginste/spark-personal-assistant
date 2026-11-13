@@ -1,6 +1,7 @@
 package safe
 
 import (
+	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -69,6 +70,30 @@ func TestIsSubPath(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestIsSubPathSymlinks(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping symlink tests on Windows")
+	}
+
+	tempDir := t.TempDir()
+	baseDir := filepath.Join(tempDir, "base")
+	subDir := filepath.Join(baseDir, "subdir")
+	outsideDir := filepath.Join(tempDir, "outside")
+
+	require.NoError(t, os.MkdirAll(subDir, 0o755))
+	require.NoError(t, os.MkdirAll(outsideDir, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(outsideDir, "file.txt"), []byte("outside"), 0o600))
+	require.NoError(t, os.WriteFile(filepath.Join(subDir, "file.txt"), []byte("inside"), 0o600))
+
+	// A symlink that stays inside the base is fine.
+	require.NoError(t, os.Symlink("subdir", filepath.Join(baseDir, "inside-link")))
+	require.NoError(t, IsSubPath(baseDir, filepath.Join(baseDir, "inside-link", "file.txt")))
+
+	// A symlink that escapes the base is rejected.
+	require.NoError(t, os.Symlink("../outside", filepath.Join(baseDir, "outside-link")))
+	require.Error(t, IsSubPath(baseDir, filepath.Join(baseDir, "outside-link", "file.txt")))
 }
 
 func TestIsSubPathWindows(t *testing.T) {
