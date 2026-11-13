@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -228,6 +229,31 @@ func TestSetFileRecreatesStorageDir(t *testing.T) {
 	require.NoError(t, service.Clear())
 
 	path, err := service.SetFile("key", func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("data")), nil
+	})
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "data", string(content))
+}
+
+func TestSetFileWithSymlinkedStorageDir(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping symlink test on Windows")
+	}
+
+	tempDir := t.TempDir()
+	realDir := filepath.Join(tempDir, "real")
+	linkDir := filepath.Join(tempDir, "link")
+
+	require.NoError(t, os.MkdirAll(realDir, 0o755))
+	require.NoError(t, os.Symlink(realDir, linkDir))
+
+	service, err := NewService(filepath.Join(linkDir, "cache"), time.Hour)
+	require.NoError(t, err)
+
+	path, err := service.SetFile("https://example.com/calendar.ics?x=1", func() (io.ReadCloser, error) {
 		return io.NopCloser(strings.NewReader("data")), nil
 	})
 	require.NoError(t, err)

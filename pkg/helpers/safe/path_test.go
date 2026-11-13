@@ -96,6 +96,22 @@ func TestIsSubPathSymlinks(t *testing.T) {
 	require.Error(t, IsSubPath(baseDir, filepath.Join(baseDir, "outside-link", "file.txt")))
 }
 
+func TestIsSubPathSymlinkedBase(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipping symlink tests on Windows")
+	}
+
+	tempDir := t.TempDir()
+	realBase := filepath.Join(tempDir, "real-base")
+	linkBase := filepath.Join(tempDir, "link-base")
+
+	require.NoError(t, os.MkdirAll(realBase, 0o755))
+	require.NoError(t, os.Symlink(realBase, linkBase))
+
+	require.NoError(t, IsSubPath(linkBase, filepath.Join(linkBase, "file.cache")))
+	require.NoError(t, IsSubPath(linkBase, filepath.Join(realBase, "file.cache")))
+}
+
 func TestIsSubPathWindows(t *testing.T) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Skipping Windows-specific path tests on non-Windows OS")
