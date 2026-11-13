@@ -236,18 +236,14 @@ github.com/dop251/goja/unistring
 # github.com/dustin/go-humanize v1.0.1
 ## explicit; go 1.16
 github.com/dustin/go-humanize
-# github.com/emersion/go-imap v1.2.1
-## explicit; go 1.13
-github.com/emersion/go-imap
-github.com/emersion/go-imap/backend
-github.com/emersion/go-imap/client
-github.com/emersion/go-imap/commands
-github.com/emersion/go-imap/responses
-github.com/emersion/go-imap/server
-github.com/emersion/go-imap/utf7
-# github.com/emersion/go-imap-idle v0.0.0-20210907174914-db2568431445
-## explicit; go 1.13
-github.com/emersion/go-imap-idle
+# github.com/emersion/go-imap/v2 v2.0.0-beta.8
+## explicit; go 1.18
+github.com/emersion/go-imap/v2
+github.com/emersion/go-imap/v2/imapclient
+github.com/emersion/go-imap/v2/internal
+github.com/emersion/go-imap/v2/internal/imapnum
+github.com/emersion/go-imap/v2/internal/imapwire
+github.com/emersion/go-imap/v2/internal/utf7
 # github.com/emersion/go-message v0.18.2
 ## explicit; go 1.14
 github.com/emersion/go-message

@@ -1,6 +1,7 @@
 package mail
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"errors"
@@ -12,9 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emersion/go-imap"
-	idle "github.com/emersion/go-imap-idle"
-	"github.com/emersion/go-imap/client"
+	"github.com/emersion/go-imap/v2"
+	imapclient "github.com/emersion/go-imap/v2/imapclient"
 	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/charset"
 	msgmail "github.com/emersion/go-message/mail"
@@ -52,30 +52,51 @@ type Message struct {
 	Body        string
 }
 
-func init() {
-	imap.CharsetReader = charset.Reader
+const pollInterval = time.Minute
+
+type idleResult struct {
+	command *imapclient.IdleCommand
+	err     error
 }
 
 func ConnectAndIdle(ctx context.Context, cfg Config, msgChan chan<- Message, logger *slog.Logger) error {
 	addr := fmt.Sprintf("%s:%d", cfg.IMAP.Host, cfg.IMAP.Port)
-	var c *client.Client
-	var err error
 
-	if cfg.UseTLS {
-		c, err = client.DialTLS(addr, &tls.Config{
+	updates := make(chan struct{}, 1)
+
+	options := &imapclient.Options{
+		TLSConfig: &tls.Config{
 			ServerName: cfg.IMAP.Host,
 			MinVersion: tls.VersionTLS12,
-		})
+		},
+		WordDecoder: &mime.WordDecoder{CharsetReader: charset.Reader},
+		UnilateralDataHandler: &imapclient.UnilateralDataHandler{
+			Mailbox: func(*imapclient.UnilateralDataMailbox) {
+				select {
+				case updates <- struct{}{}:
+				default:
+				}
+			},
+		},
+	}
+
+	var (
+		c   *imapclient.Client
+		err error
+	)
+
+	if cfg.UseTLS {
+		c, err = imapclient.DialTLS(addr, options)
 	} else {
-		c, err = client.Dial(addr)
+		c, err = imapclient.DialInsecure(addr, options)
 	}
 
 	if err != nil {
 		return fmt.Errorf("failed to connect to imap server: %w", err)
 	}
-	defer c.Logout()
+	defer func() { _ = c.Close() }()
 
-	if err := c.Login(cfg.Username, cfg.Password); err != nil {
+	if err := c.Login(cfg.Username, cfg.Password).Wait(); err != nil {
 		return fmt.Errorf("failed to login: %w", err)
 	}
 
@@ -84,127 +105,126 @@ func ConnectAndIdle(ctx context.Context, cfg Config, msgChan chan<- Message, log
 		folder = "INBOX"
 	}
 
-	_, err = c.Select(folder, false)
-	if err != nil {
+	if _, err := c.Select(folder, nil).Wait(); err != nil {
 		return fmt.Errorf("failed to select folder %s: %w", folder, err)
 	}
 
-	// Fetch any existing unseen messages first
-	msgs, err := fetchUnseen(c, cfg, logger)
+	messages, err := fetchUnseen(c, cfg, logger)
 	if err != nil {
 		logger.Error("failed to fetch initial unseen messages", "error", err)
 	} else {
-		for _, m := range msgs {
+		for _, m := range messages {
 			msgChan <- m
 		}
 	}
 
-	idleClient := idle.NewClient(c)
-
-	updates := make(chan client.Update, 50)
-	c.Updates = updates
+	if !c.Caps().Has(imap.CapIdle) {
+		return pollUnseen(ctx, c, cfg, logger, msgChan)
+	}
 
 	for {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		stop := make(chan struct{})
-		done := make(chan error, 1)
+		idleCh := make(chan idleResult, 1)
 
 		go func() {
-			done <- idleClient.IdleWithFallback(stop, 0)
+			command, err := c.Idle()
+			idleCh <- idleResult{command: command, err: err}
 		}()
 
 		select {
-		case update := <-updates:
-			if err := handleUpdate(update, c, cfg, logger, stop, done, msgChan); err != nil {
-				return err
-			}
-		case err := <-done:
-			if err != nil {
-				return fmt.Errorf("idle disconnected: %w", err)
-			}
 		case <-ctx.Done():
-			close(stop)
-			<-done
-
 			return ctx.Err()
+		case result := <-idleCh:
+			if result.err != nil {
+				return fmt.Errorf("idle failed: %w", result.err)
+			}
+
+			select {
+			case <-updates:
+				if err := result.command.Close(); err != nil {
+					return fmt.Errorf("idle disconnected: %w", err)
+				}
+
+				newMessages, err := fetchUnseen(c, cfg, logger)
+				if err != nil {
+					logger.Error("failed to fetch unseen messages", "error", err)
+					continue
+				}
+
+				for _, m := range newMessages {
+					msgChan <- m
+				}
+			case <-ctx.Done():
+				_ = result.command.Close()
+				return ctx.Err()
+			}
 		}
 	}
 }
 
-func handleUpdate(update client.Update, c *client.Client, cfg Config, logger *slog.Logger, stop chan struct{}, done chan error, msgChan chan<- Message) error {
-	logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
+func pollUnseen(ctx context.Context, c *imapclient.Client, cfg Config, logger *slog.Logger, msgChan chan<- Message) error {
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
 
-	close(stop)
-	err := <-done // Wait for IDLE to finish
-	if err != nil {
-		return fmt.Errorf("idle disconnected: %w", err)
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-ticker.C:
+			messages, err := fetchUnseen(c, cfg, logger)
+			if err != nil {
+				logger.Error("failed to fetch unseen messages", "error", err)
+				continue
+			}
 
-	newMsgs, err := fetchUnseen(c, cfg, logger)
-	if err != nil {
-		logger.Error("failed to fetch unseen messages", "error", err)
-		return nil
+			for _, m := range messages {
+				msgChan <- m
+			}
+		}
 	}
-
-	if len(newMsgs) == 0 {
-		return nil
-	}
-
-	logger.Info("Fetched new unseen messages", "count", len(newMsgs))
-	for _, m := range newMsgs {
-		msgChan <- m
-	}
-	logger.Info("IMAP updates parsed")
-	return nil
 }
 
-func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, error) {
-	criteria := imap.NewSearchCriteria()
-	criteria.WithoutFlags = []string{imap.SeenFlag}
+func fetchUnseen(c *imapclient.Client, cfg Config, logger *slog.Logger) ([]Message, error) {
+	criteria := &imap.SearchCriteria{NotFlag: []imap.Flag{imap.FlagSeen}}
 
-	// Ensure we don't hang if server doesn't respond
-	c.Timeout = 10 * time.Second
-	defer func() { c.Timeout = 0 }()
-
-	uids, err := c.Search(criteria)
+	data, err := c.Search(criteria, nil).Wait()
 	if err != nil {
 		return nil, fmt.Errorf("failed to search messages: %w", err)
 	}
-	logger.Info("IMAP search found unseen messages", "count", len(uids))
-	if len(uids) == 0 {
+
+	seqNums := data.AllSeqNums()
+	logger.Info("IMAP search found unseen messages", "count", len(seqNums))
+	if len(seqNums) == 0 {
 		return []Message{}, nil
 	}
 
-	seqset := new(imap.SeqSet)
-	seqset.AddNum(uids...)
+	seqSet := imap.SeqSetNum(seqNums...)
 
-	section := &imap.BodySectionName{}
-	items := []imap.FetchItem{imap.FetchEnvelope, section.FetchItem()}
+	buffers, err := c.Fetch(seqSet, &imap.FetchOptions{
+		Envelope:    true,
+		BodySection: []*imap.FetchItemBodySection{{Peek: true}},
+	}).Collect()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch messages: %w", err)
+	}
 
-	messages := make(chan *imap.Message, 10)
-	done := make(chan error, 1)
-
-	go func() {
-		done <- c.Fetch(seqset, items, messages)
-	}()
-
-	results := make([]Message, 0, len(uids))
-	for msg := range messages {
-		if msg == nil {
+	results := make([]Message, 0, len(buffers))
+	for _, buffer := range buffers {
+		if buffer.Envelope == nil {
 			continue
 		}
 
 		m := Message{
-			Subject: msg.Envelope.Subject,
-			Date:    msg.Envelope.Date,
+			Subject: buffer.Envelope.Subject,
+			Date:    buffer.Envelope.Date,
 		}
 
-		if len(msg.Envelope.From) > 0 {
-			m.From = msg.Envelope.From[0].PersonalName
-			m.FromAddress = msg.Envelope.From[0].MailboxName + "@" + msg.Envelope.From[0].HostName
+		if len(buffer.Envelope.From) > 0 {
+			m.From = buffer.Envelope.From[0].Name
+			m.FromAddress = buffer.Envelope.From[0].Addr()
 			if m.From == "" {
 				m.From = m.FromAddress
 			}
@@ -215,9 +235,8 @@ func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, 
 			continue
 		}
 
-		r := msg.GetBody(section)
-		if r != nil {
-			body, err := extractMessageBody(r)
+		if len(buffer.BodySection) > 0 {
+			body, err := extractMessageBody(bytes.NewReader(buffer.BodySection[0].Bytes))
 			if err != nil {
 				logger.Error("failed to decode message body", "error", err)
 				continue
@@ -228,14 +247,11 @@ func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, 
 		results = append(results, m)
 	}
 
-	if err := <-done; err != nil {
-		return nil, fmt.Errorf("failed to fetch messages: %w", err)
-	}
-
-	// Mark as seen
-	flags := []any{imap.SeenFlag}
-	item := imap.FormatFlagsOp(imap.AddFlags, true)
-	if err := c.Store(seqset, item, flags, nil); err != nil {
+	if err := c.Store(seqSet, &imap.StoreFlags{
+		Op:     imap.StoreFlagsAdd,
+		Silent: true,
+		Flags:  []imap.Flag{imap.FlagSeen},
+	}, nil).Close(); err != nil {
 		logger.Error("failed to mark messages as seen", "error", err)
 	}
 

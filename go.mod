@@ -12,8 +12,7 @@ require (
 	github.com/chzyer/readline v1.5.1
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/dop251/goja v0.0.0-20260903201622-f87b40ad7341
-	github.com/emersion/go-imap v1.2.1
-	github.com/emersion/go-imap-idle v0.0.0-20210907174914-db2568431445
+	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-vcard v0.1.0
 	github.com/glebarez/go-sqlite v1.23.0
