@@ -2,12 +2,10 @@ package websearch
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/robermar23/langchaingo/tools/duckduckgo"
 )
 
 type Config struct{}
@@ -48,7 +46,7 @@ func (m *Module) handler(ctx context.Context, request *mcp.CallToolRequest, para
 		maxResults = 10
 	}
 
-	results, err := m.search(ctx, params.Query, maxResults)
+	results, err := searchDuckDuckGo(ctx, params.Query, maxResults)
 	if err != nil {
 		reqLogger.Error("Failed to search the web", "query", params.Query, "error", err)
 		return nil, nil, err
@@ -61,18 +59,4 @@ func (m *Module) handler(ctx context.Context, request *mcp.CallToolRequest, para
 			},
 		},
 	}, nil, nil
-}
-
-func (m *Module) search(ctx context.Context, query string, maxResults int) (string, error) {
-	tool, err := duckduckgo.New(maxResults, duckduckgo.DefaultUserAgent)
-	if err != nil {
-		return "", fmt.Errorf("failed to initialize duckduckgo search: %w", err)
-	}
-
-	result, err := tool.Call(ctx, query)
-	if err != nil {
-		return "", fmt.Errorf("failed to execute search: %w", err)
-	}
-
-	return result, nil
 }

@@ -23,7 +23,6 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/netresearch/go-cron v0.16.0
 	github.com/openai/openai-go v1.12.0
-	github.com/robermar23/langchaingo v0.1.9
 	github.com/samber/slog-echo v1.23.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -179,7 +178,6 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.4.3 // indirect
 	github.com/petermattis/goid v0.0.0-20260820044319-269ab09b5261 // indirect
-	github.com/pkoukk/tiktoken-go v0.1.8 // indirect
 	github.com/polyfloyd/go-errorlint v1.7.1 // indirect
 	github.com/prometheus/client_golang v1.12.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
@@ -249,7 +247,6 @@ require (
 	go.opentelemetry.io/otel v1.46.0 // indirect
 	go.opentelemetry.io/otel/metric v1.46.0 // indirect
 	go.opentelemetry.io/otel/trace v1.46.0 // indirect
-	go.starlark.net v0.0.0-20260904161901-6ecada49e42f // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
