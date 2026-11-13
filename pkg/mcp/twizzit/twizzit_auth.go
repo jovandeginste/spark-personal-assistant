@@ -58,7 +58,7 @@ func (t *Twizzit) retryRequest(method, requestURL string, formData ...url.Values
 
 func (t *Twizzit) handleAuthError(resp *http.Response) (bool, error) {
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		if t.config.Username != "" && t.config.Password != "" {
+		if t.cfg().Username != "" && t.cfg().Password != "" {
 			t.Logger().Info("twizzit returned unauthorized/forbidden, attempting login", "status_code", resp.StatusCode)
 			if err := t.login(); err != nil {
 				return false, fmt.Errorf("login failed after unauthorized: %w", err)
@@ -72,7 +72,7 @@ func (t *Twizzit) handleAuthError(resp *http.Response) (bool, error) {
 		location, err := resp.Location()
 		if err == nil {
 			if strings.Contains(location.String(), "login") || strings.Contains(location.String(), "expired") {
-				if t.config.Username != "" && t.config.Password != "" {
+				if t.cfg().Username != "" && t.cfg().Password != "" {
 					t.Logger().Info("twizzit session expired or redirected to login, attempting login")
 					if err := t.login(); err != nil {
 						return false, fmt.Errorf("twizzit session expired and login failed: %w", err)
@@ -114,8 +114,8 @@ func (t *Twizzit) login() error {
 	form.Set("mobileDeviceType", "")
 	form.Set("mobileDeviceId", "")
 	form.Set("token", token)
-	form.Set("username", t.config.Username)
-	form.Set("password", t.config.Password)
+	form.Set("username", t.cfg().Username)
+	form.Set("password", t.cfg().Password)
 	form.Set("authCode", "")
 
 	req, err = http.NewRequest(http.MethodPost, "https://app.twizzit.com/v2/login", strings.NewReader(form.Encode()))
@@ -149,8 +149,8 @@ func (t *Twizzit) login() error {
 
 			// Just hit the dashboard to finalize the session
 			dashboardURL := "https://app.twizzit.com/v2/dashboard"
-			if t.config.OrganizationID != 0 {
-				dashboardURL = fmt.Sprintf("%s?organization-id=%d", dashboardURL, t.config.OrganizationID)
+			if t.cfg().OrganizationID != 0 {
+				dashboardURL = fmt.Sprintf("%s?organization-id=%d", dashboardURL, t.cfg().OrganizationID)
 			}
 			t.Logger().Debug("calling dashboard to finalize login", "url", dashboardURL)
 			req, err = http.NewRequest(http.MethodGet, dashboardURL, nil)

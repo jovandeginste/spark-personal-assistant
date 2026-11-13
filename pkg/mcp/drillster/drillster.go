@@ -33,7 +33,6 @@ type Config struct {
 
 type Drillster struct {
 	mcp.BaseModule
-	config Config
 	client *http.Client
 
 	mu    sync.Mutex
@@ -44,12 +43,15 @@ func New(config Config, logger *slog.Logger) *Drillster {
 	jar, _ := cookiejar.New(nil)
 	return &Drillster{
 		BaseModule: mcp.NewBaseModule(config, logger),
-		config:     config,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 			Jar:     jar,
 		},
 	}
+}
+
+func (d *Drillster) cfg() Config {
+	return d.Config().(Config)
 }
 
 func (d *Drillster) Register(server *sdk.Server) error {
@@ -139,7 +141,7 @@ func (d *Drillster) login() error {
 
 	// Step 2: POST /daas/identify
 	form := url.Values{}
-	form.Add("username", d.config.Username)
+	form.Add("username", d.cfg().Username)
 	form.Add("_csrf", csrf)
 
 	resp, err = d.client.PostForm(drillsterIdentifyURL, form)
@@ -151,7 +153,7 @@ func (d *Drillster) login() error {
 	// Step 3: POST /daas/authenticate/password
 	form = url.Values{}
 	form.Add("principalIdentifierAccountId", "")
-	form.Add("password", d.config.Password)
+	form.Add("password", d.cfg().Password)
 	form.Add("_csrf", csrf)
 
 	resp, err = d.client.PostForm(drillsterAuthenticateURL, form)

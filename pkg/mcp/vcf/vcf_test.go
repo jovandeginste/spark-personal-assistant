@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewCleansConfigPath(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "sub", "..", "contacts.vcf")
+	module := New(Config{Path: path}, slog.Default())
+
+	assert.Equal(t, filepath.Clean(path), module.Config().(Config).Path)
+}
+
 func TestParseVCF(t *testing.T) {
 	vcfContent := `BEGIN:VCARD
 VERSION:3.0

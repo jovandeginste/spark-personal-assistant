@@ -134,14 +134,16 @@ func (c *cli) chatCmd() *cobra.Command {
 				)
 
 				cancel := spinner.Start(context.Background())
-				defer cancel()
 
 				md, err := aiClient.GeneratePrompt(context.Background(), aiData)
 				if err != nil {
+					cancel()
+
 					return err
 				}
 
 				spinner.Stop("Ready!")
+				cancel()
 				fmt.Println(md)
 				aiData.AddChatHistory("cli", "user", input)
 				aiData.AddChatHistory("cli", "assistant", md)

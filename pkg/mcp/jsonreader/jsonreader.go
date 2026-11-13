@@ -131,11 +131,12 @@ func (m *Module) loadAllEvents(config Config) ([]Event, []string) {
 		result, err, _ := m.sourceGroup.Do(key, func() (any, error) {
 			var data []byte
 
+			cached := false
 			if m.Cache != nil {
-				data, _ = m.Cache.Get(key)
+				data, cached = m.Cache.Get(key)
 			}
 
-			if data == nil {
+			if !cached {
 				fetched, err := generic.GetBody(source.URL)
 				if err != nil {
 					return nil, err
@@ -149,7 +150,7 @@ func (m *Module) loadAllEvents(config Config) ([]Event, []string) {
 				return nil, fmt.Errorf("invalid JSON: %w", err)
 			}
 
-			if m.Cache != nil {
+			if !cached && m.Cache != nil {
 				m.Cache.Set(key, data)
 			}
 

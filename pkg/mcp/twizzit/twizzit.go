@@ -24,7 +24,6 @@ type Config struct {
 
 type Twizzit struct {
 	mcp.BaseModule
-	config Config
 	client *http.Client
 }
 
@@ -33,7 +32,6 @@ func New(config Config, logger *slog.Logger) *Twizzit {
 
 	return &Twizzit{
 		BaseModule: mcp.NewBaseModule(config, logger),
-		config:     config,
 		client: &http.Client{
 			Timeout: 10 * time.Second,
 			Jar:     jar,
@@ -42,6 +40,10 @@ func New(config Config, logger *slog.Logger) *Twizzit {
 			},
 		},
 	}
+}
+
+func (t *Twizzit) cfg() Config {
+	return t.Config().(Config)
 }
 
 func (t *Twizzit) Register(server *sdk.Server) error {

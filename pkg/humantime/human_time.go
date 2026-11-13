@@ -14,7 +14,7 @@ type HumanTime struct {
 }
 
 func (ct *HumanTime) DateOnly() bool {
-	return ct.Hour() == 0 && ct.Minute() == 0
+	return ct.Hour() == 0 && ct.Minute() == 0 && ct.Second() == 0 && ct.Nanosecond() == 0
 }
 
 func (ct *HumanTime) MarshalJSON() ([]byte, error) {

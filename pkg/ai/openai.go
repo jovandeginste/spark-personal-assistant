@@ -2,10 +2,12 @@ package ai
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/openai/openai-go"
@@ -117,6 +119,15 @@ func (c *openaiClient) GenerateWithTools(ctx context.Context, data any, tools []
 
 	messages := []openai.ChatCompletionMessageParamUnion{promptMsg}
 
+	if len(fileURIs) > 0 {
+		parts := make([]openai.ChatCompletionContentPartUnionParam, 0, len(fileURIs))
+		for _, uri := range fileURIs {
+			parts = append(parts, openai.ImageContentPart(openai.ChatCompletionContentPartImageImageURLParam{URL: uri}))
+		}
+
+		messages = append(messages, openai.UserMessage(parts))
+	}
+
 	for i := range MaxToolCalls {
 		result, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 			Messages: messages,
@@ -165,8 +176,16 @@ func (c *openaiClient) GenerateWithTools(ctx context.Context, data any, tools []
 	return "", errors.New("reached maximum iterations with tool calls")
 }
 
-func (c *openaiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
-	return "", errors.New("not implemented")
+func (c *openaiClient) UploadFile(_ context.Context, name string, content []byte, mimeType string) (string, error) {
+	if !strings.HasPrefix(mimeType, "image/") {
+		return "", fmt.Errorf("OpenAI-compatible backends only support image attachments, got %q for %s", mimeType, name)
+	}
+
+	if len(content) == 0 {
+		return "", fmt.Errorf("cannot upload empty file %s", name)
+	}
+
+	return "data:" + mimeType + ";base64," + base64.StdEncoding.EncodeToString(content), nil
 }
 
 func (c *openaiClient) newOpenAIClient() openai.Client {

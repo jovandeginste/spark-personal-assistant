@@ -301,6 +301,46 @@ func TestLoadAllEventsCachesSources(t *testing.T) {
 	assert.Equal(t, 1, calls)
 }
 
+type countingCache struct {
+	caching.Cache
+	sets int
+}
+
+func (c *countingCache) Set(key string, value []byte) {
+	c.sets++
+	c.Cache.Set(key, value)
+}
+
+func TestLoadAllEventsDoesNotRewriteCachedSources(t *testing.T) {
+	realCache, err := caching.NewService(t.TempDir(), time.Hour)
+	require.NoError(t, err)
+
+	const (
+		name = "Cached Source"
+		url  = "http://example.com/cached.json"
+	)
+
+	realCache.Set("jsonreader:"+url, mockEventsJSON)
+
+	cache := &countingCache{Cache: realCache}
+
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	generic.GetBody = func(string) ([]byte, error) {
+		t.Fatal("cached source should not be fetched")
+		return nil, nil
+	}
+
+	config := Config{Sources: []Source{{Name: name, URL: url}}}
+	module := New(config, cache, slog.Default())
+
+	events, failed := module.loadAllEvents(config)
+	require.Empty(t, failed)
+	require.Len(t, events, 3)
+	assert.Zero(t, cache.sets)
+}
+
 func TestLoadAllEventsReportsFailures(t *testing.T) {
 	originalGetBody := generic.GetBody
 	defer func() { generic.GetBody = originalGetBody }()

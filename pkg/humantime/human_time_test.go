@@ -204,3 +204,24 @@ func TestHumanTime_FormatDate(t *testing.T) {
 		})
 	}
 }
+
+func TestHumanTime_DateOnly(t *testing.T) {
+	tests := []struct {
+		name     string
+		ht       HumanTime
+		expected bool
+	}{
+		{"midnight", newHumanTimeLocal(2024, time.January, 1, 0, 0, 0), true},
+		{"with seconds", newHumanTimeLocal(2024, time.January, 1, 0, 0, 1), false},
+		{"with nanoseconds", HumanTime{Time: time.Date(2024, time.January, 1, 0, 0, 0, 1, LocalTimezone)}, false},
+		{"with minutes", newHumanTimeLocal(2024, time.January, 1, 0, 1, 0), false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ht.DateOnly(); got != tt.expected {
+				t.Errorf("DateOnly() got = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
