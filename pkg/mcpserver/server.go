@@ -25,22 +25,34 @@ type Server struct {
 // New creates a server and initializes all modules. Initialization failures are
 // logged and do not prevent the server from starting.
 func New(name, version string, modules []sparkmcp.Module, logger *slog.Logger) *Server {
+	enabled := make([]sparkmcp.Module, 0, len(modules))
+
 	for _, module := range modules {
+		if err := module.Enabled(); err != nil {
+			logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
+
+			continue
+		}
+
 		if err := module.Initialize(); err != nil {
 			logger.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
 		}
+
+		enabled = append(enabled, module)
 	}
 
 	return &Server{
 		name:    name,
 		version: version,
-		modules: modules,
+		modules: enabled,
 		logger:  logger,
 	}
 }
 
 // Run listens on addr and shuts down gracefully when ctx is canceled.
 func (s *Server) Run(ctx context.Context, addr string, extraRoutes func(*http.ServeMux)) error {
+	defer s.closeModules()
+
 	mux := http.NewServeMux()
 	mux.Handle("/", s.handler())
 
@@ -75,6 +87,14 @@ func (s *Server) Run(ctx context.Context, addr string, extraRoutes func(*http.Se
 	}
 }
 
+func (s *Server) closeModules() {
+	for _, module := range s.modules {
+		if err := module.Close(); err != nil {
+			s.logger.Error("failed to close module", "module", fmt.Sprintf("%T", module), "error", err)
+		}
+	}
+}
+
 func (s *Server) handler() http.Handler {
 	return sdk.NewStreamableHTTPHandler(func(r *http.Request) *sdk.Server {
 		server := sdk.NewServer(&sdk.Implementation{
@@ -88,12 +108,6 @@ func (s *Server) handler() http.Handler {
 		})
 
 		for _, module := range s.modules {
-			if err := module.Enabled(); err != nil {
-				s.logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
-
-				continue
-			}
-
 			if err := module.Register(server); err != nil {
 				s.logger.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
 

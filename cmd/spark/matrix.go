@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/spf13/cobra"
+	"golang.org/x/sync/errgroup"
 )
 
 func (c *cli) matrixChatCmd() *cobra.Command {
@@ -26,10 +28,15 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 				return err
 			}
 
+			group, groupCtx := errgroup.WithContext(ctx)
+			started := false
+
 			for instanceName, mCfg := range c.app.Config.Matrix {
 				if !mCfg.IsEnabled() {
 					continue
 				}
+
+				started = true
 
 				mc, err := c.initMatrixClient(instanceName, aiClient, nil)
 				if err != nil {
@@ -46,17 +53,25 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 				)
 
 				if wCfg, ok := mc.App.Config.Webserver[instanceName]; ok && wCfg.IsEnabled() {
-					mc.ServeHTTP(ctx, instanceName)
+					mc.ServeHTTP(groupCtx, instanceName)
 				}
 
-				if err := mc.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
-					c.app.Logger().Error("Failed to sync", "instance", instanceName, "error", err)
-				}
+				group.Go(func() error {
+					defer func() { _ = mc.CryptoHelper.Close() }()
 
-				return mc.CryptoHelper.Close()
+					if err := mc.Client.SyncWithContext(groupCtx); err != nil && !errors.Is(err, context.Canceled) {
+						return fmt.Errorf("matrix %s: %w", instanceName, err)
+					}
+
+					return nil
+				})
 			}
 
-			return errors.New("no enabled matrix instance found in configuration")
+			if !started {
+				return errors.New("no enabled matrix instance found in configuration")
+			}
+
+			return group.Wait()
 		},
 	}
 

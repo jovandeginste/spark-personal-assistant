@@ -9,10 +9,13 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+const mcpConnectTimeout = 30 * time.Second
 
 func (a *App) getMCPClient(ctx context.Context, name string) (*mcp.ClientSession, error) {
 	result, err, _ := a.mcpGroup.Do(name, func() (any, error) {
@@ -56,13 +59,17 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 
 	a.Logger().Info("Connecting to MCP server", "name", name, "transport", transportType)
 
-	// Create a context for the connection.
-	// Note: We need a long-lived context for the connection, distinct from the request context.
-	// Using context.Background() for now as these should live as long as the app/connection needs.
-	connectCtx := context.Background()
+	// The connection context must outlive the handshake, but the handshake
+	// itself should not be able to block forever.
+	connectCtx, cancel := context.WithCancel(context.Background())
+	connectTimer := time.AfterFunc(mcpConnectTimeout, cancel)
 
 	session, err := c.Connect(connectCtx, transport, nil)
+	connectTimer.Stop()
+
 	if err != nil {
+		cancel()
+
 		return nil, fmt.Errorf("failed to connect to MCP server %s: %w", name, err)
 	}
 
@@ -71,6 +78,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 	// Another goroutine may have connected while we were dialing.
 	if existing, ok := a.mcpClients[name]; ok {
 		a.mcpMu.Unlock()
+		cancel()
 		_ = session.Close()
 
 		return existing, nil
@@ -78,6 +86,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 
 	a.mcpClients[name] = session
 	a.mcpCleanup[name] = func() {
+		cancel()
 		_ = session.Close()
 	}
 
@@ -89,7 +98,7 @@ func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSessi
 // forceReconnect closes the existing session (if any) and removes it, ensuring the next get call creates a new one
 func (a *App) forceReconnect(name string) {
 	a.mcpMu.Lock()
-	session, ok := a.mcpClients[name]
+	cleanup, ok := a.mcpCleanup[name]
 	if ok {
 		delete(a.mcpClients, name)
 		// invalidate cached tools when we reconnect, they might have changed
@@ -103,7 +112,7 @@ func (a *App) forceReconnect(name string) {
 	}
 
 	a.Logger().Info("Forcing reconnection for MCP server", "name", name)
-	_ = session.Close()
+	cleanup()
 }
 
 func (a *App) GetMCPTools(ctx context.Context) ([]ai.Tool, error) {

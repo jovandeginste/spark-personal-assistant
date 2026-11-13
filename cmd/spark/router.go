@@ -57,6 +57,7 @@ func (c *cli) routerCmd() *cobra.Command {
 			c.waitForShutdown()
 
 			cancel()
+			r.Wait()
 			wg.Wait()
 
 			return nil

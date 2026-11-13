@@ -37,7 +37,8 @@ type Reminder struct {
 
 type Module struct {
 	sparkmcp.BaseModule
-	mu sync.RWMutex
+	mu           sync.RWMutex
+	workerCancel context.CancelFunc
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -92,11 +93,22 @@ func (m *Module) readRemindersLocked() (map[string]Reminder, error) {
 }
 
 func (m *Module) Initialize() error {
-	m.StartWorker()
+	ctx, cancel := context.WithCancel(context.Background())
+	m.workerCancel = cancel
+	m.StartWorker(ctx)
+
 	return nil
 }
 
-func (m *Module) StartWorker() {
+func (m *Module) Close() error {
+	if m.workerCancel != nil {
+		m.workerCancel()
+	}
+
+	return nil
+}
+
+func (m *Module) StartWorker(ctx context.Context) {
 	config := m.Config().(Config)
 	logger := m.Logger()
 
@@ -107,13 +119,22 @@ func (m *Module) StartWorker() {
 
 	go func() {
 		logger.Info("Starting reminder worker", "callback", config.Callback)
+
 		for {
 			m.processReminders(config, logger)
 
-			// Sleep until the next minute starts
+			// Sleep until the next minute starts.
 			now := time.Now()
 			nextMinute := now.Truncate(time.Minute).Add(time.Minute)
-			time.Sleep(time.Until(nextMinute))
+			timer := time.NewTimer(time.Until(nextMinute))
+
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+
+				return
+			case <-timer.C:
+			}
 		}
 	}()
 }
@@ -132,10 +153,12 @@ func (m *Module) processReminders(config Config, logger *slog.Logger) {
 	var toTrigger []Reminder
 
 	for id, reminder := range reminders {
-		if m.shouldTriggerReminder(reminder, parser, now) {
+		schedule, parseErr := parser.Parse(reminder.Cron)
+
+		if m.shouldTriggerReminderWithSchedule(reminder, schedule, parseErr, now) {
 			toTrigger = append(toTrigger, reminder)
-			_, err := parser.Parse(reminder.Cron)
-			if reminder.OneTime || err != nil {
+
+			if reminder.OneTime || parseErr != nil {
 				// It's a one-time reminder (explicitly requested or parsing as cron failed), so delete it after triggering
 				toDelete = append(toDelete, id)
 			}
@@ -153,9 +176,15 @@ func (m *Module) processReminders(config Config, logger *slog.Logger) {
 
 func (m *Module) shouldTriggerReminder(reminder Reminder, parser cron.Parser, now time.Time) bool {
 	schedule, err := parser.Parse(reminder.Cron)
-	if err == nil {
+
+	return m.shouldTriggerReminderWithSchedule(reminder, schedule, err, now)
+}
+
+func (m *Module) shouldTriggerReminderWithSchedule(reminder Reminder, schedule cron.Schedule, parseErr error, now time.Time) bool {
+	if parseErr == nil {
 		nowMinute := now.Truncate(time.Minute)
 		nextRun := schedule.Next(nowMinute.Add(-1 * time.Minute))
+
 		return nextRun.Equal(nowMinute)
 	}
 

@@ -42,6 +42,7 @@ type Router struct {
 	addresses map[string]Address
 	aiClient  ai.Client
 	app       *app.App
+	wg        sync.WaitGroup
 }
 
 var (
@@ -345,8 +346,19 @@ func (r *Router) handleAIRequirement(ctx context.Context, msg *Message) {
 	}
 
 	if needsAI && r.aiClient != nil {
-		go r.routeToAI(ctx, *msg)
+		r.wg.Add(1)
+
+		go func() {
+			defer r.wg.Done()
+
+			r.routeToAI(ctx, *msg)
+		}()
 	}
+}
+
+// Wait blocks until all in-flight AI requests have finished.
+func (r *Router) Wait() {
+	r.wg.Wait()
 }
 
 func isAIIdentifier(value string) bool {
