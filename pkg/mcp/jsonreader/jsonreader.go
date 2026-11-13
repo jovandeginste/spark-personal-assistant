@@ -13,6 +13,7 @@ import (
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 )
 
 type Config struct {
@@ -38,7 +39,8 @@ type Event struct {
 
 type Module struct {
 	sparkmcp.BaseModule
-	Cache caching.Cache
+	Cache       caching.Cache
+	sourceGroup singleflight.Group
 }
 
 func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
@@ -125,37 +127,45 @@ func (m *Module) loadAllEvents(config Config) ([]Event, []string) {
 	for _, source := range config.Sources {
 		key := "jsonreader:" + source.URL
 
-		var (
-			data   []byte
-			cached bool
-		)
+		result, err, _ := m.sourceGroup.Do(key, func() (any, error) {
+			var data []byte
 
-		if m.Cache != nil {
-			data, cached = m.Cache.Get(key)
-		}
-
-		if !cached {
-			var err error
-
-			data, err = generic.GetBody(source.URL)
-			if err != nil {
-				m.Logger().Warn("Failed to read source", "name", source.Name, "url", source.URL, "error", err)
-				failed = append(failed, fmt.Sprintf("%s: %v", source.Name, err))
-
-				continue
+			if m.Cache != nil {
+				data, _ = m.Cache.Get(key)
 			}
-		}
 
-		var events []Event
-		if err := json.Unmarshal(data, &events); err != nil {
-			m.Logger().Warn("Failed to parse source json", "name", source.Name, "error", err)
-			failed = append(failed, fmt.Sprintf("%s: invalid JSON: %v", source.Name, err))
+			if data == nil {
+				fetched, err := generic.GetBody(source.URL)
+				if err != nil {
+					return nil, err
+				}
+
+				data = fetched
+			}
+
+			var events []Event
+			if err := json.Unmarshal(data, &events); err != nil {
+				return nil, fmt.Errorf("invalid JSON: %w", err)
+			}
+
+			if m.Cache != nil {
+				m.Cache.Set(key, data)
+			}
+
+			return events, nil
+		})
+		if err != nil {
+			m.Logger().Warn("Failed to read source", "name", source.Name, "url", source.URL, "error", err)
+			failed = append(failed, fmt.Sprintf("%s: %v", source.Name, err))
 
 			continue
 		}
 
-		if !cached && m.Cache != nil {
-			m.Cache.Set(key, data)
+		events, ok := result.([]Event)
+		if !ok {
+			failed = append(failed, fmt.Sprintf("%s: unexpected cached event type %T", source.Name, result))
+
+			continue
 		}
 
 		// Tag with source name

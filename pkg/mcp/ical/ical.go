@@ -18,6 +18,7 @@ import (
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 )
 
 // maxConcurrentFetches limits how many calendars are fetched at the same time.
@@ -35,7 +36,8 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
-	Cache caching.Cache
+	Cache      caching.Cache
+	fetchGroup singleflight.Group
 }
 
 func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
@@ -492,13 +494,25 @@ func isMatch(e gocal.Event, calendarMatch bool, queryLower []string) bool {
 }
 
 func (m *Module) fetchAndCacheICS(url string) (string, error) {
-	if file, ok := m.Cache.GetFile(url); ok {
-		return file, nil
+	result, err, _ := m.fetchGroup.Do(url, func() (any, error) {
+		if file, ok := m.Cache.GetFile(url); ok {
+			return file, nil
+		}
+
+		return m.Cache.SetFile(url, func() (io.ReadCloser, error) {
+			return generic.ReadResource(url)
+		})
+	})
+	if err != nil {
+		return "", err
 	}
 
-	return m.Cache.SetFile(url, func() (io.ReadCloser, error) {
-		return generic.ReadResource(url)
-	})
+	path, ok := result.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected cache path type %T", result)
+	}
+
+	return path, nil
 }
 
 func (e *Event) SetTimes(event gocal.Event) error {

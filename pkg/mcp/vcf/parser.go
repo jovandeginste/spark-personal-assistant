@@ -38,36 +38,48 @@ type Date struct {
 }
 
 func (m *Module) loadContacts(path string) ([]Contact, error) {
-	info, err := os.Stat(path)
-	if err != nil {
-		return nil, err
-	}
+	result, err, _ := m.contactsGroup.Do(path, func() (any, error) {
+		info, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
 
-	m.contactsMu.Lock()
-	if m.contacts != nil && m.contactsModTime.Equal(info.ModTime()) && m.contactsSize == info.Size() {
-		contacts := m.contacts
+		m.contactsMu.Lock()
+		if m.contacts != nil && m.contactsModTime.Equal(info.ModTime()) && m.contactsSize == info.Size() {
+			contacts := m.contacts
+			m.contactsMu.Unlock()
+
+			return contacts, nil
+		}
+		m.contactsMu.Unlock()
+
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, err
+		}
+		defer f.Close()
+
+		contacts, err := parseVCF(f)
+		if err != nil {
+			return nil, err
+		}
+
+		m.contactsMu.Lock()
+		m.contacts = contacts
+		m.contactsModTime = info.ModTime()
+		m.contactsSize = info.Size()
 		m.contactsMu.Unlock()
 
 		return contacts, nil
-	}
-	m.contactsMu.Unlock()
-
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	contacts, err := parseVCF(f)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	m.contactsMu.Lock()
-	m.contacts = contacts
-	m.contactsModTime = info.ModTime()
-	m.contactsSize = info.Size()
-	m.contactsMu.Unlock()
+	contacts, ok := result.([]Contact)
+	if !ok {
+		return nil, fmt.Errorf("unexpected contacts type %T", result)
+	}
 
 	return contacts, nil
 }

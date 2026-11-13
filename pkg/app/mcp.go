@@ -15,26 +15,27 @@ import (
 )
 
 func (a *App) getMCPClient(ctx context.Context, name string) (*mcp.ClientSession, error) {
-	// If we already have a healthy client, return it
-	// Note: The SDK doesn't expose a simple "IsConnected()" check that is cheap.
-	// We might need to handle this by trying and if it fails, reconnecting.
-	// For now, let's just return the existing session if it exists, and let the caller handle errors by retrying.
-	// OR: we can check if the session is closed? The struct doesn't export that state easily.
+	result, err, _ := a.mcpGroup.Do(name, func() (any, error) {
+		a.mcpMu.Lock()
+		session, ok := a.mcpClients[name]
+		a.mcpMu.Unlock()
 
-	// Better approach: Since we can't easily check health without making a call,
-	// let's wrap the "get" logic to create if missing.
-	a.mcpMu.Lock()
-	session, ok := a.mcpClients[name]
-	a.mcpMu.Unlock()
+		if ok {
+			return session, nil
+		}
 
-	if ok {
-		// Basic check - we can't really know if it's dead until we try to use it
-		// or if we track close events (which we don't currently).
-		// For a robust implementation, we might want to send a ping? Or just return it.
-		return session, nil
+		return a.connectMCPClient(ctx, name)
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	return a.connectMCPClient(ctx, name)
+	session, ok := result.(*mcp.ClientSession)
+	if !ok {
+		return nil, fmt.Errorf("unexpected MCP session type %T", result)
+	}
+
+	return session, nil
 }
 
 func (a *App) connectMCPClient(_ context.Context, name string) (*mcp.ClientSession, error) {

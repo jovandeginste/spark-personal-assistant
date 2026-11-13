@@ -7,6 +7,7 @@ import (
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 )
 
 type App struct {
@@ -19,6 +20,7 @@ type App struct {
 	mcpClients map[string]*mcp.ClientSession
 	mcpCleanup map[string]func()
 	mcpTools   map[string][]ai.Tool
+	mcpGroup   singleflight.Group
 }
 
 func NewApp() *App {

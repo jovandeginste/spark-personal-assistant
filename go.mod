@@ -35,6 +35,7 @@ require (
 	github.com/yarlson/pin v0.10.0
 	golang.org/x/net v0.58.0
 	golang.org/x/oauth2 v0.36.0
+	golang.org/x/sync v0.22.0
 	google.golang.org/api v0.297.0
 	google.golang.org/genai v1.71.0
 	maunium.net/go/mautrix v0.30.0
@@ -262,7 +263,6 @@ require (
 	golang.org/x/exp v0.0.0-20260824195058-e88cd73687aa // indirect
 	golang.org/x/exp/typeparams v0.0.0-20250210185358-939b2ce775ac // indirect
 	golang.org/x/mod v0.40.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.41.0 // indirect
 	golang.org/x/time v0.15.0 // indirect

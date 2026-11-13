@@ -13,6 +13,7 @@ import (
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/api/option"
 	"google.golang.org/api/people/v1"
 )
@@ -34,6 +35,7 @@ type Module struct {
 	contactsMu      sync.Mutex
 	contacts        []*people.Person
 	contactsFetched time.Time
+	contactsGroup   singleflight.Group
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -266,24 +268,36 @@ func (m *Module) listConnections(ctx context.Context, srv *people.Service) (stri
 }
 
 func (m *Module) allConnections(ctx context.Context, srv *people.Service) ([]*people.Person, error) {
-	m.contactsMu.Lock()
-	if m.contacts != nil && time.Since(m.contactsFetched) < contactsCacheTTL {
-		connections := m.contacts
+	result, err, _ := m.contactsGroup.Do("connections", func() (any, error) {
+		m.contactsMu.Lock()
+		if m.contacts != nil && time.Since(m.contactsFetched) < contactsCacheTTL {
+			connections := m.contacts
+			m.contactsMu.Unlock()
+
+			return connections, nil
+		}
+		m.contactsMu.Unlock()
+
+		connections, err := fetchAllConnections(ctx, srv)
+		if err != nil {
+			return nil, err
+		}
+
+		m.contactsMu.Lock()
+		m.contacts = connections
+		m.contactsFetched = time.Now()
 		m.contactsMu.Unlock()
 
 		return connections, nil
-	}
-	m.contactsMu.Unlock()
-
-	connections, err := fetchAllConnections(ctx, srv)
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	m.contactsMu.Lock()
-	m.contacts = connections
-	m.contactsFetched = time.Now()
-	m.contactsMu.Unlock()
+	connections, ok := result.([]*people.Person)
+	if !ok {
+		return nil, fmt.Errorf("unexpected connections type %T", result)
+	}
 
 	return connections, nil
 }

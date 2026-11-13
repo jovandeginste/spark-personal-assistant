@@ -12,6 +12,7 @@ import (
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"golang.org/x/sync/singleflight"
 )
 
 type Config struct {
@@ -25,6 +26,7 @@ type Module struct {
 	contacts        []Contact
 	contactsModTime time.Time
 	contactsSize    int64
+	contactsGroup   singleflight.Group
 }
 
 func New(config Config, logger *slog.Logger) *Module {
