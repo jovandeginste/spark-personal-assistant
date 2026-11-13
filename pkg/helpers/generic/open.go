@@ -3,11 +3,36 @@ package generic
 import (
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"time"
 )
+
+const (
+	dialTimeout    = 3 * time.Second
+	requestTimeout = 30 * time.Second
+)
+
+// httpClient bounds resource downloads: DNS lookup and connection setup take at
+// most dialTimeout, while the whole request (including reading the body) is
+// capped at requestTimeout.
+var httpClient = newHTTPClient()
+
+func newHTTPClient() *http.Client {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.DialContext = (&net.Dialer{
+		Timeout:   dialTimeout,
+		KeepAlive: 30 * time.Second,
+	}).DialContext
+
+	return &http.Client{
+		Timeout:   requestTimeout,
+		Transport: transport,
+	}
+}
 
 // ReadResource reads a resource from a given URI, supporting file and http/https schemes.
 // It returns an io.ReadCloser and an error. The caller is responsible for closing the ReadCloser.
@@ -62,7 +87,7 @@ func readHTTP(u *url.URL, headers map[string]string) (io.ReadCloser, error) {
 		req.Header.Set(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

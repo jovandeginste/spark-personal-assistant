@@ -21,6 +21,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const mailRetryDelay = time.Minute
+
 func (c *cli) routerCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "router",
@@ -213,9 +215,22 @@ func (c *cli) runMailLoop(ctx context.Context, r *router.Router, cfg mail.Config
 		}
 	}()
 
-	c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
-	if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
-		c.app.Logger().Error("Mail connection failed", "instance", instName, "error", err)
+	for {
+		c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
+
+		if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
+			if ctx.Err() != nil {
+				return
+			}
+
+			c.app.Logger().Error("Mail connection failed, retrying later", "instance", instName, "error", err, "retry_in", mailRetryDelay)
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(mailRetryDelay):
+		}
 	}
 }
 
