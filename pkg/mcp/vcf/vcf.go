@@ -36,7 +36,7 @@ type contactParams struct {
 }
 
 type birthdayParams struct {
-	sparkmcp.DateRangeParams
+	sparkmcp.MonthDayRangeParams
 }
 
 func (m *Module) Register(server *mcp.Server) error {

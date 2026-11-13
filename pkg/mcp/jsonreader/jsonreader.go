@@ -3,6 +3,7 @@ package jsonreader
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -82,7 +83,11 @@ func (m *Module) handleEventsByDate(ctx context.Context, request *mcp.CallToolRe
 
 	events := m.loadAllEvents(config)
 
-	filtered := m.filterEventsByDate(events, params)
+	filtered, err := m.filterEventsByDate(events, params)
+	if err != nil {
+		logger.Error("Invalid date filter", "error", err)
+		return nil, nil, err
+	}
 
 	if len(filtered) == 0 {
 		return &mcp.CallToolResult{
@@ -140,31 +145,23 @@ func (m *Module) loadAllEvents(config Config) []Event {
 	return allEvents
 }
 
-func (m *Module) filterEventsByDate(events []Event, params dateParams) []Event {
+func (m *Module) filterEventsByDate(events []Event, params dateParams) ([]Event, error) {
+	startStr, endStr := params.GetDateRange()
+
+	startDate, err := parseDateFilter(startStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start date %q: %w", startStr, err)
+	}
+
+	endDate, err := parseDateFilter(endStr)
+	if err != nil {
+		return nil, fmt.Errorf("invalid end date %q: %w", endStr, err)
+	}
+
 	results := make([]Event, 0, len(events))
 
-	// Parse parameters
-	startStr, endStr := params.GetDateRange()
-	var startDate, endDate time.Time
-	var err error
-	const layout = "2006-01-02"
-
-	if startStr != "" {
-		startDate, err = time.Parse(layout, startStr)
-		if err != nil {
-			m.Logger().Warn("Invalid start date format", "date", startStr)
-		}
-	}
-	if endStr != "" {
-		endDate, err = time.Parse(layout, endStr)
-		if err != nil {
-			m.Logger().Warn("Invalid end date format", "date", endStr)
-		}
-	}
-
 	for _, e := range events {
-		// Event date truncated to day for comparison
-		eDate := e.Date.Truncate(24 * time.Hour)
+		eDate := dateOnly(e.Date.Time)
 
 		if !startDate.IsZero() && eDate.Before(startDate) {
 			continue
@@ -177,7 +174,21 @@ func (m *Module) filterEventsByDate(events []Event, params dateParams) []Event {
 		results = append(results, e)
 	}
 
-	return results
+	return results, nil
+}
+
+func parseDateFilter(value string) (time.Time, error) {
+	if value == "" {
+		return time.Time{}, nil
+	}
+
+	return time.ParseInLocation("2006-01-02", value, humantime.LocalTimezone)
+}
+
+func dateOnly(t time.Time) time.Time {
+	t = t.In(humantime.LocalTimezone)
+
+	return time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, humantime.LocalTimezone)
 }
 
 func (m *Module) filterEventsByQuery(events []Event, queries []string) []Event {

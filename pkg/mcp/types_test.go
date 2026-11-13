@@ -7,6 +7,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMonthDayRangeParams_GetDateRange(t *testing.T) {
+	params := MonthDayRangeParams{
+		StartDate: "12-01",
+		EndDate:   "01-31",
+	}
+
+	gotStart, gotEnd := params.GetDateRange()
+	assert.Equal(t, "12-01", gotStart)
+	assert.Equal(t, "01-31", gotEnd)
+
+	params.Date = "12-25"
+	gotStart, gotEnd = params.GetDateRange()
+	assert.Equal(t, "12-25", gotStart)
+	assert.Equal(t, "12-25", gotEnd)
+}
+
 func TestGetDateRange(t *testing.T) {
 	tests := []struct {
 		name      string

@@ -43,6 +43,9 @@ mail:
     password: secretpassword
     folder: INBOX
     use_tls: true
+    # Only process email from these senders; leave empty to allow everyone:
+    # allowlist:
+    #   - sender@example.com
 prompts:
   my_prompt: |
     This is a custom prompt.

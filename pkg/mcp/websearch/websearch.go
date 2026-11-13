@@ -48,7 +48,7 @@ func (m *Module) handler(ctx context.Context, request *mcp.CallToolRequest, para
 		maxResults = 10
 	}
 
-	results, err := m.search(params.Query, maxResults)
+	results, err := m.search(ctx, params.Query, maxResults)
 	if err != nil {
 		reqLogger.Error("Failed to search the web", "query", params.Query, "error", err)
 		return nil, nil, err
@@ -67,13 +67,13 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func (m *Module) search(query string, maxResults int) (string, error) {
+func (m *Module) search(ctx context.Context, query string, maxResults int) (string, error) {
 	tool, err := duckduckgo.New(maxResults, duckduckgo.DefaultUserAgent)
 	if err != nil {
 		return "", fmt.Errorf("failed to initialize duckduckgo search: %w", err)
 	}
 
-	result, err := tool.Call(context.Background(), query)
+	result, err := tool.Call(ctx, query)
 	if err != nil {
 		return "", fmt.Errorf("failed to execute search: %w", err)
 	}

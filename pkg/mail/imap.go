@@ -16,6 +16,7 @@ import (
 	"github.com/emersion/go-imap"
 	idle "github.com/emersion/go-imap-idle"
 	"github.com/emersion/go-imap/client"
+	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/charset"
 	"github.com/gomarkdown/markdown"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
@@ -88,7 +89,7 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 	}
 
 	// Fetch any existing unseen messages first
-	msgs, err := fetchUnseen(c, logger)
+	msgs, err := fetchUnseen(c, cfg, logger)
 	if err != nil {
 		logger.Error("failed to fetch initial unseen messages", "error", err)
 	} else {
@@ -112,7 +113,7 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 
 		select {
 		case update := <-updates:
-			if err := handleUpdate(update, c, logger, stop, done, msgChan); err != nil {
+			if err := handleUpdate(update, c, cfg, logger, stop, done, msgChan); err != nil {
 				return err
 			}
 		case err := <-done:
@@ -123,7 +124,7 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 	}
 }
 
-func handleUpdate(update client.Update, c *client.Client, logger *slog.Logger, stop chan struct{}, done chan error, msgChan chan<- Message) error {
+func handleUpdate(update client.Update, c *client.Client, cfg Config, logger *slog.Logger, stop chan struct{}, done chan error, msgChan chan<- Message) error {
 	logger.Info("IMAP update received", "type", fmt.Sprintf("%T", update))
 
 	close(stop)
@@ -132,7 +133,7 @@ func handleUpdate(update client.Update, c *client.Client, logger *slog.Logger, s
 		return fmt.Errorf("idle disconnected: %w", err)
 	}
 
-	newMsgs, err := fetchUnseen(c, logger)
+	newMsgs, err := fetchUnseen(c, cfg, logger)
 	if err != nil {
 		logger.Error("failed to fetch unseen messages", "error", err)
 		return nil
@@ -150,7 +151,7 @@ func handleUpdate(update client.Update, c *client.Client, logger *slog.Logger, s
 	return nil
 }
 
-func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
+func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, error) {
 	criteria := imap.NewSearchCriteria()
 	criteria.WithoutFlags = []string{imap.SeenFlag}
 
@@ -199,20 +200,19 @@ func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
 			}
 		}
 
+		if !isAllowedSender(cfg, m.FromAddress) {
+			logger.Info("Ignoring email from non-allowlisted sender", "from", m.FromAddress)
+			continue
+		}
+
 		r := msg.GetBody(section)
 		if r != nil {
-			parsed, err := stdmail.ReadMessage(r)
+			body, err := extractMessageBody(r)
 			if err != nil {
-				logger.Error("failed to read message body", "error", err)
+				logger.Error("failed to decode message body", "error", err)
 				continue
 			}
-
-			body, err := io.ReadAll(parsed.Body)
-			if err != nil {
-				logger.Error("failed to read message body", "error", err)
-				continue
-			}
-			m.Body = string(body)
+			m.Body = body
 		}
 
 		results = append(results, m)
@@ -230,6 +230,83 @@ func fetchUnseen(c *client.Client, logger *slog.Logger) ([]Message, error) {
 	}
 
 	return results, nil
+}
+
+// extractMessageBody decodes transfer encodings, charsets and multipart
+// bodies, preferring the text/plain part over HTML.
+func extractMessageBody(r io.Reader) (string, error) {
+	entity, err := message.Read(r)
+	if err != nil && !message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err) {
+		return "", err
+	}
+
+	if entity == nil {
+		return "", err
+	}
+
+	var plainBody, htmlBody string
+
+	err = entity.Walk(func(_ []int, part *message.Entity, walkErr error) error {
+		if walkErr != nil {
+			if message.IsUnknownCharset(walkErr) || message.IsUnknownEncoding(walkErr) {
+				return nil
+			}
+
+			return walkErr
+		}
+
+		mediaType, _, _ := part.Header.ContentType()
+
+		switch {
+		case strings.HasPrefix(mediaType, "multipart/"):
+			return nil
+		case plainBody == "" && strings.HasPrefix(mediaType, "text/plain"):
+			body, err := io.ReadAll(part.Body)
+			if err != nil {
+				return err
+			}
+
+			plainBody = string(body)
+		case htmlBody == "" && strings.HasPrefix(mediaType, "text/html"):
+			body, err := io.ReadAll(part.Body)
+			if err != nil {
+				return err
+			}
+
+			htmlBody = string(body)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+
+	if plainBody != "" {
+		return plainBody, nil
+	}
+
+	return htmlBody, nil
+}
+
+func isAllowedSender(cfg Config, address string) bool {
+	if len(cfg.Allowlist) == 0 {
+		return true
+	}
+
+	address, ok := parseEmailAddress(address)
+	if !ok {
+		return false
+	}
+
+	for _, allowed := range cfg.Allowlist {
+		allowedAddress, ok := parseEmailAddress(allowed)
+		if ok && strings.EqualFold(address, allowedAddress) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Register registers the Mail instance as an address to the central router with full SMTP sending capability.

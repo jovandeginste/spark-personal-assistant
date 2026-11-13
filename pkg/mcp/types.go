@@ -8,6 +8,14 @@ import (
 
 type DateRangeParams struct {
 	Date      string `json:"date,omitempty" jsonschema:"A specific date to query (YYYY-MM-DD)"`
+	StartDate string `json:"start_date,omitempty" jsonschema:"The start date for the range (YYYY-MM-DD)"`
+	EndDate   string `json:"end_date,omitempty" jsonschema:"The end date for the range (YYYY-MM-DD)"`
+}
+
+// MonthDayRangeParams is used by tools that support recurring annual events.
+// It accepts both YYYY-MM-DD and MM-DD.
+type MonthDayRangeParams struct {
+	Date      string `json:"date,omitempty" jsonschema:"A specific date to query (YYYY-MM-DD, or MM-DD for recurring annual events)"`
 	StartDate string `json:"start_date,omitempty" jsonschema:"The start date for the range (YYYY-MM-DD, or MM-DD for recurring annual events)"`
 	EndDate   string `json:"end_date,omitempty" jsonschema:"The end date for the range (YYYY-MM-DD, or MM-DD for recurring annual events)"`
 }
@@ -18,10 +26,20 @@ type DateRangeParams struct {
 // If EndDate is provided, it is used for end.
 // If both Date and StartDate/EndDate are provided, Date takes precedence.
 func (p DateRangeParams) GetDateRange() (string, string) {
-	if p.Date != "" {
-		return p.Date, p.Date
+	return resolveDateRange(p.Date, p.StartDate, p.EndDate)
+}
+
+// GetDateRange returns the start and end dates based on the params.
+func (p MonthDayRangeParams) GetDateRange() (string, string) {
+	return resolveDateRange(p.Date, p.StartDate, p.EndDate)
+}
+
+func resolveDateRange(date, startDate, endDate string) (string, string) {
+	if date != "" {
+		return date, date
 	}
-	return p.StartDate, p.EndDate
+
+	return startDate, endDate
 }
 
 // ParseDateRange parses the date range strings into time.Time objects.

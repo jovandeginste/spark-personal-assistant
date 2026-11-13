@@ -76,6 +76,8 @@ func (s *Service) GetFile(key string) (string, bool) {
 	}
 
 	if time.Since(info.ModTime()) > s.ttl {
+		_ = os.Remove(filename)
+
 		return "", false
 	}
 
@@ -85,6 +87,13 @@ func (s *Service) GetFile(key string) (string, bool) {
 // SetFile writes data to a file in the cache directory and returns the path
 func (s *Service) SetFile(key string, dataProvider func() (io.ReadCloser, error)) (string, error) {
 	filename := s.getFilePath(key)
+	if filename == "" {
+		return "", fmt.Errorf("invalid cache key: %s", key)
+	}
+
+	if err := os.MkdirAll(s.storageDir, 0o755); err != nil {
+		return "", fmt.Errorf("failed to create cache directory: %w", err)
+	}
 
 	rc, err := dataProvider()
 	if err != nil {
@@ -92,14 +101,30 @@ func (s *Service) SetFile(key string, dataProvider func() (io.ReadCloser, error)
 	}
 	defer rc.Close()
 
-	out, err := os.Create(filename)
+	tmp, err := os.CreateTemp(s.storageDir, ".tmp-*")
 	if err != nil {
 		return "", err
 	}
-	defer out.Close()
 
-	_, err = io.Copy(out, rc)
-	if err != nil {
+	tmpName := tmp.Name()
+	removeTemp := func() { _ = os.Remove(tmpName) }
+
+	if _, err := io.Copy(tmp, rc); err != nil {
+		_ = tmp.Close()
+		removeTemp()
+
+		return "", err
+	}
+
+	if err := tmp.Close(); err != nil {
+		removeTemp()
+
+		return "", err
+	}
+
+	if err := os.Rename(tmpName, filename); err != nil {
+		removeTemp()
+
 		return "", err
 	}
 

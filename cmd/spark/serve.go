@@ -27,10 +27,6 @@ func (c *cli) printCmd() *cobra.Command {
 		Example: "spark print",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := c.app.Initialize(); err != nil {
-				return err
-			}
-
 			aiData, err := c.app.BuildData()
 			if err != nil {
 				return err
@@ -87,10 +83,6 @@ func (c *cli) chatCmd() *cobra.Command {
 		Example: "spark chat",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if err := c.app.Initialize(); err != nil {
-				return err
-			}
-
 			aiData, err := c.app.BuildData()
 			if err != nil {
 				return err

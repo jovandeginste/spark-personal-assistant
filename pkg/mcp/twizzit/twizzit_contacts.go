@@ -38,9 +38,13 @@ func (t *Twizzit) registerSearchContacts(server *sdk.Server) {
 		queryData := url.Values{}
 		queryData.Set("view", "contact")
 		queryData.Set("licenceRelationId", "")
+
 		// searchFields needs to be a JSON string inside the form param
-		searchFields := fmt.Sprintf(`{"textSearch":"%s"}`, params.Query)
-		queryData.Set("searchFields", searchFields)
+		searchFields, err := json.Marshal(map[string]string{"textSearch": params.Query})
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to marshal contact search fields: %w", err)
+		}
+		queryData.Set("searchFields", string(searchFields))
 
 		t.Logger().Info("querying contacts", "url", queryURL, "data", queryData.Encode())
 

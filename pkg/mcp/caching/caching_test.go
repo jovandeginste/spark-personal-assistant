@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -217,4 +218,40 @@ func TestPathSafety(t *testing.T) {
 	validExtKey := "image.png"
 	path = service.getFilePath(validExtKey)
 	assert.Contains(t, path, ".png")
+}
+
+func TestSetFileRecreatesStorageDir(t *testing.T) {
+	tempDir := t.TempDir()
+	service, err := NewService(tempDir, time.Minute)
+	require.NoError(t, err)
+
+	require.NoError(t, service.Clear())
+
+	path, err := service.SetFile("key", func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("data")), nil
+	})
+	require.NoError(t, err)
+
+	content, err := os.ReadFile(path)
+	require.NoError(t, err)
+	assert.Equal(t, "data", string(content))
+}
+
+func TestGetFileRemovesExpiredFile(t *testing.T) {
+	tempDir := t.TempDir()
+	service, err := NewService(tempDir, time.Millisecond)
+	require.NoError(t, err)
+
+	path, err := service.SetFile("expired", func() (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader("data")), nil
+	})
+	require.NoError(t, err)
+
+	time.Sleep(10 * time.Millisecond)
+
+	_, ok := service.GetFile("expired")
+	assert.False(t, ok)
+
+	_, err = os.Stat(path)
+	assert.True(t, os.IsNotExist(err))
 }

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
@@ -34,6 +35,10 @@ var mockEventsJSON = []byte(`[
 ]`)
 
 func TestFilterEventsByDate(t *testing.T) {
+	originalTimezone := humantime.LocalTimezone
+	humantime.LocalTimezone = time.UTC
+	defer func() { humantime.LocalTimezone = originalTimezone }()
+
 	module := &Module{
 		BaseModule: sparkmcp.NewBaseModule(Config{}, slog.Default()),
 	}
@@ -48,6 +53,7 @@ func TestFilterEventsByDate(t *testing.T) {
 		name          string
 		params        dateParams
 		expectedCount int
+		expectError   bool
 	}{
 		{
 			name: "All events in range",
@@ -87,11 +93,24 @@ func TestFilterEventsByDate(t *testing.T) {
 			}},
 			expectedCount: 1, // Event 1
 		},
+		{
+			name: "Invalid start date",
+			params: dateParams{sparkmcp.DateRangeParams{
+				StartDate: "not-a-date",
+			}},
+			expectError: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			results := module.filterEventsByDate(events, tt.params)
+			results, err := module.filterEventsByDate(events, tt.params)
+			if tt.expectError {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
 			assert.Len(t, results, tt.expectedCount)
 		})
 	}

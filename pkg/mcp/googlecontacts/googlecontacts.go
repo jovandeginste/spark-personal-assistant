@@ -66,7 +66,7 @@ type contactsParams struct {
 }
 
 type dateParams struct {
-	sparkmcp.DateRangeParams
+	sparkmcp.MonthDayRangeParams
 }
 
 type locationParams struct {
@@ -195,7 +195,7 @@ func (m *Module) searchContacts(ctx context.Context, query []string) (string, er
 
 	// If query is empty, list connections instead of searching
 	if len(query) == 0 {
-		return listConnections(srv)
+		return listConnections(ctx, srv)
 	}
 
 	// We'll collect results from all queries
@@ -205,7 +205,7 @@ func (m *Module) searchContacts(ctx context.Context, query []string) (string, er
 		if q == "" {
 			continue
 		}
-		call := srv.People.SearchContacts().Query(q).ReadMask(strings.Join(readMask, ","))
+		call := srv.People.SearchContacts().Query(q).ReadMask(strings.Join(readMask, ",")).Context(ctx)
 
 		r, err := call.Do()
 		if err != nil {
@@ -240,8 +240,8 @@ func (m *Module) searchContacts(ctx context.Context, query []string) (string, er
 	return string(j), nil
 }
 
-func listConnections(srv *people.Service) (string, error) {
-	connections, err := fetchAllConnections(srv)
+func listConnections(ctx context.Context, srv *people.Service) (string, error) {
+	connections, err := fetchAllConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
@@ -258,14 +258,15 @@ func listConnections(srv *people.Service) (string, error) {
 	return string(j), nil
 }
 
-func fetchAllConnections(srv *people.Service) ([]*people.Person, error) {
+func fetchAllConnections(ctx context.Context, srv *people.Service) ([]*people.Person, error) {
 	var allConnections []*people.Person
 	pageToken := ""
 
 	for {
 		call := srv.People.Connections.List("people/me").
 			PersonFields(strings.Join(readMask, ",")).
-			PageSize(100)
+			PageSize(100).
+			Context(ctx)
 
 		if pageToken != "" {
 			call.PageToken(pageToken)
@@ -297,7 +298,7 @@ func (m *Module) searchContactsByDate(ctx context.Context, start, end string) (s
 		return "", fmt.Errorf("unable to retrieve people client: %w", err)
 	}
 
-	connections, err := fetchAllConnections(srv)
+	connections, err := fetchAllConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
@@ -382,7 +383,7 @@ func (m *Module) searchContactsByLocation(ctx context.Context, params locationPa
 		return "", fmt.Errorf("unable to retrieve people client: %w", err)
 	}
 
-	connections, err := fetchAllConnections(srv)
+	connections, err := fetchAllConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
