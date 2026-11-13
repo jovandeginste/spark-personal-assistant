@@ -9,12 +9,12 @@ require (
 	github.com/adrg/frontmatter v0.2.0
 	github.com/apognu/gocal v0.9.1
 	github.com/awterman/monkey v0.0.0-20250408083113-2942abf7dbe9
-	github.com/chzyer/readline v1.5.1
 	github.com/cyphar/filepath-securejoin v0.6.1
 	github.com/dop251/goja v0.0.0-20260903201622-f87b40ad7341
 	github.com/emersion/go-imap/v2 v2.0.0-beta.8
 	github.com/emersion/go-message v0.18.2
 	github.com/emersion/go-vcard v0.1.0
+	github.com/ergochat/readline v0.1.3
 	github.com/glebarez/go-sqlite v1.23.0
 	github.com/gomarkdown/markdown v0.0.0-20250810172220-2e2c11897d1a
 	github.com/google/go-querystring v1.2.0

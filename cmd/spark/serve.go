@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/chzyer/readline"
+	"github.com/ergochat/readline"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/spf13/cobra"
 	"github.com/yarlson/pin"
