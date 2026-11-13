@@ -9,7 +9,6 @@ import (
 	"log/slog"
 	"mime"
 	stdmail "net/mail"
-	"net/smtp"
 	"strings"
 	"time"
 
@@ -18,9 +17,10 @@ import (
 	"github.com/emersion/go-imap/client"
 	"github.com/emersion/go-message"
 	"github.com/emersion/go-message/charset"
-	gomail "github.com/emersion/go-message/mail"
+	msgmail "github.com/emersion/go-message/mail"
 	"github.com/gomarkdown/markdown"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/router"
+	gomail "github.com/wneessen/go-mail"
 )
 
 type IMAPConfig struct {
@@ -245,7 +245,7 @@ func fetchUnseen(c *client.Client, cfg Config, logger *slog.Logger) ([]Message, 
 // extractMessageBody decodes transfer encodings, charsets and multipart
 // bodies, preferring the text/plain part over HTML.
 func extractMessageBody(r io.Reader) (string, error) {
-	reader, err := gomail.CreateReader(r)
+	reader, err := msgmail.CreateReader(r)
 	if err != nil {
 		if reader == nil || (!message.IsUnknownCharset(err) && !message.IsUnknownEncoding(err)) {
 			return "", err
@@ -361,25 +361,51 @@ func sendEmail(cfg Config, msg router.Message, logger *slog.Logger) error {
 			smtpPort = 465
 		}
 	}
-	auth := smtp.Auth(nil)
+	mailMsg := gomail.NewMsg()
+
+	if err := mailMsg.From(cfg.Username); err != nil {
+		return fmt.Errorf("invalid sender %q: %w", cfg.Username, err)
+	}
+
+	if err := mailMsg.To(to...); err != nil {
+		return fmt.Errorf("invalid recipient: %w", err)
+	}
+
+	mailMsg.Subject(sanitizeHeaderValue(msg.Metadata.Subject))
+	mailMsg.SetBodyString(gomail.TypeTextPlain, msg.Content)
+	mailMsg.AddAlternativeString(gomail.TypeTextHTML, string(markdown.ToHTML([]byte(msg.Content), nil, nil)))
+
+	opts := []gomail.Option{
+		gomail.WithPort(smtpPort),
+	}
+
 	if cfg.Username != "" && cfg.Password != "" {
-		auth = smtp.PlainAuth("", cfg.Username, cfg.Password, smtpHost)
+		opts = append(opts,
+			gomail.WithSMTPAuth(gomail.SMTPAuthPlain),
+			gomail.WithUsername(cfg.Username),
+			gomail.WithPassword(cfg.Password),
+		)
 	}
 
-	msgBytes := buildMultipartMessage(cfg.Username, to, msg.Metadata.Subject, msg.Content)
-	smtpAddr := fmt.Sprintf("%s:%d", smtpHost, smtpPort)
-
-	var err error
 	if smtpPort == 465 {
-		err = sendSMTPSecure(smtpAddr, smtpHost, auth, cfg.Username, to, msgBytes)
+		opts = append(opts, gomail.WithSSL())
 	} else {
-		err = smtp.SendMail(smtpAddr, auth, cfg.Username, to, msgBytes)
+		opts = append(opts, gomail.WithTLSPolicy(gomail.TLSOpportunistic))
 	}
 
+	smtpClient, err := gomail.NewClient(smtpHost, opts...)
 	if err != nil {
+		return fmt.Errorf("failed to create smtp client: %w", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := smtpClient.DialAndSendWithContext(ctx, mailMsg); err != nil {
 		if logger != nil {
 			logger.Error("Failed to send email", "error", err)
 		}
+
 		return fmt.Errorf("failed to send email: %w", err)
 	}
 
@@ -406,42 +432,6 @@ func sanitizeHeaderValue(value string) string {
 	replacer := strings.NewReplacer("\r\n", " ", "\r", " ", "\n", " ")
 
 	return strings.TrimSpace(replacer.Replace(value))
-}
-
-func encodeHeaderValue(value string) string {
-	return mime.QEncoding.Encode("utf-8", sanitizeHeaderValue(value))
-}
-
-func buildMultipartMessage(from string, to []string, subject, plainText string) []byte {
-	if subject == "" {
-		subject = "Response from Spark Assistant"
-	}
-
-	htmlContent := markdown.ToHTML([]byte(plainText), nil, nil)
-	boundary := "----=_Part_Spark_Assistant_Boundary_123456789"
-
-	var msgBuilder strings.Builder
-	msgBuilder.WriteString(fmt.Sprintf("From: %s\r\n", sanitizeHeaderValue(from)))
-	msgBuilder.WriteString(fmt.Sprintf("To: %s\r\n", sanitizeHeaderValue(strings.Join(to, ", "))))
-	msgBuilder.WriteString(fmt.Sprintf("Subject: %s\r\n", encodeHeaderValue(subject)))
-	msgBuilder.WriteString("MIME-Version: 1.0\r\n")
-	msgBuilder.WriteString(fmt.Sprintf("Content-Type: multipart/alternative; boundary=\"%s\"\r\n\r\n", boundary))
-
-	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	msgBuilder.WriteString("Content-Type: text/plain; charset=UTF-8\r\n")
-	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
-	msgBuilder.WriteString(plainText)
-	msgBuilder.WriteString("\r\n\r\n")
-
-	msgBuilder.WriteString(fmt.Sprintf("--%s\r\n", boundary))
-	msgBuilder.WriteString("Content-Type: text/html; charset=UTF-8\r\n")
-	msgBuilder.WriteString("Content-Transfer-Encoding: 8bit\r\n\r\n")
-	msgBuilder.Write(htmlContent)
-	msgBuilder.WriteString("\r\n\r\n")
-
-	msgBuilder.WriteString(fmt.Sprintf("--%s--\r\n", boundary))
-
-	return []byte(msgBuilder.String())
 }
 
 func collectCandidateRecipients(msg router.Message) []string {
@@ -522,45 +512,4 @@ func filterByAllowlist(candidates, allowlist []string) []string {
 	}
 
 	return filtered
-}
-
-func sendSMTPSecure(smtpAddr, smtpHost string, auth smtp.Auth, username string, to []string, msgBytes []byte) error {
-	tlsconfig := &tls.Config{
-		ServerName: smtpHost,
-		MinVersion: tls.VersionTLS12,
-	}
-	conn, err := tls.Dial("tcp", smtpAddr, tlsconfig)
-	if err != nil {
-		return fmt.Errorf("failed to TLS dial smtp: %w", err)
-	}
-	defer conn.Close()
-
-	smtpClient, err := smtp.NewClient(conn, smtpHost)
-	if err != nil {
-		return fmt.Errorf("failed to create smtp client: %w", err)
-	}
-	defer smtpClient.Quit()
-
-	if auth != nil {
-		if err := smtpClient.Auth(auth); err != nil {
-			return fmt.Errorf("smtp auth failed: %w", err)
-		}
-	}
-	if err = smtpClient.Mail(username); err != nil {
-		return err
-	}
-	for _, recipient := range to {
-		if err = smtpClient.Rcpt(recipient); err != nil {
-			return err
-		}
-	}
-	w, err := smtpClient.Data()
-	if err != nil {
-		return err
-	}
-	_, err = w.Write(msgBytes)
-	if err != nil {
-		return err
-	}
-	return w.Close()
 }
