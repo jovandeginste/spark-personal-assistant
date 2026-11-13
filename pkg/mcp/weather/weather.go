@@ -76,7 +76,7 @@ func (m *Module) Register(server *mcp.Server) error {
 		reqLogger := logger.With("handler", "weather")
 		startDate, endDate := params.GetDateRange()
 		reqLogger.Debug("Fetching weather info", "location", params.Location, "start_date", startDate, "end_date", endDate)
-		result, err := m.getWeatherInfo(config.APIURL, params.Location, startDate, endDate)
+		result, err := m.getWeatherInfo(ctx, config.APIURL, params.Location, startDate, endDate)
 		if err != nil {
 			reqLogger.Error("Failed to get weather info", "location", params.Location, "error", err)
 			return nil, nil, err
@@ -104,8 +104,8 @@ func (m *Module) Enabled() error {
 	return nil
 }
 
-func (m *Module) getWeatherInfo(apiURL, location, startDate, endDate string) ([]byte, error) {
-	q, err := queryFor(location)
+func (m *Module) getWeatherInfo(ctx context.Context, apiURL, location, startDate, endDate string) ([]byte, error) {
+	q, err := queryFor(ctx, location)
 	if err != nil {
 		return nil, err
 	}
@@ -121,8 +121,8 @@ func (m *Module) getWeatherInfo(apiURL, location, startDate, endDate string) ([]
 	return generic.GetBody(apiURL + "?" + p.Encode())
 }
 
-func queryFor(location string) (*openMeteoParams, error) {
-	addr, err := searchLocationsFunc(location)
+func queryFor(ctx context.Context, location string) (*openMeteoParams, error) {
+	addr, err := searchLocationsFunc(ctx, location)
 	if err != nil {
 		return nil, err
 	}

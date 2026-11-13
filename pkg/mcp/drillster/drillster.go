@@ -19,6 +19,13 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
+// For testing.
+var (
+	drillsterIdentifyURL     = "https://www.drillster.com/daas/identify"
+	drillsterAuthenticateURL = "https://www.drillster.com/daas/authenticate/password"
+	drillsterSessionURL      = "https://www.drillster.com/tmb/token"
+)
+
 type Config struct {
 	Username string `mapstructure:"username"`
 	Password string `mapstructure:"password"`
@@ -64,7 +71,7 @@ func (d *Drillster) registerGetTestResults(server *sdk.Server) {
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, params GetTestResultsParams) (*sdk.CallToolResult, any, error) {
 		u := fmt.Sprintf("https://www.drillster.com/api/3/group-member-results/%s/tests", params.MemberID)
-		return d.makeRequest("GET", u)
+		return d.makeRequest(u)
 	}
 
 	sdk.AddTool(server, tool, handler)
@@ -77,7 +84,7 @@ func (d *Drillster) registerWhoAmI(server *sdk.Server) {
 	}
 
 	handler := func(ctx context.Context, request *sdk.CallToolRequest, arguments map[string]any) (*sdk.CallToolResult, any, error) {
-		return d.makeRequest("GET", "https://www.drillster.com/api/3/persons/self/accounts")
+		return d.makeRequest("https://www.drillster.com/api/3/persons/self/accounts")
 	}
 
 	sdk.AddTool(server, tool, handler)
@@ -103,7 +110,7 @@ func (d *Drillster) registerSearchMembers(server *sdk.Server) {
 		}
 		u.RawQuery = q.Encode()
 
-		return d.makeRequest("GET", u.String())
+		return d.makeRequest(u.String())
 	}
 
 	sdk.AddTool(server, tool, handler)
@@ -111,7 +118,7 @@ func (d *Drillster) registerSearchMembers(server *sdk.Server) {
 
 func (d *Drillster) login() error {
 	// Step 1: GET /daas/identify
-	resp, err := d.client.Get("https://www.drillster.com/daas/identify")
+	resp, err := d.client.Get(drillsterIdentifyURL)
 	if err != nil {
 		return fmt.Errorf("failed identify step 1: %w", err)
 	}
@@ -135,7 +142,7 @@ func (d *Drillster) login() error {
 	form.Add("username", d.config.Username)
 	form.Add("_csrf", csrf)
 
-	resp, err = d.client.PostForm("https://www.drillster.com/daas/identify", form)
+	resp, err = d.client.PostForm(drillsterIdentifyURL, form)
 	if err != nil {
 		return fmt.Errorf("failed identify step 2: %w", err)
 	}
@@ -147,14 +154,14 @@ func (d *Drillster) login() error {
 	form.Add("password", d.config.Password)
 	form.Add("_csrf", csrf)
 
-	resp, err = d.client.PostForm("https://www.drillster.com/daas/authenticate/password", form)
+	resp, err = d.client.PostForm(drillsterAuthenticateURL, form)
 	if err != nil {
 		return fmt.Errorf("failed authenticate: %w", err)
 	}
 	defer resp.Body.Close()
 
 	// Step 4: GET /tmb/token
-	resp, err = d.client.Get("https://www.drillster.com/tmb/token")
+	resp, err = d.client.Get(drillsterSessionURL)
 	if err != nil {
 		return fmt.Errorf("failed to get token: %w", err)
 	}
@@ -183,7 +190,7 @@ func (d *Drillster) login() error {
 	return nil
 }
 
-func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult, any, error) {
+func (d *Drillster) makeRequest(requestURL string) (*sdk.CallToolResult, any, error) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 
@@ -193,7 +200,7 @@ func (d *Drillster) makeRequest(method, requestURL string) (*sdk.CallToolResult,
 		}
 	}
 
-	req, err := http.NewRequest(method, requestURL, nil)
+	req, err := http.NewRequest(http.MethodGet, requestURL, nil)
 	if err != nil {
 		return d.textResult(fmt.Sprintf("Error creating request: %v", err), true), nil, nil
 	}

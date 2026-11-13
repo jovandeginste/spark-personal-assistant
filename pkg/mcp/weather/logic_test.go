@@ -1,12 +1,15 @@
 package weather
 
 import (
+	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 )
 
 func TestQueryFor(t *testing.T) {
@@ -48,11 +51,11 @@ func TestQueryFor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			searchLocationsFunc = func(query string) ([]location, error) {
+			searchLocationsFunc = func(ctx context.Context, query string) ([]location, error) {
 				return tt.mockResult, tt.mockError
 			}
 
-			params, err := queryFor(tt.location)
+			params, err := queryFor(context.Background(), tt.location)
 
 			if tt.expectedError != "" {
 				assert.EqualError(t, err, tt.expectedError)
@@ -68,22 +71,41 @@ func TestQueryFor(t *testing.T) {
 }
 
 func TestSearchLocations(t *testing.T) {
-	originalGetBody := generic.GetBody
-	defer func() { generic.GetBody = originalGetBody }()
+	originalGetBody := generic.GetBodyWithHeaders
+	defer func() { generic.GetBodyWithHeaders = originalGetBody }()
 
-	var requested string
+	var (
+		requested string
+		userAgent string
+	)
 
-	generic.GetBody = func(url string) ([]byte, error) {
+	generic.GetBodyWithHeaders = func(url string, headers map[string]string) ([]byte, error) {
 		requested = url
+		userAgent = headers["User-Agent"]
 
 		return []byte(`[{"lat":"52.3676","lon":"4.9041"}]`), nil
 	}
 
-	locations, err := searchLocations("Amsterdam")
+	locations, err := searchLocations(context.Background(), "Amsterdam")
 	require.NoError(t, err)
 	require.Len(t, locations, 1)
 	assert.Equal(t, "52.3676", locations[0].Lat)
 	assert.Contains(t, requested, "q=Amsterdam")
+	assert.Contains(t, userAgent, "Spark")
+}
+
+func TestSearchLocationsCancellation(t *testing.T) {
+	originalLimiter := geocodeLimiter
+	geocodeLimiter = rate.NewLimiter(rate.Every(time.Hour), 1)
+	defer func() { geocodeLimiter = originalLimiter }()
+
+	require.True(t, geocodeLimiter.Allow())
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := searchLocations(ctx, "Amsterdam")
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestEnabled(t *testing.T) {
@@ -123,11 +145,11 @@ func TestQueryForTimezone(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]location, error) {
+	searchLocationsFunc = func(ctx context.Context, query string) ([]location, error) {
 		return []location{{Lat: "40.7128", Lon: "-74.0060"}}, nil
 	}
 
-	params, err := queryFor("New York")
+	params, err := queryFor(context.Background(), "New York")
 	assert.NoError(t, err)
 	assert.Equal(t, "auto", params.Timezone)
 }

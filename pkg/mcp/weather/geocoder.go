@@ -24,8 +24,8 @@ type location struct {
 // For testing.
 var searchLocationsFunc = searchLocations
 
-func searchLocations(query string) ([]location, error) {
-	if err := geocodeLimiter.Wait(context.Background()); err != nil {
+func searchLocations(ctx context.Context, query string) ([]location, error) {
+	if err := geocodeLimiter.Wait(ctx); err != nil {
 		return nil, err
 	}
 
@@ -34,7 +34,9 @@ func searchLocations(query string) ([]location, error) {
 	params.Set("limit", "1")
 	params.Set("q", query)
 
-	data, err := generic.GetBody(nominatimURL + "?" + params.Encode())
+	data, err := generic.GetBodyWithHeaders(nominatimURL+"?"+params.Encode(), map[string]string{
+		"User-Agent": "Spark personal assistant (https://github.com/jovandeginste/spark-personal-assistant)",
+	})
 	if err != nil {
 		return nil, fmt.Errorf("geocoding failed: %w", err)
 	}

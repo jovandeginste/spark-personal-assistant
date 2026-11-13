@@ -1,6 +1,7 @@
 package weather
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -31,7 +32,7 @@ func TestGetWeatherInfo(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]location, error) {
+	searchLocationsFunc = func(ctx context.Context, query string) ([]location, error) {
 		return []location{
 			{
 				Lat: "51.5",
@@ -52,7 +53,7 @@ func TestGetWeatherInfo(t *testing.T) {
 	defer ts.Close()
 
 	module := &Module{}
-	result, err := module.getWeatherInfo(ts.URL, "Breda", "2024-01-01", "2024-01-02")
+	result, err := module.getWeatherInfo(context.Background(), ts.URL, "Breda", "2024-01-01", "2024-01-02")
 	assert.NoError(t, err)
 	assert.Equal(t, []byte(`{"test": "response"}`), result)
 }
@@ -62,11 +63,11 @@ func TestQueryFor_NoLocation(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]location, error) {
+	searchLocationsFunc = func(ctx context.Context, query string) ([]location, error) {
 		return []location{}, nil
 	}
 
-	_, err := queryFor("Unknown")
+	_, err := queryFor(context.Background(), "Unknown")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no location found")
 }

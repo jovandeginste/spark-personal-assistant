@@ -52,7 +52,10 @@ type Message struct {
 	Body        string
 }
 
-const pollInterval = time.Minute
+const (
+	pollInterval   = time.Minute
+	maxMessageSize = 10 * 1024 * 1024
+)
 
 type idleResult struct {
 	command *imapclient.IdleCommand
@@ -190,29 +193,36 @@ func pollUnseen(ctx context.Context, c *imapclient.Client, cfg Config, logger *s
 func fetchUnseen(c *imapclient.Client, cfg Config, logger *slog.Logger) ([]Message, error) {
 	criteria := &imap.SearchCriteria{NotFlag: []imap.Flag{imap.FlagSeen}}
 
-	data, err := c.Search(criteria, nil).Wait()
+	data, err := c.UIDSearch(criteria, nil).Wait()
 	if err != nil {
 		return nil, fmt.Errorf("failed to search messages: %w", err)
 	}
 
-	seqNums := data.AllSeqNums()
-	logger.Info("IMAP search found unseen messages", "count", len(seqNums))
-	if len(seqNums) == 0 {
+	uids := data.AllUIDs()
+	logger.Info("IMAP search found unseen messages", "count", len(uids))
+	if len(uids) == 0 {
 		return []Message{}, nil
 	}
 
-	seqSet := imap.SeqSetNum(seqNums...)
+	uidSet := imap.UIDSetNum(uids...)
 
-	buffers, err := c.Fetch(seqSet, &imap.FetchOptions{
-		Envelope:    true,
-		BodySection: []*imap.FetchItemBodySection{{Peek: true}},
+	metadata, err := c.Fetch(uidSet, &imap.FetchOptions{
+		Envelope:   true,
+		RFC822Size: true,
 	}).Collect()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch messages: %w", err)
+		return nil, fmt.Errorf("failed to fetch message metadata: %w", err)
 	}
 
-	results := make([]Message, 0, len(buffers))
-	for _, buffer := range buffers {
+	type candidate struct {
+		uid imap.UID
+		msg Message
+	}
+
+	candidates := make([]candidate, 0, len(metadata))
+	bodyUIDs := make([]imap.UID, 0, len(metadata))
+
+	for _, buffer := range metadata {
 		if buffer.Envelope == nil {
 			continue
 		}
@@ -232,30 +242,69 @@ func fetchUnseen(c *imapclient.Client, cfg Config, logger *slog.Logger) ([]Messa
 
 		if !isAllowedSender(cfg, m.FromAddress) {
 			logger.Info("Ignoring email from non-allowlisted sender", "from", m.FromAddress)
+
 			continue
 		}
 
-		if len(buffer.BodySection) > 0 {
-			body, err := extractMessageBody(bytes.NewReader(buffer.BodySection[0].Bytes))
-			if err != nil {
-				logger.Error("failed to decode message body", "error", err)
-				continue
-			}
-			m.Body = body
+		if buffer.RFC822Size > maxMessageSize {
+			logger.Warn("Skipping oversized email", "subject", m.Subject, "size", buffer.RFC822Size)
+
+			continue
 		}
 
-		results = append(results, m)
+		candidates = append(candidates, candidate{uid: buffer.UID, msg: m})
+		bodyUIDs = append(bodyUIDs, buffer.UID)
 	}
 
-	if err := c.Store(seqSet, &imap.StoreFlags{
+	if len(bodyUIDs) > 0 {
+		bodies, err := c.Fetch(imap.UIDSetNum(bodyUIDs...), &imap.FetchOptions{
+			BodySection: []*imap.FetchItemBodySection{{Peek: true}},
+		}).Collect()
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch message bodies: %w", err)
+		}
+
+		bodyByUID := make(map[imap.UID][]byte, len(bodies))
+		for _, buffer := range bodies {
+			if len(buffer.BodySection) > 0 {
+				bodyByUID[buffer.UID] = buffer.BodySection[0].Bytes
+			}
+		}
+
+		results := make([]Message, 0, len(candidates))
+		for _, cand := range candidates {
+			if body, ok := bodyByUID[cand.uid]; ok {
+				text, err := extractMessageBody(bytes.NewReader(body))
+				if err != nil {
+					logger.Error("failed to decode message body", "error", err)
+
+					continue
+				}
+
+				cand.msg.Body = text
+			}
+
+			results = append(results, cand.msg)
+		}
+
+		markSeen(c, uidSet, logger)
+
+		return results, nil
+	}
+
+	markSeen(c, uidSet, logger)
+
+	return []Message{}, nil
+}
+
+func markSeen(c *imapclient.Client, uidSet imap.UIDSet, logger *slog.Logger) {
+	if err := c.Store(uidSet, &imap.StoreFlags{
 		Op:     imap.StoreFlagsAdd,
 		Silent: true,
 		Flags:  []imap.Flag{imap.FlagSeen},
 	}, nil).Close(); err != nil {
 		logger.Error("failed to mark messages as seen", "error", err)
 	}
-
-	return results, nil
 }
 
 // extractMessageBody decodes transfer encodings, charsets and multipart

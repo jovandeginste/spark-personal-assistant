@@ -1,12 +1,112 @@
 package mail
 
 import (
+	"bytes"
+	"context"
+	"io"
+	"log/slog"
+	"net"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/emersion/go-imap/v2"
+	"github.com/emersion/go-imap/v2/imapserver"
+	"github.com/emersion/go-imap/v2/imapserver/imapmemserver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type testLiteral struct {
+	*bytes.Reader
+}
+
+func (l testLiteral) Size() int64 {
+	return int64(l.Len())
+}
+
+func TestConnectAndIdleFetchesUnseen(t *testing.T) {
+	memServer := imapmemserver.New()
+
+	user := imapmemserver.NewUser("user", "pass")
+	require.NoError(t, user.Create("INBOX", nil))
+
+	rawMessage := "From: sender@example.com\r\n" +
+		"To: user@example.com\r\n" +
+		"Subject: Test\r\n" +
+		"Date: Mon, 02 Jan 2006 15:04:05 -0700\r\n" +
+		"Content-Type: text/plain\r\n" +
+		"\r\n" +
+		"Hello"
+
+	_, err := user.Append("INBOX", testLiteral{bytes.NewReader([]byte(rawMessage))}, &imap.AppendOptions{})
+	require.NoError(t, err)
+
+	memServer.AddUser(user)
+
+	server := imapserver.New(&imapserver.Options{
+		NewSession: func(*imapserver.Conn) (imapserver.Session, *imapserver.GreetingData, error) {
+			return memServer.NewSession(), nil, nil
+		},
+		Caps:         imap.CapSet{imap.CapIMAP4rev1: {}, imap.CapIdle: {}},
+		InsecureAuth: true,
+	})
+
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+
+	go func() {
+		_ = server.Serve(listener)
+	}()
+
+	t.Cleanup(func() {
+		_ = listener.Close()
+		_ = server.Close()
+	})
+
+	host, portString, err := net.SplitHostPort(listener.Addr().String())
+	require.NoError(t, err)
+
+	port, err := strconv.Atoi(portString)
+	require.NoError(t, err)
+
+	cfg := Config{
+		IMAP:     IMAPConfig{Host: host, Port: port},
+		Username: "user",
+		Password: "pass",
+		Folder:   "INBOX",
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	msgChan := make(chan Message, 1)
+	errChan := make(chan error, 1)
+
+	go func() {
+		errChan <- ConnectAndIdle(ctx, cfg, msgChan, logger)
+	}()
+
+	select {
+	case msg := <-msgChan:
+		assert.Equal(t, "Test", msg.Subject)
+		assert.Equal(t, "sender@example.com", msg.FromAddress)
+		assert.Contains(t, msg.Body, "Hello")
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for message")
+	}
+
+	cancel()
+
+	select {
+	case err := <-errChan:
+		assert.ErrorIs(t, err, context.Canceled)
+	case <-time.After(5 * time.Second):
+		t.Fatal("ConnectAndIdle did not stop")
+	}
+}
 
 func TestSanitizeHeaderValue(t *testing.T) {
 	assert.Equal(t, "Hello Bcc: evil@example.com", sanitizeHeaderValue("Hello\r\nBcc: evil@example.com"))

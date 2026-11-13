@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/PuerkitoBio/goquery"
@@ -17,11 +18,17 @@ const (
 	defaultDuckDuckGoURL = "https://html.duckduckgo.com/html/"
 	duckDuckGoUserAgent  = "Spark personal assistant"
 	searchTimeout        = 30 * time.Second
+	searchCooldown       = 5 * time.Minute
 )
 
 var duckDuckGoURL = defaultDuckDuckGoURL
 
 var searchClient = &http.Client{Timeout: searchTimeout}
+
+var (
+	cooldownMu    sync.Mutex
+	cooldownUntil time.Time
+)
 
 type searchResult struct {
 	Title string
@@ -30,9 +37,21 @@ type searchResult struct {
 }
 
 func searchDuckDuckGo(ctx context.Context, query string, maxResults int) (string, error) {
+	if err := checkSearchCooldown(); err != nil {
+		return "", err
+	}
+
 	if maxResults <= 0 {
 		maxResults = 10
 	}
+
+	success := false
+
+	defer func() {
+		if !success {
+			markSearchFailure()
+		}
+	}()
 
 	params := url.Values{}
 	params.Set("q", query)
@@ -88,6 +107,9 @@ func searchDuckDuckGo(ctx context.Context, query string, maxResults int) (string
 		return true
 	})
 
+	success = true
+	clearSearchCooldown()
+
 	if len(results) == 0 {
 		return "No good DuckDuckGo Search Results was found", nil
 	}
@@ -98,4 +120,35 @@ func searchDuckDuckGo(ctx context.Context, query string, maxResults int) (string
 	}
 
 	return output.String(), nil
+}
+
+func checkSearchCooldown() error {
+	cooldownMu.Lock()
+	defer cooldownMu.Unlock()
+
+	if cooldownUntil.IsZero() {
+		return nil
+	}
+
+	if time.Now().After(cooldownUntil) {
+		cooldownUntil = time.Time{}
+
+		return nil
+	}
+
+	return fmt.Errorf("websearch failed recently, retry in %s", time.Until(cooldownUntil).Round(time.Second))
+}
+
+func markSearchFailure() {
+	cooldownMu.Lock()
+	defer cooldownMu.Unlock()
+
+	cooldownUntil = time.Now().Add(searchCooldown)
+}
+
+func clearSearchCooldown() {
+	cooldownMu.Lock()
+	defer cooldownMu.Unlock()
+
+	cooldownUntil = time.Time{}
 }

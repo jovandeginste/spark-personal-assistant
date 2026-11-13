@@ -5,13 +5,24 @@ import (
 )
 
 var (
-	GetBody      = getBody
-	GetBodySafe  = getBodySafe
-	readResource = ReadResource
+	GetBody            = getBody
+	GetBodyWithHeaders = getBodyWithHeaders
+	GetBodySafe        = getBodySafe
+	readResource       = ReadResource
 )
 
 func getBody(remote string) ([]byte, error) {
 	data, err := readResource(remote)
+	if err != nil {
+		return nil, err
+	}
+	defer data.Close()
+
+	return io.ReadAll(data)
+}
+
+func getBodyWithHeaders(remote string, headers map[string]string) ([]byte, error) {
+	data, err := ReadResourceWithHeaders(remote, headers)
 	if err != nil {
 		return nil, err
 	}
