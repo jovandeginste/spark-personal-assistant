@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -142,6 +143,8 @@ func main() {
 }
 
 func loadConfig() (*Config, error) {
+	viper.Reset()
+
 	viper.SetConfigName("mcp-config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -153,6 +156,7 @@ func loadConfig() (*Config, error) {
 
 	// Environment variables override config file
 	viper.SetEnvPrefix("MCP")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

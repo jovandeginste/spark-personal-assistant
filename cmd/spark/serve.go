@@ -14,10 +14,7 @@ import (
 )
 
 func (c *cli) printCmd() *cobra.Command {
-	var (
-		format       string
-		customPrompt []string
-	)
+	var customPrompt []string
 
 	cmd := &cobra.Command{
 		Use:     "print",
@@ -65,7 +62,6 @@ func (c *cli) printCmd() *cobra.Command {
 	cmd.Flags().StringSliceVarP(&customPrompt, "prompt", "p", nil, "extra custom prompt")
 	cmd.Flags().StringVar(&c.app.ConfigFile, "config", "./spark.yaml", "config file")
 	cmd.Flags().StringVar(&c.app.Config.AssistantFileCLI, "persona", "", "persona")
-	cmd.Flags().StringVarP(&format, "format", "f", "full", "Format to use")
 
 	return cmd
 }

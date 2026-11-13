@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAllModules(t *testing.T) {
@@ -46,4 +48,18 @@ weather:
 	assert.NoError(t, err)
 	assert.Equal(t, ":9999", config.Port)
 	assert.Equal(t, "http://test-weather.com", config.Weather.APIURL)
+}
+
+func TestLoadConfigEnvOverride(t *testing.T) {
+	viper.Reset()
+	t.Cleanup(viper.Reset)
+	t.Chdir(t.TempDir())
+
+	t.Setenv("MCP_PORT", ":9998")
+	t.Setenv("MCP_WEATHER_APIURL", "http://env-weather.example")
+
+	config, err := loadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, ":9998", config.Port)
+	assert.Equal(t, "http://env-weather.example", config.Weather.APIURL)
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -95,6 +96,8 @@ func main() {
 }
 
 func loadConfig() (*Config, error) {
+	viper.Reset()
+
 	viper.SetConfigName("mcp-hockey")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
@@ -103,6 +106,7 @@ func loadConfig() (*Config, error) {
 	viper.SetDefault("port", ":8082")
 
 	viper.SetEnvPrefix("HOCKEY")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

@@ -7,26 +7,17 @@ How much work would it be to make this myself?
 The answer: it's only a few hours of _vibe coding_ to get to a working
 prototype. But then come all those details...
 
-Spark is a personal AI assistant. You store information about important (future)
-events in a local database. Spark sends this information to an AI API and
-compiles a summary of the events for you.
+Spark is a personal AI assistant. It gathers data from MCP servers (calendar,
+contacts, weather, reminders, ...), sends it to an AI provider together with
+your question, and returns an answer. You can use it from the command line, from
+Matrix, from mail, or through a small HTTP interface.
 
-The following summaries are currently pre-defined:
-
-- today: the summary for today and a quick look at tomorrow
-- week: a summary for the current week
-- full: a summary of all entries in scope (you can use command line flags to
-  determine the scope)
-
-You can also start a conversation with Spark, to ask it questions about your
-events.
-
-Spark supports Google Gemini, OpenAI ChatGPT, Ollama, and OpenCode. All backends
-use the OpenAI-compatible API format, making configuration simple.
+Spark supports Google Gemini natively and OpenAI, Ollama and OpenCode through
+their OpenAI-compatible APIs.
 
 ## Installation
 
-Install the binary:
+Install the CLI:
 
 ```bash
 go install github.com/jovandeginste/spark-personal-assistant/cmd/spark@latest
@@ -37,29 +28,44 @@ Create a configuration file. Take a look at
 
 ## Getting started
 
-Create a summary:
+Ask for a summary:
 
 ```bash
-spark print -f today
-spark print -f week
-spark print -f full
+spark print
+spark print --prompt "Find a free evening for a movie"
 ```
 
-## MCP server
+Start a conversation:
 
-Spark includes an MCP (Model Context Protocol) server that exposes your personal
-data (calendar, weather, planned meals) to LLMs.
+```bash
+spark chat
+```
+
+## MCP servers
+
+Spark includes two MCP (Model Context Protocol) servers:
+
+- `spark-mcp-assistant` — calendar, weather, contacts, reminders, web search,
+  and other personal data sources
+- `spark-mcp-hockey` — Drillster and Twizzit
 
 ### Installation
 
 ```bash
-go install github.com/jovandeginste/spark-personal-assistant/cmd/mcp@latest
+go install github.com/jovandeginste/spark-personal-assistant/cmd/spark-mcp-assistant@latest
+go install github.com/jovandeginste/spark-personal-assistant/cmd/spark-mcp-hockey@latest
 ```
 
 ### Configuration
 
-Create a `mcp-config.yaml` file (or use environment variables with `MCP_`
-prefix).
+Create a `mcp-config.yaml` file for the assistant, or `mcp-hockey.yaml` for the
+hockey server.
+
+Environment variables override the configuration file. Nested keys use
+underscores in the environment variable name:
+
+- assistant: `MCP_` prefix, e.g. `MCP_PORT`, `MCP_WEATHER_APIURL`
+- hockey: `HOCKEY_` prefix, e.g. `HOCKEY_PORT`
 
 ```yaml
 port: :8081
@@ -82,18 +88,16 @@ You can customize Spark's behavior by changing the configuration file.
 
 ### Pick your LLM
 
-Spark supports any provider that offers an OpenAI-compatible API.
+Gemini uses Google's native SDK; `base_url` is ignored for `type: gemini`.
+OpenAI, Ollama and OpenCode use their OpenAI-compatible endpoints.
 
 #### Gemini
-
-Uses Google's OpenAI-compatible endpoint.
 
 ```yaml
 llm:
   type: gemini
   model: gemini-2.0-flash-exp
   api_key: your-gemini-api-key
-  base_url: https://generativelanguage.googleapis.com/v1beta/openai/
 ```
 
 #### Ollama (Local)
@@ -154,6 +158,63 @@ llm:
   base_url: https://api.deepseek.com/v1/
 ```
 
+### Web server
+
+Spark can expose a small HTTP interface for prompts, persona changes and MCP
+updates. It listens on `127.0.0.1:8080` by default.
+
+Set a token before exposing it on another interface:
+
+```yaml
+webserver:
+  default:
+    enabled: true
+    bind: "127.0.0.1:8080"
+    token: change-me
+```
+
+Requests must then send either `Authorization: Bearer change-me` or
+`X-Auth-Token: change-me`.
+
+### Mail
+
+The `allowlist` restricts both incoming and outgoing mail. When it is empty,
+everyone is allowed.
+
+```yaml
+mail:
+  default:
+    enabled: true
+    imap:
+      host: imap.example.com
+      port: 993
+    smtp:
+      host: smtp.example.com
+      port: 587
+    username: user@example.com
+    password: secretpassword
+    folder: INBOX
+    use_tls: true
+    allowlist:
+      - sender@example.com
+```
+
+### Matrix
+
+```yaml
+matrix:
+  default:
+    homeserver: https://matrix.org
+    username: spark-bot
+    password: secretpassword
+    room_id: "!roomid:matrix.org"
+    database: ./matrix.db
+    crypto_passphrase: change-me
+```
+
+Set `crypto_passphrase` before creating a new crypto store. Existing stores
+created with the legacy passphrase keep working, but Spark logs a warning.
+
 ### Your names
 
 ```yaml
@@ -163,8 +224,8 @@ user_data:
     - Jane Doe (wife)
 ```
 
-This allows you to describe the members of your family, which will be used as
-extra context and for the greeting in the summary.
+This allows you to describe the members of your family, which is used as extra
+context in the prompt.
 
 ### Extra context
 
@@ -187,21 +248,22 @@ is probably supervising the exam instead of taking it.
 
 You can customize the behavior of the assistant by creating a custom persona.
 
-A number of alternative persona can be found in the [personas](./personas)
+A number of alternative personas can be found in the [personas](./personas)
 folder.
 
 ```yaml
 assistant:
-  file: ./persona/chuck.md
+  file: ./personas/chuck.md
   language: German
 ```
 
 ## Usage
 
-Ask for a summary:
+Ask for a summary, optionally with an extra prompt:
 
 ```bash
-spark print --format today --days-ahead 1 --days-back 1
+spark print
+spark print --prompt "Plan my week"
 ```
 
 Chat with Spark:
