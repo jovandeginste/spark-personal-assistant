@@ -7,7 +7,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 )
@@ -32,8 +31,8 @@ func TestGetWeatherInfo(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]geocoder.Result, error) {
-		return []geocoder.Result{
+	searchLocationsFunc = func(query string) ([]location, error) {
+		return []location{
 			{
 				Lat: "51.5",
 				Lon: "4.5",
@@ -63,8 +62,8 @@ func TestQueryFor_NoLocation(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]geocoder.Result, error) {
-		return []geocoder.Result{}, nil
+	searchLocationsFunc = func(query string) ([]location, error) {
+		return []location{}, nil
 	}
 
 	_, err := queryFor("Unknown")

@@ -10,7 +10,6 @@ import (
 	"github.com/google/go-querystring/query"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
-	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -36,9 +35,6 @@ var (
 		"cloud_cover",
 		"visibility",
 	}
-
-	// For testing
-	searchLocationsFunc = geocoder.SearchLocations
 )
 
 type Config struct {

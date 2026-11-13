@@ -18,7 +18,6 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/webfetcher"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/websearch"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcpserver"
-	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
 )
 
 type Config struct {
@@ -36,8 +35,6 @@ type Config struct {
 
 func main() {
 	logger := mcpserver.NewLogger("spark-mcp-assistant")
-
-	geocoder.SetClient(logger, "Spark")
 
 	config, err := loadConfig(logger)
 	if err != nil {

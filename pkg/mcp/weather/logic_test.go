@@ -4,8 +4,9 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/jovandeginste/workout-tracker/v2/pkg/geocoder"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestQueryFor(t *testing.T) {
@@ -16,14 +17,14 @@ func TestQueryFor(t *testing.T) {
 	tests := []struct {
 		name          string
 		location      string
-		mockResult    []geocoder.Result
+		mockResult    []location
 		mockError     error
 		expectedError string
 	}{
 		{
 			name:     "Valid Location",
 			location: "Amsterdam",
-			mockResult: []geocoder.Result{
+			mockResult: []location{
 				{Lat: "52.3676", Lon: "4.9041"},
 			},
 			mockError:     nil,
@@ -39,7 +40,7 @@ func TestQueryFor(t *testing.T) {
 		{
 			name:          "No Results",
 			location:      "Nowhere",
-			mockResult:    []geocoder.Result{},
+			mockResult:    []location{},
 			mockError:     nil,
 			expectedError: "no location found for \"Nowhere\"",
 		},
@@ -47,7 +48,7 @@ func TestQueryFor(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			searchLocationsFunc = func(query string) ([]geocoder.Result, error) {
+			searchLocationsFunc = func(query string) ([]location, error) {
 				return tt.mockResult, tt.mockError
 			}
 
@@ -64,6 +65,25 @@ func TestQueryFor(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSearchLocations(t *testing.T) {
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	var requested string
+
+	generic.GetBody = func(url string) ([]byte, error) {
+		requested = url
+
+		return []byte(`[{"lat":"52.3676","lon":"4.9041"}]`), nil
+	}
+
+	locations, err := searchLocations("Amsterdam")
+	require.NoError(t, err)
+	require.Len(t, locations, 1)
+	assert.Equal(t, "52.3676", locations[0].Lat)
+	assert.Contains(t, requested, "q=Amsterdam")
 }
 
 func TestEnabled(t *testing.T) {
@@ -103,8 +123,8 @@ func TestQueryForTimezone(t *testing.T) {
 	originalSearchLocations := searchLocationsFunc
 	defer func() { searchLocationsFunc = originalSearchLocations }()
 
-	searchLocationsFunc = func(query string) ([]geocoder.Result, error) {
-		return []geocoder.Result{{Lat: "40.7128", Lon: "-74.0060"}}, nil
+	searchLocationsFunc = func(query string) ([]location, error) {
+		return []location{{Lat: "40.7128", Lon: "-74.0060"}}, nil
 	}
 
 	params, err := queryFor("New York")
