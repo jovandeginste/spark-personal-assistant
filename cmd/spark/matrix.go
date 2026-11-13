@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"errors"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/ai"
 	"github.com/spf13/cobra"
@@ -15,6 +18,9 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 		Example: "spark matrix",
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+			defer stop()
+
 			aiClient, err := ai.NewClient(c.app.Config.LLM, &c.app.Config.Assistant, c.app.Logger())
 			if err != nil {
 				return err
@@ -40,10 +46,10 @@ func (c *cli) matrixChatCmd() *cobra.Command {
 				)
 
 				if wCfg, ok := mc.App.Config.Webserver[instanceName]; ok && wCfg.IsEnabled() {
-					mc.ServeHTTP(instanceName)
+					mc.ServeHTTP(ctx, instanceName)
 				}
 
-				if err := mc.Client.SyncWithContext(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+				if err := mc.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
 					c.app.Logger().Error("Failed to sync", "instance", instanceName, "error", err)
 				}
 

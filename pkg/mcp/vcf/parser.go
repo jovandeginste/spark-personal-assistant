@@ -38,10 +38,19 @@ type Date struct {
 }
 
 func (m *Module) loadContacts(path string) ([]Contact, error) {
-	// We'll use the cache to store the parsed contacts if possible,
-	// or just read the file directly since VCFs are usually local files.
-	// For simplicity, let's just read the file directly for now,
-	// but we could use the cache service if we were fetching from a URL.
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+
+	m.contactsMu.Lock()
+	if m.contacts != nil && m.contactsModTime.Equal(info.ModTime()) && m.contactsSize == info.Size() {
+		contacts := m.contacts
+		m.contactsMu.Unlock()
+
+		return contacts, nil
+	}
+	m.contactsMu.Unlock()
 
 	f, err := os.Open(path)
 	if err != nil {
@@ -49,7 +58,18 @@ func (m *Module) loadContacts(path string) ([]Contact, error) {
 	}
 	defer f.Close()
 
-	return parseVCF(f)
+	contacts, err := parseVCF(f)
+	if err != nil {
+		return nil, err
+	}
+
+	m.contactsMu.Lock()
+	m.contacts = contacts
+	m.contactsModTime = info.ModTime()
+	m.contactsSize = info.Size()
+	m.contactsMu.Unlock()
+
+	return contacts, nil
 }
 
 func parseVCF(r io.Reader) ([]Contact, error) {

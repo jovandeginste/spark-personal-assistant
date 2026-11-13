@@ -11,6 +11,7 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -37,11 +38,13 @@ type Event struct {
 
 type Module struct {
 	sparkmcp.BaseModule
+	Cache caching.Cache
 }
 
-func New(config Config, logger *slog.Logger) *Module {
+func New(config Config, cache caching.Cache, logger *slog.Logger) *Module {
 	module := &Module{
 		BaseModule: sparkmcp.NewBaseModule(config, logger),
+		Cache:      cache,
 	}
 	module.SetLogger(logger.With("module", "jsonreader"))
 	return module
@@ -123,25 +126,49 @@ func (m *Module) handleEventsByQuery(ctx context.Context, request *mcp.CallToolR
 
 func (m *Module) loadAllEvents(config Config) []Event {
 	var allEvents []Event
+
 	for _, source := range config.Sources {
-		data, err := generic.GetBody(source.URL)
-		if err != nil {
-			m.Logger().Warn("Failed to read source", "name", source.Name, "url", source.URL, "error", err)
-			continue
+		key := "jsonreader:" + source.URL
+
+		var (
+			data   []byte
+			cached bool
+		)
+
+		if m.Cache != nil {
+			data, cached = m.Cache.Get(key)
+		}
+
+		if !cached {
+			var err error
+
+			data, err = generic.GetBody(source.URL)
+			if err != nil {
+				m.Logger().Warn("Failed to read source", "name", source.Name, "url", source.URL, "error", err)
+
+				continue
+			}
 		}
 
 		var events []Event
 		if err := json.Unmarshal(data, &events); err != nil {
 			m.Logger().Warn("Failed to parse source json", "name", source.Name, "error", err)
+
 			continue
+		}
+
+		if !cached && m.Cache != nil {
+			m.Cache.Set(key, data)
 		}
 
 		// Tag with source name
 		for i := range events {
 			events[i].Source = source.Name
 		}
+
 		allEvents = append(allEvents, events...)
 	}
+
 	return allEvents
 }
 

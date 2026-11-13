@@ -11,8 +11,10 @@ import (
 	"github.com/jovandeginste/spark-personal-assistant/pkg/helpers/generic"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/humantime"
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/caching"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Mock data
@@ -183,7 +185,7 @@ func TestHandleEventsByDate(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	module := New(config, logger)
+	module := New(config, nil, logger)
 
 	// Test case: Find events in Jan 2026
 	params := dateParams{sparkmcp.DateRangeParams{
@@ -223,7 +225,7 @@ func TestHandleEventsByQuery(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	module := New(config, logger)
+	module := New(config, nil, logger)
 
 	// Test case: Find "Dinner"
 	params := queryParams{
@@ -261,8 +263,38 @@ func TestLoadAllEvents_ErrorHandling(t *testing.T) {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
-	module := New(config, logger)
+	module := New(config, nil, logger)
 
 	events := module.loadAllEvents(config)
 	assert.Empty(t, events)
+}
+
+func TestLoadAllEventsCachesSources(t *testing.T) {
+	cache, err := caching.NewService(t.TempDir(), time.Hour)
+	require.NoError(t, err)
+
+	originalGetBody := generic.GetBody
+	defer func() { generic.GetBody = originalGetBody }()
+
+	calls := 0
+	generic.GetBody = func(string) ([]byte, error) {
+		calls++
+
+		return mockEventsJSON, nil
+	}
+
+	config := Config{
+		Sources: []Source{
+			{Name: "Test Source", URL: "http://example.com/events.json"},
+		},
+	}
+
+	module := New(config, cache, slog.Default())
+
+	events := module.loadAllEvents(config)
+	require.Len(t, events, 3)
+
+	events = module.loadAllEvents(config)
+	require.Len(t, events, 3)
+	assert.Equal(t, 1, calls)
 }

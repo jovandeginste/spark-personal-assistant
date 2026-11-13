@@ -1,11 +1,15 @@
 package vcf
 
 import (
+	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseVCF(t *testing.T) {
@@ -215,4 +219,34 @@ func TestFindContactByName(t *testing.T) {
 		results := findContactByName(contacts, tt.query)
 		assert.Len(t, results, tt.expected, "Query: %s", tt.query)
 	}
+}
+
+func TestLoadContactsCache(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "contacts.vcf")
+	module := New(Config{Path: path}, slog.Default())
+
+	writeVCF := func(content string) {
+		t.Helper()
+
+		require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+	}
+
+	writeVCF("BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nEND:VCARD\n")
+
+	contacts, err := module.loadContacts(path)
+	require.NoError(t, err)
+	assert.Len(t, contacts, 1)
+
+	// The second call uses the cached result.
+	contacts, err = module.loadContacts(path)
+	require.NoError(t, err)
+	assert.Len(t, contacts, 1)
+
+	writeVCF("BEGIN:VCARD\nVERSION:3.0\nFN:John Doe\nEND:VCARD\nBEGIN:VCARD\nVERSION:3.0\nFN:Jane Doe\nEND:VCARD\n")
+	newTime := time.Now().Add(time.Second)
+	require.NoError(t, os.Chtimes(path, newTime, newTime))
+
+	contacts, err = module.loadContacts(path)
+	require.NoError(t, err)
+	assert.Len(t, contacts, 2)
 }

@@ -1,10 +1,10 @@
 package matrix
 
 import (
+	"context"
 	"errors"
-	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/web"
 	"github.com/labstack/echo/v4"
@@ -12,7 +12,7 @@ import (
 	slogecho "github.com/samber/slog-echo"
 )
 
-func (mc *MatrixConfig) ServeHTTP(instanceName string) {
+func (mc *MatrixConfig) ServeHTTP(ctx context.Context, instanceName string) {
 	// Echo instance
 	e := echo.New()
 
@@ -46,6 +46,17 @@ func (mc *MatrixConfig) ServeHTTP(instanceName string) {
 		}
 	}()
 
+	go func() {
+		<-ctx.Done()
+
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if err := e.Shutdown(shutdownCtx); err != nil {
+			mc.App.Logger().Error("failed to stop server", "error", err)
+		}
+	}()
+
 	mc.App.Logger().Info("HTTP server started", "bind", bind, "instance", instanceName)
 }
 
@@ -62,15 +73,8 @@ func (mc *MatrixConfig) prompt(c echo.Context) error {
 	return c.String(http.StatusOK, response)
 }
 
-type PromptPayload struct {
-	Title   string         `json:"title"`
-	Message string         `json:"message"`
-	Source  string         `json:"source"`
-	Extra   map[string]any `json:"extra"`
-}
-
 func (mc *MatrixConfig) postPrompt(c echo.Context) error {
-	var payload PromptPayload
+	var payload web.PromptPayload
 	if err := c.Bind(&payload); err != nil {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 	}
@@ -79,24 +83,9 @@ func (mc *MatrixConfig) postPrompt(c echo.Context) error {
 		return c.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
 	}
 
-	var prompt strings.Builder
-
-	prompt.WriteString(payload.Title + "\n\n" + payload.Message)
-	if payload.Source != "" {
-		prompt.WriteString("\n\nSource: " + payload.Source)
-	}
-
-	if len(payload.Extra) > 0 {
-		prompt.WriteString("\n\nExtra Metadata:\n")
-
-		for k, v := range payload.Extra {
-			prompt.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
-		}
-	}
-
 	mc.sendNotice(mc.DefaultRoomID(), "", "Parsing prompt from "+payload.Source+": "+payload.Title)
 
-	response, err := mc.calculateInputResponse(mc.DefaultRoomID(), "", "web", prompt.String())
+	response, err := mc.calculateInputResponse(mc.DefaultRoomID(), "", "web", payload.Format())
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, err)
 	}

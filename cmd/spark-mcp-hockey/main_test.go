@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/spf13/viper"
@@ -15,7 +16,7 @@ func TestLoadConfigEnvOverride(t *testing.T) {
 
 	t.Setenv("HOCKEY_PORT", ":9997")
 
-	config, err := loadConfig()
+	config, err := loadConfig(slog.Default())
 	require.NoError(t, err)
 	assert.Equal(t, ":9997", config.Port)
 }

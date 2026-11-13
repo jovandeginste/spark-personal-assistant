@@ -30,6 +30,8 @@ repository, not a historical snapshot.
   (`ical`, `vcf`, `weather`, `googlecontacts`, `jsonreader`, `webfetcher`,
   `websearch`, `reminders`, `recycleapp`, `drillster`, `twizzit`).
 - `pkg/mcp/caching/` — shared memory/file cache.
+- `pkg/mcpserver/` — shared MCP server bootstrap: logger, config loading,
+  module registration, HTTP server and graceful shutdown.
 - `pkg/helpers/generic/` — file/HTTP resource readers, including the
   public-address-only client used by webfetcher.
 - `pkg/helpers/safe/` — path containment checks.
@@ -103,8 +105,8 @@ golangci-lint. The lint workflow runs without `--fix`.
 - Modules implement `pkg/mcp.Module` and usually embed `pkg/mcp.BaseModule`.
 - Each module package provides `New`, `Register` and optionally `Enabled` and
   `Initialize`.
-- Both MCP servers expose a stateless streamable HTTP handler and register all
-  enabled modules per server instance.
+- Both MCP servers use `pkg/mcpserver` for config loading, logging, module
+  registration and graceful shutdown.
 - The assistant's `/update` endpoint clears the shared cache and triggers an
   iCal prefetch.
 

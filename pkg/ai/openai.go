@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/openai/openai-go"
 	"github.com/openai/openai-go/option"
@@ -20,21 +21,24 @@ type openaiClient struct {
 	assistant *AssistantConfig
 	logger    *slog.Logger
 	sessionID string
+
+	clientOnce sync.Once
+	client     openai.Client
 }
 
-func (c openaiClient) Logger() *slog.Logger {
+func (c *openaiClient) Logger() *slog.Logger {
 	return c.logger
 }
 
-func (c openaiClient) APIKey() string {
+func (c *openaiClient) APIKey() string {
 	return c.apiKey
 }
 
-func (c openaiClient) Model() string {
+func (c *openaiClient) Model() string {
 	return c.model
 }
 
-func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMessageParamUnion, error) {
+func (c *openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMessageParamUnion, error) {
 	prompt, err := p(c.assistant, data)
 	if err != nil {
 		return openai.ChatCompletionMessageParamUnion{}, err
@@ -51,7 +55,7 @@ func (c openaiClient) convertPrompt(p Prompt, data any) (openai.ChatCompletionMe
 	return openai.UserMessage(parts), nil
 }
 
-func (c openaiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
+func (c *openaiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
 	c.Logger().Info("Fetching result from AI...")
 
 	prompt, err := c.convertPrompt(PromptCustom, data)
@@ -82,7 +86,7 @@ func (c openaiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 	return "", errors.New("no response returned by AI")
 }
 
-func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
+func (c *openaiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
 	promptMsg, err := c.convertPrompt(PromptCustom, data)
@@ -161,22 +165,26 @@ func (c openaiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 	return "", errors.New("reached maximum iterations with tool calls")
 }
 
-func (c openaiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
+func (c *openaiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
 	return "", errors.New("not implemented")
 }
 
-func (c openaiClient) newOpenAIClient() openai.Client {
-	opts := []option.RequestOption{
-		option.WithAPIKey(c.APIKey()),
-	}
+func (c *openaiClient) newOpenAIClient() openai.Client {
+	c.clientOnce.Do(func() {
+		opts := []option.RequestOption{
+			option.WithAPIKey(c.APIKey()),
+		}
 
-	if c.baseURL != "" {
-		opts = append(opts, option.WithBaseURL(c.baseURL))
-	}
+		if c.baseURL != "" {
+			opts = append(opts, option.WithBaseURL(c.baseURL))
+		}
 
-	if c.sessionID != "" {
-		opts = append(opts, option.WithHeader("x-opencode-session", c.sessionID))
-	}
+		if c.sessionID != "" {
+			opts = append(opts, option.WithHeader("x-opencode-session", c.sessionID))
+		}
 
-	return openai.NewClient(opts...)
+		c.client = openai.NewClient(opts...)
+	})
+
+	return c.client
 }

@@ -55,7 +55,7 @@ func init() {
 	imap.CharsetReader = charset.Reader
 }
 
-func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) error {
+func ConnectAndIdle(ctx context.Context, cfg Config, msgChan chan<- Message, logger *slog.Logger) error {
 	addr := fmt.Sprintf("%s:%d", cfg.IMAP.Host, cfg.IMAP.Port)
 	var c *client.Client
 	var err error
@@ -104,6 +104,10 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 	c.Updates = updates
 
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
 		stop := make(chan struct{})
 		done := make(chan error, 1)
 
@@ -120,6 +124,11 @@ func ConnectAndIdle(cfg Config, msgChan chan<- Message, logger *slog.Logger) err
 			if err != nil {
 				return fmt.Errorf("idle disconnected: %w", err)
 			}
+		case <-ctx.Done():
+			close(stop)
+			<-done
+
+			return ctx.Err()
 		}
 	}
 }

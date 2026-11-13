@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -39,27 +39,32 @@ func (c *cli) routerCmd() *cobra.Command {
 
 			r := router.NewRouter(aiClient, c.app)
 
-			if err := c.startMatrixRouters(ctx, aiClient, r); err != nil {
+			var wg sync.WaitGroup
+
+			if err := c.startMatrixRouters(ctx, aiClient, r, &wg); err != nil {
 				return err
 			}
 
-			if err := c.startWebServers(r); err != nil {
+			if err := c.startWebServers(ctx, r, &wg); err != nil {
 				return err
 			}
 
-			if err := c.startMailRouters(ctx, r); err != nil {
+			if err := c.startMailRouters(ctx, r, &wg); err != nil {
 				return err
 			}
 
 			c.app.Logger().Info("Router started")
 			c.waitForShutdown()
 
+			cancel()
+			wg.Wait()
+
 			return nil
 		},
 	}
 }
 
-func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *router.Router) error {
+func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *router.Router, wg *sync.WaitGroup) error {
 	for instanceName, mCfg := range c.app.Config.Matrix {
 		if !mCfg.IsEnabled() {
 			c.app.Logger().Info("Matrix client is disabled in config", "instance", instanceName)
@@ -71,7 +76,11 @@ func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *rou
 			return err
 		}
 
+		wg.Add(1)
+
 		go func(client *matrix.MatrixConfig) {
+			defer wg.Done()
+
 			if err := client.Client.SyncWithContext(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				c.app.Logger().Error("Failed to sync matrix", "error", err)
 			}
@@ -81,7 +90,7 @@ func (c *cli) startMatrixRouters(ctx context.Context, aiClient ai.Client, r *rou
 	return nil
 }
 
-func (c *cli) startWebServers(r *router.Router) error {
+func (c *cli) startWebServers(ctx context.Context, r *router.Router, wg *sync.WaitGroup) error {
 	for instanceName, wCfg := range c.app.Config.Webserver {
 		if !wCfg.IsEnabled() {
 			c.app.Logger().Info("Web server is disabled in config", "instance", instanceName)
@@ -120,12 +129,7 @@ func (c *cli) startWebServers(r *router.Router) error {
 		})
 
 		e.POST("/prompt", func(ec echo.Context) error {
-			var payload struct {
-				Title   string         `json:"title"`
-				Message string         `json:"message"`
-				Source  string         `json:"source"`
-				Extra   map[string]any `json:"extra"`
-			}
+			var payload web.PromptPayload
 			if err := ec.Bind(&payload); err != nil {
 				return ec.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid JSON format"})
 			}
@@ -133,19 +137,7 @@ func (c *cli) startWebServers(r *router.Router) error {
 				return ec.JSON(http.StatusBadRequest, map[string]string{"error": "Title is required"})
 			}
 
-			var prompt strings.Builder
-			prompt.WriteString(payload.Title + "\n\n" + payload.Message)
-			if payload.Source != "" {
-				prompt.WriteString("\n\nSource: " + payload.Source)
-			}
-			if len(payload.Extra) > 0 {
-				prompt.WriteString("\n\nExtra Metadata:\n")
-				for k, v := range payload.Extra {
-					prompt.WriteString(fmt.Sprintf("- %s: %v\n", k, v))
-				}
-			}
-
-			return submitWebPrompt(ec, r, webAddrID, payload.Title, prompt.String())
+			return submitWebPrompt(ec, r, webAddrID, payload.Title, payload.Format())
 		})
 
 		bind := wCfg.Bind
@@ -158,12 +150,27 @@ func (c *cli) startWebServers(r *router.Router) error {
 				c.app.Logger().Error("failed to start web server", "error", err)
 			}
 		}(e, bind)
+
+		wg.Add(1)
+
+		go func(srv *echo.Echo) {
+			defer wg.Done()
+
+			<-ctx.Done()
+
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			if err := srv.Shutdown(shutdownCtx); err != nil {
+				c.app.Logger().Error("failed to stop web server", "error", err)
+			}
+		}(e)
 	}
 
 	return nil
 }
 
-func (c *cli) startMailRouters(ctx context.Context, r *router.Router) error {
+func (c *cli) startMailRouters(ctx context.Context, r *router.Router, wg *sync.WaitGroup) error {
 	for instanceName, mailCfg := range c.app.Config.Mail {
 		if !mailCfg.IsEnabled() {
 			c.app.Logger().Info("Mail client is disabled in config", "instance", instanceName)
@@ -193,7 +200,13 @@ func (c *cli) startMailRouters(ctx context.Context, r *router.Router) error {
 			return err
 		}
 
-		go c.runMailLoop(ctx, r, mc, mailAddrID, instanceName)
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+
+			c.runMailLoop(ctx, r, mc, mailAddrID, instanceName)
+		}()
 	}
 
 	return nil
@@ -201,6 +214,8 @@ func (c *cli) startMailRouters(ctx context.Context, r *router.Router) error {
 
 func (c *cli) runMailLoop(ctx context.Context, r *router.Router, cfg mail.Config, addrID, instName string) {
 	msgChan := make(chan mail.Message, 10)
+	defer close(msgChan)
+
 	go func() {
 		for msg := range msgChan {
 			c.app.Logger().Info("Received email via mail", "instance", instName, "subject", msg.Subject, "from", msg.From)
@@ -220,7 +235,7 @@ func (c *cli) runMailLoop(ctx context.Context, r *router.Router, cfg mail.Config
 	for {
 		c.app.Logger().Info("Starting Mail idle connection...", "instance", instName)
 
-		if err := mail.ConnectAndIdle(cfg, msgChan, c.app.Logger()); err != nil {
+		if err := mail.ConnectAndIdle(ctx, cfg, msgChan, c.app.Logger()); err != nil {
 			if ctx.Err() != nil {
 				return
 			}

@@ -9,6 +9,22 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPromptPayloadFormat(t *testing.T) {
+	payload := PromptPayload{
+		Title:   "Title",
+		Message: "Message",
+		Source:  "Source",
+		Extra:   map[string]any{"key": "value"},
+	}
+
+	expected := "Title\n\nMessage\n\nSource: Source\n\nExtra Metadata:\n- key: value\n"
+	assert.Equal(t, expected, payload.Format())
+
+	payload.Source = ""
+	payload.Extra = nil
+	assert.Equal(t, "Title\n\nMessage", payload.Format())
+}
+
 func TestTokenAuth(t *testing.T) {
 	tests := []struct {
 		name       string

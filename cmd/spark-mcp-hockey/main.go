@@ -1,18 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
-	"strings"
-	"time"
 
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/drillster"
 	"github.com/jovandeginste/spark-personal-assistant/pkg/mcp/twizzit"
-	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/spf13/viper"
+	"github.com/jovandeginste/spark-personal-assistant/pkg/mcpserver"
 )
 
 type Config struct {
@@ -22,15 +17,9 @@ type Config struct {
 }
 
 func main() {
-	lvl := new(slog.LevelVar)
-	lvl.Set(slog.LevelInfo)
-	if os.Getenv("DEBUG") != "" {
-		lvl.Set(slog.LevelDebug)
-	}
+	logger := mcpserver.NewLogger("spark-mcp-hockey")
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: lvl})).With("app", "spark-mcp-hockey")
-
-	config, err := loadConfig()
+	config, err := loadConfig(logger)
 	if err != nil {
 		logger.Error("failed to load configuration", "error", err)
 		os.Exit(1)
@@ -41,85 +30,34 @@ func main() {
 		twizzit.New(config.Twizzit, logger),
 	}
 
-	for _, module := range modules {
-		if err := module.Initialize(); err != nil {
-			logger.Error("failed to initialize module", "module", fmt.Sprintf("%T", module), "error", err)
-			continue
-		}
-	}
+	server := mcpserver.New("spark-mcp-hockey", "1.0.0", modules, logger)
 
-	streamableHandler := sdk.NewStreamableHTTPHandler(func(r *http.Request) *sdk.Server {
-		server := sdk.NewServer(&sdk.Implementation{
-			Name:    "spark-mcp-hockey",
-			Version: "1.0.0",
-		}, &sdk.ServerOptions{
-			Logger: logger,
-			Capabilities: &sdk.ServerCapabilities{
-				Tools: &sdk.ToolCapabilities{ListChanged: false},
-			},
-		})
-
-		for _, module := range modules {
-			if err := module.Enabled(); err != nil {
-				logger.Info("Module disabled", "module", fmt.Sprintf("%T", module), "reason", err)
-				continue
-			}
-
-			if err := module.Register(server); err != nil {
-				logger.Error("failed to register module", "module", fmt.Sprintf("%T", module), "error", err)
-				continue
-			}
-
-			logger.Info("Module registered", "module", fmt.Sprintf("%T", module))
-		}
-
-		return server
-	}, &sdk.StreamableHTTPOptions{
-		Stateless: true,
-	})
+	ctx, stop := mcpserver.SignalContext()
 
 	logger.Info("Starting server on " + config.Port)
 
-	mux := http.NewServeMux()
-	mux.Handle("/", streamableHandler)
+	err = server.Run(ctx, config.Port, nil)
 
-	server := &http.Server{
-		Addr:              config.Port,
-		Handler:           mux,
-		ReadHeaderTimeout: 3 * time.Second,
-	}
+	stop()
 
-	if err := server.ListenAndServe(); err != nil {
+	if err != nil {
 		logger.Error("Server failed", "error", err)
 		os.Exit(1)
 	}
 }
 
-func loadConfig() (*Config, error) {
-	viper.Reset()
+func loadConfig(logger *slog.Logger) (*Config, error) {
+	config := &Config{}
 
-	viper.SetConfigName("mcp-hockey")
-	viper.SetConfigType("yaml")
-	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME/.config/spark-mcp")
+	err := mcpserver.LoadConfig(mcpserver.ConfigOptions{
+		Name:      "mcp-hockey",
+		EnvPrefix: "HOCKEY",
+		Defaults: map[string]any{
+			"port": ":8082",
+		},
+		Target: config,
+		Logger: logger,
+	})
 
-	viper.SetDefault("port", ":8082")
-
-	viper.SetEnvPrefix("HOCKEY")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("error reading config file: %w", err)
-		}
-		slog.Info("No config file found, using defaults and environment variables")
-	}
-
-	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("unable to decode into struct: %w", err)
-	}
-
-	return &config, nil
+	return config, err
 }

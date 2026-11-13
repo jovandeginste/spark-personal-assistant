@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -21,12 +22,18 @@ type Config struct {
 	TokenFile string `mapstructure:"token_file"`
 }
 
+const contactsCacheTTL = 5 * time.Minute
+
 type Module struct {
 	sparkmcp.BaseModule
 
 	initOnce sync.Once
 	client   *http.Client
 	initErr  error
+
+	contactsMu      sync.Mutex
+	contacts        []*people.Person
+	contactsFetched time.Time
 }
 
 func New(config Config, logger *slog.Logger) *Module {
@@ -195,7 +202,7 @@ func (m *Module) searchContacts(ctx context.Context, query []string) (string, er
 
 	// If query is empty, list connections instead of searching
 	if len(query) == 0 {
-		return listConnections(ctx, srv)
+		return m.listConnections(ctx, srv)
 	}
 
 	// We'll collect results from all queries
@@ -240,8 +247,8 @@ func (m *Module) searchContacts(ctx context.Context, query []string) (string, er
 	return string(j), nil
 }
 
-func listConnections(ctx context.Context, srv *people.Service) (string, error) {
-	connections, err := fetchAllConnections(ctx, srv)
+func (m *Module) listConnections(ctx context.Context, srv *people.Service) (string, error) {
+	connections, err := m.allConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
@@ -256,6 +263,29 @@ func listConnections(ctx context.Context, srv *people.Service) (string, error) {
 	}
 
 	return string(j), nil
+}
+
+func (m *Module) allConnections(ctx context.Context, srv *people.Service) ([]*people.Person, error) {
+	m.contactsMu.Lock()
+	if m.contacts != nil && time.Since(m.contactsFetched) < contactsCacheTTL {
+		connections := m.contacts
+		m.contactsMu.Unlock()
+
+		return connections, nil
+	}
+	m.contactsMu.Unlock()
+
+	connections, err := fetchAllConnections(ctx, srv)
+	if err != nil {
+		return nil, err
+	}
+
+	m.contactsMu.Lock()
+	m.contacts = connections
+	m.contactsFetched = time.Now()
+	m.contactsMu.Unlock()
+
+	return connections, nil
 }
 
 func fetchAllConnections(ctx context.Context, srv *people.Service) ([]*people.Person, error) {
@@ -298,7 +328,7 @@ func (m *Module) searchContactsByDate(ctx context.Context, start, end string) (s
 		return "", fmt.Errorf("unable to retrieve people client: %w", err)
 	}
 
-	connections, err := fetchAllConnections(ctx, srv)
+	connections, err := m.allConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}
@@ -383,7 +413,7 @@ func (m *Module) searchContactsByLocation(ctx context.Context, params locationPa
 		return "", fmt.Errorf("unable to retrieve people client: %w", err)
 	}
 
-	connections, err := fetchAllConnections(ctx, srv)
+	connections, err := m.allConnections(ctx, srv)
 	if err != nil {
 		return "", fmt.Errorf("unable to list connections: %w", err)
 	}

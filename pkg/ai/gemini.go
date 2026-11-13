@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"google.golang.org/genai"
 )
@@ -21,21 +22,25 @@ type geminiClient struct {
 	model     string
 	assistant *AssistantConfig
 	logger    *slog.Logger
+
+	clientOnce sync.Once
+	client     *genai.Client
+	clientErr  error
 }
 
-func (c geminiClient) Logger() *slog.Logger {
+func (c *geminiClient) Logger() *slog.Logger {
 	return c.logger
 }
 
-func (c geminiClient) APIKey() string {
+func (c *geminiClient) APIKey() string {
 	return c.apiKey
 }
 
-func (c geminiClient) Model() string {
+func (c *geminiClient) Model() string {
 	return c.model
 }
 
-func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) {
+func (c *geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) {
 	prompt, err := p(c.assistant, data)
 	if err != nil {
 		return nil, err
@@ -52,7 +57,7 @@ func (c geminiClient) convertPrompt(p Prompt, data any) (*genai.Content, error) 
 	return genai.NewContentFromParts(parts, genai.RoleUser), nil
 }
 
-func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
+func (c *geminiClient) GeneratePrompt(ctx context.Context, data any) (string, error) {
 	c.Logger().Info("Fetching result from AI...")
 
 	prompt, err := c.convertPrompt(PromptCustom, data)
@@ -62,7 +67,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 
 	c.Logger().Info("Prompt", "prompt", prompt)
 
-	client, err := c.newGeminiClient(ctx)
+	client, err := c.newGeminiClient()
 	if err != nil {
 		return "", err
 	}
@@ -95,7 +100,7 @@ func (c geminiClient) GeneratePrompt(ctx context.Context, data any) (string, err
 	return "", nil
 }
 
-func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
+func (c *geminiClient) GenerateWithTools(ctx context.Context, data any, tools []Tool, executor ToolExecutor, fileURIs []string) (string, error) {
 	c.Logger().Info("Fetching result from AI with tools...")
 
 	promptContent, err := c.convertPrompt(PromptCustom, data)
@@ -103,7 +108,7 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 		return "", err
 	}
 
-	client, err := c.newGeminiClient(ctx)
+	client, err := c.newGeminiClient()
 	if err != nil {
 		return "", err
 	}
@@ -157,7 +162,7 @@ func (c geminiClient) GenerateWithTools(ctx context.Context, data any, tools []T
 	return "", errors.New("reached maximum iterations with tool calls")
 }
 
-func (c geminiClient) executeToolCalls(ctx context.Context, candidate *genai.Candidate, executor ToolExecutor) ([]*genai.Part, bool) {
+func (c *geminiClient) executeToolCalls(ctx context.Context, candidate *genai.Candidate, executor ToolExecutor) ([]*genai.Part, bool) {
 	hasToolCall := false
 	toolResponses := []*genai.Part{}
 
@@ -185,7 +190,7 @@ func (c geminiClient) executeToolCalls(ctx context.Context, candidate *genai.Can
 	return toolResponses, hasToolCall
 }
 
-func (c geminiClient) convertTools(tools []Tool) []*genai.Tool {
+func (c *geminiClient) convertTools(tools []Tool) []*genai.Tool {
 	genaiTools := make([]*genai.Tool, 0, len(tools))
 	for _, t := range tools {
 		schema := c.convertToolSchema(t)
@@ -203,7 +208,7 @@ func (c geminiClient) convertTools(tools []Tool) []*genai.Tool {
 	return genaiTools
 }
 
-func (c geminiClient) convertToolSchema(t Tool) *genai.Schema {
+func (c *geminiClient) convertToolSchema(t Tool) *genai.Schema {
 	if s, ok := t.InputSchema.(*genai.Schema); ok {
 		return s
 	}
@@ -282,8 +287,8 @@ func sanitizeSchema(data any) {
 	}
 }
 
-func (c geminiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
-	client, err := c.newGeminiClient(ctx)
+func (c *geminiClient) UploadFile(ctx context.Context, name string, content []byte, mimeType string) (string, error) {
+	client, err := c.newGeminiClient()
 	if err != nil {
 		return "", err
 	}
@@ -300,15 +305,19 @@ func (c geminiClient) UploadFile(ctx context.Context, name string, content []byt
 	return f.URI, nil
 }
 
-func (c geminiClient) newGeminiClient(ctx context.Context) (*genai.Client, error) {
-	attempts := int32(geminiRetryAttempts)
+func (c *geminiClient) newGeminiClient() (*genai.Client, error) {
+	c.clientOnce.Do(func() {
+		attempts := int32(geminiRetryAttempts)
 
-	return genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: c.apiKey,
-		HTTPOptions: genai.HTTPOptions{
-			RetryOptions: &genai.HTTPRetryOptions{
-				Attempts: &attempts,
+		c.client, c.clientErr = genai.NewClient(context.Background(), &genai.ClientConfig{
+			APIKey: c.apiKey,
+			HTTPOptions: genai.HTTPOptions{
+				RetryOptions: &genai.HTTPRetryOptions{
+					Attempts: &attempts,
+				},
 			},
-		},
+		})
 	})
+
+	return c.client, c.clientErr
 }

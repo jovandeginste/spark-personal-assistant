@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"sync"
 	"time"
 
 	sparkmcp "github.com/jovandeginste/spark-personal-assistant/pkg/mcp"
@@ -19,6 +20,11 @@ type Config struct {
 
 type Module struct {
 	sparkmcp.BaseModule
+
+	contactsMu      sync.Mutex
+	contacts        []Contact
+	contactsModTime time.Time
+	contactsSize    int64
 }
 
 func New(config Config, logger *slog.Logger) *Module {

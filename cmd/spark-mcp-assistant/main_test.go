@@ -19,7 +19,7 @@ func TestAllModules(t *testing.T) {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	cacheService, _ := caching.NewService(os.TempDir(), time.Hour)
 
-	modules := allModules(config, logger, cacheService)
+	modules, _ := allModules(config, logger, cacheService)
 
 	assert.NotEmpty(t, modules)
 	assert.Len(t, modules, 9)
@@ -44,7 +44,7 @@ weather:
 	defer os.Chdir(wd)
 	os.Chdir(tmpDir)
 
-	config, err := loadConfig()
+	config, err := loadConfig(slog.Default())
 	assert.NoError(t, err)
 	assert.Equal(t, ":9999", config.Port)
 	assert.Equal(t, "http://test-weather.com", config.Weather.APIURL)
@@ -58,7 +58,7 @@ func TestLoadConfigEnvOverride(t *testing.T) {
 	t.Setenv("MCP_PORT", ":9998")
 	t.Setenv("MCP_WEATHER_APIURL", "http://env-weather.example")
 
-	config, err := loadConfig()
+	config, err := loadConfig(slog.Default())
 	require.NoError(t, err)
 	assert.Equal(t, ":9998", config.Port)
 	assert.Equal(t, "http://env-weather.example", config.Weather.APIURL)

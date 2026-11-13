@@ -65,3 +65,53 @@ func TestGeneratePromptReturnsErrorAfterRetries(t *testing.T) {
 	_, err := c.GeneratePrompt(context.Background(), nil)
 	require.Error(t, err)
 }
+
+func TestGenerateWithToolsHandlesEmptyChoices(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"x","object":"chat.completion","created":0,"model":"m","choices":[]}`)
+	}))
+	defer server.Close()
+
+	c := openaiClient{
+		apiKey:    "test-key",
+		model:     "test-model",
+		baseURL:   server.URL + "/",
+		assistant: &AssistantConfig{Name: "TestAssistant"},
+		logger:    slog.Default(),
+	}
+
+	_, err := c.GenerateWithTools(context.Background(), nil, []Tool{{
+		Name:        "test",
+		InputSchema: map[string]any{"type": "object"},
+	}}, func(context.Context, string, map[string]any) (string, error) {
+		return "", nil
+	}, nil)
+
+	require.Error(t, err)
+}
+
+func TestGenerateWithToolsSkipsInvalidSchema(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"id":"x","object":"chat.completion","created":0,"model":"m","choices":[]}`)
+	}))
+	defer server.Close()
+
+	c := openaiClient{
+		apiKey:    "test-key",
+		model:     "test-model",
+		baseURL:   server.URL + "/",
+		assistant: &AssistantConfig{Name: "TestAssistant"},
+		logger:    slog.Default(),
+	}
+
+	_, err := c.GenerateWithTools(context.Background(), nil, []Tool{{
+		Name:        "test",
+		InputSchema: "not-a-schema",
+	}}, func(context.Context, string, map[string]any) (string, error) {
+		return "", nil
+	}, nil)
+
+	require.Error(t, err)
+}
