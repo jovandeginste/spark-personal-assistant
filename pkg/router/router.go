@@ -428,7 +428,10 @@ func (r *Router) routeToAI(ctx context.Context, msg Message) {
 	}
 
 	if err != nil {
-		r.app.Logger().Error("Failed to get AI response", "error", err)
+		if r.app != nil && r.app.Logger() != nil {
+			r.app.Logger().Error("Failed to get AI response", "error", err)
+		}
+
 		r.sendReply(ctx, replyTarget, "Sorry, I encountered an error processing your request.", msg.Metadata.Subject, msg.Metadata.Extra)
 		return
 	}

@@ -22,7 +22,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const mailRetryDelay = time.Minute
+const (
+	mailRetryDelay = time.Minute
+	// webRequestTimeout bounds a web prompt on the server side, independently
+	// of the client connection.
+	webRequestTimeout = 5 * time.Minute
+)
 
 func (c *cli) routerCmd() *cobra.Command {
 	return &cobra.Command{
@@ -280,7 +285,12 @@ func submitWebPrompt(ec echo.Context, r *router.Router, webAddrID, subject, cont
 	}
 	defer r.UnregisterAddress(replyAddr)
 
-	err = r.SubmitMessage(ec.Request().Context(), webAddrID, router.Message{
+	// Detach from the HTTP request context: a client or proxy disconnect must
+	// not abort the AI tool loop half-way.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ec.Request().Context()), webRequestTimeout)
+	defer cancel()
+
+	err = r.SubmitMessage(ctx, webAddrID, router.Message{
 		Metadata: router.Metadata{
 			From:    webAddrID,
 			To:      []string{"ai"},
@@ -298,7 +308,7 @@ func submitWebPrompt(ec echo.Context, r *router.Router, webAddrID, subject, cont
 	select {
 	case reply := <-respChan:
 		return ec.String(http.StatusOK, reply)
-	case <-time.After(60 * time.Second):
+	case <-ctx.Done():
 		return ec.JSON(http.StatusGatewayTimeout, map[string]string{"error": "timed out waiting for AI response"})
 	}
 }
